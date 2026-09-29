@@ -1,5 +1,9 @@
 # ADR 0003: Identity, hosting, and pilot budget
 
+> **Superseded in part by ADR 0005.** Its paid Render worker/data topology and
+> budget are historical. The initial pilot now uses only conditional free tiers
+> at EUR 0/month; Auth0 remains selected only if required features stay free.
+
 - **Status:** accepted for implementation; purchase requires owner approval
 - **Date:** 2026-09-29
 - **Decision owners:** product owner (contracts/spend) and technical owner

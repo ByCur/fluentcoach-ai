@@ -1,5 +1,9 @@
 # ADR 0004: Privacy, devices, and stack feasibility
 
+> **Amended by ADR 0005.** Application retention/device decisions remain. Its
+> OpenAI-specific provider-data analysis is historical for the initial pilot;
+> Gemini Free's model-improvement and human-review tradeoff now governs.
+
 - **Status:** accepted targets; real-data and physical-device gates remain
 - **Date:** 2026-09-29
 - **Decision owners:** product owner (learner/privacy facts) and technical owner
