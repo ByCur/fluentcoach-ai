@@ -1,9 +1,10 @@
 # FluentCoach AI
 
 FluentCoach is a strict TypeScript modular monolith for a private English-learning
-pilot. Milestone M01 supplies only the executable foundation: process shells,
-configuration, local data services, health checks, tests, and CI. It deliberately
-contains no authentication, learner records, tutoring, AI, or voice behavior.
+pilot. M00–M02 are complete: the repository records the architecture and
+feasibility decisions, provides the executable foundation and quality gates, and
+implements isolated learner identity plus Spanish-first onboarding. Tutoring, AI,
+and voice behavior remain later milestones.
 
 ## Prerequisites
 
@@ -96,3 +97,16 @@ Development uses the deterministic **synthetic** identity button; it is rejected
 An existing authenticated browser refreshes its CSRF value through `GET /api/v1/auth/csrf`; the opaque session ID remains only in the HttpOnly cookie.
 
 `db:migrate:test` recreates an isolated test schema from the committed Prisma migration SQL; deployment and Compose use controlled `prisma migrate deploy`. M02 checks are `pnpm db:migrate:test`, `pnpm test:integration:identity`, and `pnpm test:e2e:onboarding`. They use synthetic accounts and require local PostgreSQL/Redis, never Auth0 or Gemini credentials.
+
+## Codex workflows
+
+Repository-local skills keep milestone implementation and PR repair focused. Use
+these prompts, replacing the milestone or PR number when appropriate:
+
+**Milestone**
+
+> Implement M03 from PLAN.md. Use the fluentcoach-milestone skill. Prepare the PR and stop when all M03 gates pass. Do not merge.
+
+**PR fix**
+
+> Fix PR #N using the fluentcoach-pr-fix skill. Resolve review feedback and CI until green. Do not merge.
