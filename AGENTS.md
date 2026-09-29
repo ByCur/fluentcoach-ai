@@ -1,43 +1,43 @@
 # FluentCoach AI — Contributor rules
 
-## State and scope
+## Scope and context
 
-- Planning only: no application or validation commands are implemented yet.
-- Read `SPEC.md`, `PLAN.md` and `DOCUMENTATION.md` before implementation.
-- Work on the requested milestone; do not implement later scope speculatively.
+- Work only on the requested milestone or fix; do not start later milestones.
+- Search with `rg` and read targeted ranges. Locate the relevant `PLAN.md`
+  milestone, then read only applicable `SPEC.md`, ADR, and implementation sections.
 - Record material architecture changes in ADRs and update affected documents.
 
 ## Architecture and data
 
-- Follow the proposed strict TypeScript modular architecture once M00 confirms
-  it. Domain/application code must not import framework, ORM or provider SDKs.
-- Keep AI SDKs behind application-owned ports. Validate output schemas, evidence,
-  references and ownership before applying AI-generated proposals.
+- Keep the strict TypeScript modular architecture. Domain/application code must
+  not import frameworks, ORMs, infrastructure, or provider SDKs.
+- Keep AI SDKs behind application-owned ports. Validate schemas, evidence,
+  references, and ownership before applying AI proposals.
 - PostgreSQL is canonical learner state; Redis is delivery/cache infrastructure.
-- Scope queries, writes, streams and jobs to accounts; use database constraints
-  as well as application checks and test two-account isolation.
-- Make commands/worker effects idempotent; commit outbox with domain changes.
-  Never assume exactly-once delivery or external provider execution.
-- Version prompts, report schemas, taxonomy, review algorithms and job envelopes.
+- Scope all operations to accounts; enforce isolation in code and database
+  constraints, with deterministic two-account tests.
+- Make effects idempotent and commit outbox records with domain changes. Never
+  assume exactly-once delivery or provider execution.
+- Version prompts, report schemas, taxonomy, review algorithms, and job envelopes.
 
 ## Product and privacy
 
 - Preserve deferred Natural Conversation corrections and useful Teaching Mode
-  corrections after completed turns. Keep A1–B2 and Spanish help explicit.
-- Findings need evidence; do not claim certified CEFR or pronunciation from text.
-- No audio storage by default; never log learner content, prompts or secrets.
-  Keep AI keys server-side and media credentials scoped and short-lived.
-- Respect retention/deletion including in-flight work. No real-data pilot before
-  PLAN.md privacy and release gates.
+  corrections. Keep A1–B2 and Spanish help explicit.
+- Findings require evidence; never claim certified CEFR or pronunciation from text.
+- Store no audio by default. Never log learner content, prompts, or secrets; keep
+  AI keys server-side and media credentials scoped and short-lived.
+- Respect retention/deletion during in-flight work. Meet `PLAN.md` privacy and
+  release gates before any real-data pilot.
 
-## Delivery and checks
+## Delivery
 
-- Pin dependencies/runtime and commit the package-manager lockfile.
-- Use migrations; document compatibility and rollback limits.
-- Test invariants deterministically; use real PostgreSQL/Redis for transaction
-  and queue tests. Normal CI uses fake AI, not paid provider calls.
-- Run actual milestone checks; planned commands are not available until built.
-  Report skipped/failed checks without claiming completion.
+- Pin dependencies and runtimes; commit the package-manager lockfile.
+- Use migrations and document compatibility and rollback limits.
+- Test deterministically. Use real PostgreSQL/Redis for transaction and queue
+  tests; normal CI uses fake AI, not paid provider calls.
+- Run every requested milestone gate, fix failures, and never bypass tests.
+  Report skipped or failed checks without claiming completion.
 - Validate prompt/provider changes with versioned, cost-capped evaluations.
-- Keep setup and architecture docs current. Never commit secrets, real learner
-  fixtures, exports or unrelated scaffolding.
+- Keep setup, status, and architecture docs current. Never commit secrets, real
+  learner fixtures, exports, or unrelated scaffolding.

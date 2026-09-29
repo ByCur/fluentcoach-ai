@@ -96,3 +96,16 @@ Development uses the deterministic **synthetic** identity button; it is rejected
 An existing authenticated browser refreshes its CSRF value through `GET /api/v1/auth/csrf`; the opaque session ID remains only in the HttpOnly cookie.
 
 `db:migrate:test` recreates an isolated test schema from the committed Prisma migration SQL; deployment and Compose use controlled `prisma migrate deploy`. M02 checks are `pnpm db:migrate:test`, `pnpm test:integration:identity`, and `pnpm test:e2e:onboarding`. They use synthetic accounts and require local PostgreSQL/Redis, never Auth0 or Gemini credentials.
+
+## Codex workflows
+
+Repository-local skills keep milestone implementation and PR repair focused. Use
+these prompts, replacing the milestone or PR number when appropriate:
+
+**Milestone**
+
+> Implement M03 from PLAN.md. Use the fluentcoach-milestone skill. Prepare the PR and stop when all M03 gates pass. Do not merge.
+
+**PR fix**
+
+> Fix PR #N using the fluentcoach-pr-fix skill. Resolve review feedback and CI until green. Do not merge.
