@@ -12,4 +12,11 @@ describe('container smoke contract', () => {
     for (const file of ['Dockerfile', 'infra/nginx.conf', '.dockerignore', '.env.example']) accessSync(file, constants.R_OK);
     expect(readFileSync('.dockerignore', 'utf8')).toContain('.env');
   });
+
+  it('copies the built worker workspace into the worker runtime image', () => {
+    const dockerfile = readFileSync('Dockerfile', 'utf8');
+    const workerStage = dockerfile.slice(dockerfile.indexOf('FROM api AS worker'), dockerfile.indexOf('FROM nginx:'));
+    expect(workerStage).toContain('COPY --from=build --chown=node:node /app/apps/worker ./apps/worker');
+    expect(workerStage).toContain('CMD ["node", "apps/worker/dist/main.js"]');
+  });
 });

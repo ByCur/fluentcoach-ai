@@ -18,6 +18,7 @@ EXPOSE 3000
 CMD ["node", "apps/api/dist/main.js"]
 
 FROM api AS worker
+COPY --from=build --chown=node:node /app/apps/worker ./apps/worker
 EXPOSE 3001
 CMD ["node", "apps/worker/dist/main.js"]
 
