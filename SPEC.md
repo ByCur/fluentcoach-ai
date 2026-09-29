@@ -50,8 +50,8 @@ choices in future `docs/adr/` decision records.
 | Practice goal | Editable default of 10 minutes, three days/week | Validate in M02 |
 | Correction timing | Natural: after session; Teaching: after completed turns | Script review M03, live review M05/M06 |
 | Stack | M01 pins Node 20.20.x, pnpm, strict TypeScript, React/Vite, NestJS, PostgreSQL and Redis; Prisma/BullMQ when owned by later milestones | M00 compatibility resolved; review runtime support before production |
-| AI vendor/model | Gemini Developer API Free: configurable `gemini-2.5-flash` text/analysis and `gemini-2.5-flash-native-audio-preview-09-2025` Live candidate; deterministic fake; OpenAI optional future only | Re-check current free models/terms at M05/M06; preview lifecycle is a risk |
-| Voice transport | Gemini Live direct browser WebSocket using API-minted ephemeral token if verified safe; otherwise minimum secure API relay; text fallback | M06 must prove free-tier support, key safety, authority and target devices |
+| AI vendor/model | Gemini Developer API Free: configurable `gemini-3.8-flash` text/analysis and `gemini-3.8-live` Live candidate; deterministic fake; OpenAI optional future only | Re-check current free models/terms at M05/M06; model lifecycle is a risk |
+| Voice transport | Gemini Live direct browser WebSocket using API-minted ephemeral token if verified safe; otherwise minimum secure API WebSocket relay; text fallback | M06 must prove free-tier support, key safety, authority and target devices |
 | Identity | Auth0 EU OIDC tenant, closed sign-up, secure server sessions | M00 resolved; plan/DPA configuration gates real access |
 | Hosting | Render Static Site Free + one cold-starting Free API; Neon PostgreSQL Free; Upstash Redis/QStash Free; no deployed worker | M11 must re-check every free tier and refuse billing-required configuration |
 | Load/cost | One invited learner; `BILLING_MODE=free_only`; EUR 0/month; exhaustion fails closed; no paid fallback | Re-check limits/terms before deployment; any future spend requires owner approval and a new ADR |

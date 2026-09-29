@@ -12,8 +12,8 @@ foundation tests. Product behavior and persistence remain intentionally absent.
 ADR 0005 selects a strict **EUR 0/month** pilot: Render Static Site Free,
 Render Free Web Service, Neon PostgreSQL Free, Upstash Redis Free, Upstash QStash
 Free, conditional Auth0 Free, and Gemini Developer API Free. Configurable
-`gemini-2.5-flash` (text/analysis) and
-`gemini-2.5-flash-native-audio-preview-09-2025` (Live native audio) are candidates;
+`gemini-3.8-flash` (text/analysis) and
+`gemini-3.8-live` (Live native audio) are candidates;
 the deterministic fake remains normal development/CI. OpenAI and a dedicated
 BullMQ worker are future non-default alternatives. No provider or hosting resource
 has been provisioned, billing enabled, payment method supplied, or secret added.
@@ -52,12 +52,13 @@ Trace behavior to SPEC.md requirements and update documents when decisions chang
   Render's 750 hours/cold starts, Neon compute/storage, Upstash Redis/QStash,
   Auth0 feature/MAU and model-specific Gemini limits all require dated re-checks.
 - Target devices remain modern iPhone/iPad Safari, Android Chrome and desktop
-  Chrome/Edge. M06 owns physical validation and preview-model lifecycle evidence.
+  Chrome/Edge. M06 owns physical validation and model-lifecycle evidence.
 
 M00's network research command was blocked by the execution proxy (HTTP 403), and
-no credentials were available. Accordingly, the credentialed synthetic WebRTC,
-structured-output procedure in ADR 0002 must run at the M05 entry gate and the
-WebRTC latency/cost procedure must run at the M06 entry gate;
+no credentials were available. Accordingly, the credentialed synthetic
+structured-output procedure must run at the M05 entry gate, and the Gemini Live
+browser-WebSocket/secure-relay latency and quota procedure must run at the M06
+entry gate;
 provider/privacy terms must be verified before any real learner data. These
 limitations do not block M02's synthetic account/profile implementation.
 

@@ -117,9 +117,9 @@ strict EUR 0/month release gate.
 - **Scope:** One real conversation/analyzer adapter, versioned prompts/schema,
   validation/evidence checks, deadlines/cancellation, budgets, report UI and retry.
 - **Entry gate:** With synthetic content and an owner-approved free-tier
-  credential, verify current Gemini Free models/limits/data terms, valid/invalid
-  structured output, application evidence rejection, reported usage and latency.
-  Record the model,
+  credential, verify `gemini-3.8-flash` remains a current Free-Tier candidate,
+  verify its limits/data terms and valid/invalid structured output, and exercise
+  application evidence rejection, reported usage and latency. Record the model,
   prompt and schema versions; do not treat the M00 desk assessment as this test.
 - **Acceptance criteria:** Reports cite actual learner turns; invalid evidence
   rejected; modes/help pass live rubric; provider failures are visible/recoverable;
@@ -137,10 +137,11 @@ strict EUR 0/month release gate.
 
 - **Objective:** Usable spoken practice on agreed devices.
 - **Entry gate:** Run the ADR 0005 Gemini Live spike with synthetic speech: verify
-  current free native-audio model, ephemeral-token scope/expiry and supported
-  browser architecture, or measure the minimum secure API relay; verify event
-  authority, interruption, reconnect, latency and quota behavior. Failure leaves
-  voice unavailable with text fallback; it never permits key exposure or spend.
+  `gemini-3.8-live` remains a current Free-Tier Live candidate, ephemeral-token
+  scope/expiry and the direct browser WebSocket architecture, or measure the
+  minimum secure API WebSocket relay; verify event authority, interruption,
+  reconnect, latency and quota behavior. Failure leaves voice unavailable with
+  text fallback; it never permits key exposure or spend.
 - **Scope:** Chosen voice transport/adapter, scoped credentials, microphone,
   captions/playback, mute/stop/interruption, reconnect, authoritative event
   normalization, text fallback and server-enforced session limits.

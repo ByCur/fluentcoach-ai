@@ -69,13 +69,13 @@ is required. Otherwise M02 stops and records a replacement decision.
 ## AI and realtime voice
 
 The first production adapter is the **Gemini Developer API free tier**. Current
-candidates are configurable `gemini-2.5-flash` for text tutoring and structured
-post-session analysis, and `gemini-2.5-flash-native-audio-preview-09-2025` for
-Gemini Live native-audio conversation. Identifiers belong in runtime adapter
+candidates are configurable `gemini-3.8-flash` for text tutoring and structured
+post-session analysis, and `gemini-3.8-live` for native-audio Gemini Live
+conversation. Identifiers belong in runtime adapter
 configuration, never the domain. M05/M06 must reselect a current, officially
-supported free-tier model if either is retired. Preview Live models have an
-especially unpredictable lifecycle and can change behavior, quotas, availability
-or terms; promotion requires a dated compatibility/device evaluation.
+supported free-tier model if either is retired. Live models can have a short,
+unpredictable lifecycle and can change behavior, quotas, availability or terms;
+promotion requires a dated compatibility/device evaluation.
 
 The deterministic fake remains the development/CI default. An OpenAI adapter is
 an optional future provider only: it is neither required nor an automatic
@@ -128,7 +128,7 @@ stays disabled; a paid tier is not an automatic remedy under this ADR.
 | Upstash Redis Free | Planning snapshot: one free database, 256 MB and 500,000 commands/month; request, bandwidth, record and connection limits apply. | Drop cache/delivery acceleration, re-authenticate if needed, and rebuild from PostgreSQL. |
 | Upstash QStash Free | Planning snapshot: 1,000 messages/day with free schedule/log/retention limits; delivery is at least once. | Keep outbox/analysis `pending`, display pending, and reconcile later; never run a paid worker. |
 | Auth0 Free | Planning snapshot: up to 25,000 MAU with limited organizations/features/support; custom domains and some security/branding are paid. One invited user is intended. | Block onboarding if the secure invitation/session flow is not free; never depend on a trial. |
-| Gemini Developer API Free | Eligibility and rate limits vary by model/project and appear in official rate-limit documentation/AI Studio; capacity is not guaranteed. Candidate limits must be recorded at M05/M06 because preview Live/text limits change. Free-tier content has the data-use tradeoff above. | A quota/429 prevents a new AI session. Voice failure offers text only if independently available. Never switch to paid/OpenAI. |
+| Gemini Developer API Free | Eligibility and rate limits vary by model/project and appear in official rate-limit documentation/AI Studio; capacity is not guaranteed. Candidate limits must be recorded at M05/M06 because Live/text limits change. Free-tier content has the data-use tradeoff above. | A quota/429 prevents a new AI session. Voice failure offers text only if independently available. Never switch to paid/OpenAI. |
 
 These numbers could not be independently fetched in this environment: an
 attempt on 2026-09-29 to `curl -L --max-time 30` each official service page was
@@ -170,7 +170,7 @@ No milestone is implemented here. M02 verifies Auth0 Free and records the
 provider disclosure/consent. M04 targets transport-neutral job ports, QStash API
 invocations and PostgreSQL reconciliation rather than a deployed BullMQ worker.
 M05 uses Gemini Free and evaluations that cannot incur charges. M06 spikes Gemini
-Live ephemeral tokens/relay, preview lifecycle and text fallback; inability to
+Live ephemeral tokens/relay, model lifecycle and text fallback; inability to
 deliver secure zero-cost voice blocks the pilot. M10 validates
 the disclosure/deletion boundary. M11 re-verifies every plan, deploys no worker,
 proves cold-start/pending/recovery behavior and refuses billing-required resources.
