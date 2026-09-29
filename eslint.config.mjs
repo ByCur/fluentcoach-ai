@@ -19,5 +19,5 @@ export default tseslint.config(
     languageOptions: { ...config.languageOptions, parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } }
   })),
   { files: ['packages/domain/**/*.{ts,tsx}', 'packages/application/**/*.{ts,tsx}'], rules: architectureRules },
-  { files: ['**/*.test.ts'], rules: { '@typescript-eslint/no-unsafe-assignment': 'off', '@typescript-eslint/no-unsafe-member-access': 'off' } }
+  { files: ['**/*.test.ts'], rules: { '@typescript-eslint/no-unsafe-assignment': 'off', '@typescript-eslint/no-unsafe-member-access': 'off', '@typescript-eslint/no-unsafe-call': 'off', '@typescript-eslint/no-unsafe-argument': 'off' } }
 );

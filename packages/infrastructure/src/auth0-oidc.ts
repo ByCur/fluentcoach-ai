@@ -1,0 +1,14 @@
+import { randomBytes,createHash } from 'node:crypto';
+import { createRemoteJWKSet,jwtVerify } from 'jose';
+import { createClient,type RedisClientType } from 'redis';
+import type { OidcIdentity,OidcProvider } from '@fluentcoach/application';
+type Transaction={verifier:string;nonce:string};
+export interface Auth0OidcConfig { issuer:string;clientId:string;clientSecret:string;callbackUrl:string;audience:string;redisUrl:string }
+const random=()=>randomBytes(32).toString('base64url');
+export class Auth0OidcAdapter implements OidcProvider {
+ private readonly redis:RedisClientType; private readonly issuer:URL;
+ constructor(private readonly config:Auth0OidcConfig){this.issuer=new URL(config.issuer.endsWith('/')?config.issuer:`${config.issuer}/`);this.redis=createClient({url:config.redisUrl});}
+ private async ready(){if(!this.redis.isOpen)await this.redis.connect();}
+ async begin(){const state=random(),nonce=random(),verifier=random();await this.ready();await this.redis.set(`oidc:${state}`,JSON.stringify({verifier,nonce} satisfies Transaction),{EX:600,NX:true});const challenge=createHash('sha256').update(verifier).digest('base64url');const url=new URL('authorize',this.issuer);url.search=new URLSearchParams({response_type:'code',client_id:this.config.clientId,redirect_uri:this.config.callbackUrl,scope:'openid profile email',audience:this.config.audience,state,nonce,code_challenge:challenge,code_challenge_method:'S256'}).toString();return{authorizationUrl:url.toString(),state};}
+ async callback(input:{code:string;state:string}):Promise<OidcIdentity>{await this.ready();const key=`oidc:${input.state}`,raw=await this.redis.getDel(key);if(!raw)throw new Error('OIDC_STATE_INVALID');const transaction=JSON.parse(raw) as Transaction;const response=await fetch(new URL('oauth/token',this.issuer),{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',client_id:this.config.clientId,client_secret:this.config.clientSecret,code:input.code,redirect_uri:this.config.callbackUrl,code_verifier:transaction.verifier})});if(!response.ok)throw new Error('OIDC_TOKEN_EXCHANGE_FAILED');const tokens=await response.json() as{ id_token?:string;access_token?:string };if(!tokens.id_token||!tokens.access_token)throw new Error('OIDC_ID_TOKEN_MISSING');await jwtVerify(tokens.access_token,createRemoteJWKSet(new URL('.well-known/jwks.json',this.issuer)),{issuer:this.issuer.toString(),audience:this.config.audience});const verified=await jwtVerify(tokens.id_token,createRemoteJWKSet(new URL('.well-known/jwks.json',this.issuer)),{issuer:this.issuer.toString(),audience:this.config.clientId});if(verified.payload.nonce!==transaction.nonce||!verified.payload.sub)throw new Error('OIDC_TOKEN_INVALID');return{issuer:this.issuer.toString(),subject:verified.payload.sub};}
+}

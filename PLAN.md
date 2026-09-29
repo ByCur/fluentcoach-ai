@@ -65,6 +65,8 @@ strict EUR 0/month release gate.
 
 ## M02 — Identity and learner setup
 
+**Status: implementation and PostgreSQL/browser gates pass locally (2026-09-29), but M02 is not marked complete until the required Docker Compose gate runs in a daemon-capable environment. Auth0 Free tenant provisioning remains a later deployment gate recorded in ADR 0006.**
+
 - **Objective:** Persist an isolated learner profile.
 - **Scope:** Invitation-only OIDC, secure server sessions, profile/goal/consent
   entities and migrations, Spanish-first onboarding, A1–B2/timezone preferences,

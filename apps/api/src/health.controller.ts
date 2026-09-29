@@ -1,7 +1,7 @@
 import { Controller, Get, HttpCode, Inject, Optional, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { HealthResponse } from '@fluentcoach/contracts';
-import { dependenciesReady, probeTcpUrl, type DependencyProbe } from '@fluentcoach/infrastructure';
+import { dependenciesReady, probeTcpUrl, schemaReady, type DependencyProbe } from '@fluentcoach/infrastructure';
 
 export const READINESS_PROBES = Symbol('READINESS_PROBES');
 
@@ -12,7 +12,8 @@ export class HealthController {
   constructor(@Optional() @Inject(READINESS_PROBES) probes?: readonly DependencyProbe[]) {
     this.probes = probes ?? [
       async () => await probeTcpUrl(process.env['DATABASE_URL'] ?? ''),
-      async () => await probeTcpUrl(process.env['REDIS_URL'] ?? '')
+      async () => await probeTcpUrl(process.env['REDIS_URL'] ?? ''),
+      schemaReady
     ];
   }
 

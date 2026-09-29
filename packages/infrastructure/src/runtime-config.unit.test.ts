@@ -18,6 +18,15 @@ describe('server configuration', () => {
     }
   });
 
+  it('rejects billable modes', () => {
+    expect(() => loadServerConfig({ ...valid, BILLING_MODE: 'paid' })).toThrow('BILLING_MODE');
+  });
+
+  it('requires the complete OIDC boundary in production', () => {
+    expect(() => loadServerConfig({ ...valid, NODE_ENV: 'production' })).toThrow('OIDC_ISSUER');
+    expect(loadServerConfig({ ...valid, NODE_ENV: 'production', OIDC_ISSUER: 'https://tenant.eu.auth0.com/', OIDC_CLIENT_ID: 'client', OIDC_CLIENT_SECRET: 'synthetic-secret', OIDC_AUDIENCE: 'https://api.fluentcoach.invalid', OIDC_CALLBACK_URL: 'https://app.invalid/api/v1/auth/callback', OIDC_LOGOUT_URL: 'https://app.invalid/' })).toMatchObject({ BILLING_MODE: 'free_only' });
+  });
+
   it('rejects ports outside the TCP range', () => {
     expect(() => loadServerConfig({ ...valid, API_PORT: '70000' })).toThrow('API_PORT');
   });

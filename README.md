@@ -61,9 +61,7 @@ corepack pnpm test:smoke
 
 `test:smoke` verifies the container contract; after `docker compose up --wait`,
 Compose additionally executes each runtime health check. Liveness only indicates
-a running process. Readiness returns HTTP 503 until PostgreSQL and Redis can be
-reached. No database schema exists in M01; Prisma migrations begin with the first
-owned entities, so there is no placeholder/destructive migration command.
+a running process. Readiness returns HTTP 503 until PostgreSQL, Redis, and the committed M02 Prisma migration are compatible. Compose waits for PostgreSQL, runs a one-shot `prisma migrate deploy`, then starts the API. Request handlers never create schema.
 
 ## Repository boundaries
 
@@ -82,3 +80,19 @@ Only non-secret browser settings may use Vite's `VITE_` prefix. Server URLs and
 future credentials must remain server-side. Validation errors name invalid fields
 without printing values, URLs, passwords, or tokens. Do not commit `.env`, learner
 content, provider prompts, exports, credentials, or real-data fixtures.
+
+## M02 identity and onboarding
+
+M02 adds PostgreSQL/Prisma learner state and a Spanish-first onboarding flow. Start PostgreSQL and Redis, apply the migration, then run API and web:
+
+```bash
+cp .env.example .env
+pnpm db:migrate:dev
+pnpm dev
+```
+
+Development uses the deterministic **synthetic** identity button; it is rejected when `NODE_ENV=production`. No password is implemented. Production uses the Auth0 Free manual-user design in ADR 0006: public signup disabled, Authorization Code + PKCE, exact callback/logout URLs, server-side token validation, and no Organizations feature. Tenant provisioning and live callback verification remain deployment gates. Sessions are opaque and server-side in Redis; browser state contains only an HttpOnly cookie. `BILLING_MODE=free_only` is the only accepted value.
+
+An existing authenticated browser refreshes its CSRF value through `GET /api/v1/auth/csrf`; the opaque session ID remains only in the HttpOnly cookie.
+
+`db:migrate:test` recreates an isolated test schema from the committed Prisma migration SQL; deployment and Compose use controlled `prisma migrate deploy`. M02 checks are `pnpm db:migrate:test`, `pnpm test:integration:identity`, and `pnpm test:e2e:onboarding`. They use synthetic accounts and require local PostgreSQL/Redis, never Auth0 or Gemini credentials.

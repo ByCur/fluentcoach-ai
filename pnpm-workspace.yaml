@@ -5,3 +5,5 @@ packages:
 onlyBuiltDependencies:
   - '@nestjs/core'
   - esbuild
+  - '@prisma/engines'
+  - prisma

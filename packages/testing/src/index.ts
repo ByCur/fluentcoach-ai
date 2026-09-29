@@ -1,2 +1,2 @@
-/** Synthetic test helpers only; real learner data must never be added here. */
-export const syntheticFixtureMarker = 'synthetic' as const;
+import type { OidcProvider } from '@fluentcoach/application';
+export class FakeOidcProvider implements OidcProvider { begin(){return Promise.resolve({authorizationUrl:'https://synthetic.invalid/authorize',state:'synthetic-state'})} callback(){return Promise.resolve({issuer:'https://synthetic.invalid/',subject:'oidc-learner'})} }
