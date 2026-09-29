@@ -2,10 +2,18 @@
 
 ## Status and document map
 
-Milestone M01 is implemented. The repository now has pinned executable tooling,
+M00 architecture/decisions and M01 are complete; M00 live feasibility is formally
+deferred to M05/M06 entry gates. The repository has pinned executable tooling,
 web/API/worker shells, PostgreSQL and Redis development services, validated
 server configuration, health/readiness endpoints, container builds, CI, and
 foundation tests. Product behavior and persistence remain intentionally absent.
+
+M00 selected configurable OpenAI Responses/`gpt-5.6-terra` as the quality-first
+text candidate and `gpt-realtime-2.1-mini` as the cost-efficient voice candidate,
+behind application ports and a deterministic fake. It selected browser-to-provider
+WebRTC with an API sideband, Auth0 EU OIDC, and Render Frankfurt. ADRs 0002–0004
+contain the rationale, diagrams, privacy/device limits, budget, evidence and
+live-validation gates. No provider or hosting resource has been provisioned.
 
 - `SPEC.md`: requirements, decisions, architecture and data model.
 - `PLAN.md`: milestone scope, acceptance and validation gates.
@@ -18,6 +26,34 @@ foundation tests. Product behavior and persistence remain intentionally absent.
 Deliver one coherent milestone slice per review. Product rules belong in pure
 domain/application code, transport in apps, SDK/ORM dependencies in adapters.
 Trace behavior to SPEC.md requirements and update documents when decisions change.
+
+## M00 operational envelope
+
+- Normal development/CI uses deterministic synthetic AI and costs $0. Paid text
+  evaluations are capped at $10/run, voice spikes at $5/run, and all require
+  owner approval. Development AI has a $20/month provider ceiling.
+- The one-user pilot estimate is $30/month fixed infrastructure plus $6/month AI.
+  Enforce a $10/month application AI stop and a $50/month total approval ceiling;
+  re-quote every service before purchase.
+- Voice sessions are initially capped at 15 minutes. Short-lived browser material
+  and the API sideband replace exposure of a standard provider key. Text remains
+  available when voice permission, connection, reconnect, or compatibility fails.
+- Target devices are modern iPhone/iPad Safari, Android Chrome and desktop
+  Chrome/Edge. This is not physical validation; M06 owns the recorded device run.
+- Store no audio by default. Application transcripts/reports target 90 days;
+  provider retention, EU processing, DPAs, learner adulthood/consent, actual
+  devices and backup/deletion behavior remain real-data release gates.
+- Send ordinary Responses tutoring and analysis requests with `store: false`.
+  This disables provider-side response-state storage; it neither changes the
+  application's retention policy nor by itself eliminates provider abuse-monitoring
+  retention. ZDR/MAM eligibility remains a separately verified pilot gate.
+
+M00's network research command was blocked by the execution proxy (HTTP 403), and
+no credentials were available. Accordingly, the credentialed synthetic WebRTC,
+structured-output procedure in ADR 0002 must run at the M05 entry gate and the
+WebRTC latency/cost procedure must run at the M06 entry gate;
+provider/privacy terms must be verified before any real learner data. These
+limitations do not block M02's synthetic account/profile implementation.
 
 M01 pins a supported Node.js release and pnpm after compatibility checks, commits
 the lockfile, and adds Docker Compose for web/API/worker/PostgreSQL/Redis. Provide

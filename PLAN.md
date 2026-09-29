@@ -21,18 +21,25 @@ decision gates before their affected work, especially real learner access.
 
 ## M00 — Decisions and feasibility
 
+**Status: architecture/decision complete (2026-09-29); live feasibility
+validation deferred.** Architecture decisions are recorded in ADRs 0002–0004.
+Credentialed provider behavior and physical-device feasibility are now formally
+M05/M06 entry gates; contracts and paid deployment remain later release gates.
+
 - **Objective:** Resolve decisions that could invalidate implementation.
 - **Scope:** Learner/device/age assumptions, budget, identity/hosting selection,
-  stack compatibility; synthetic voice and structured-output feasibility spike;
-  ADRs for transport, provider capabilities, retention and deployment.
+  stack compatibility, desk-based provider feasibility assessment, and ADRs for
+  transport, provider capabilities, retention and deployment.
 - **Acceptance criteria:** Named initial provider/transport and fallback with
-  evidence; device matrix and budget limits; decision owners recorded; no
-  real-data use with unresolved age/privacy gates.
-- **Required tests:** Disposable synthetic voice interruption, scoped connection
-  expiry/termination, authoritative events and invalid structured output;
-  record latency and cost observations. Spike follows planning acceptance.
-- **Validation commands:** No repository commands yet; record exact reproducible
-  spike commands/results in `docs/adr/0001-baseline.md`; manually review decisions.
+  documented evidence and limitations; device matrix and budget limits; decision
+  owners recorded; live validation assigned to M05/M06; no real-data use with
+  unresolved age/privacy gates.
+- **Required checks:** Repository compatibility/boundary checks and manual review
+  of the decisions, official-document references, assumptions, and deferred-gate
+  ownership. No credentialed provider test is claimed as an M00 result.
+- **Validation commands:** Run the implemented M01 documentation-adjacent gates
+  (`pnpm lint`, `pnpm typecheck`, `pnpm test:boundaries`, `pnpm build`); exact
+  research commands/results and deferred live spikes are in ADR 0002.
 - **Out of scope:** Production application, real learner data, paid provisioning,
   multiple complete commercial adapters.
 
@@ -102,6 +109,10 @@ decision gates before their affected work, especially real learner access.
 - **Objective:** Useful live tutoring and evidence-backed feedback.
 - **Scope:** One real conversation/analyzer adapter, versioned prompts/schema,
   validation/evidence checks, deadlines/cancellation, budgets, report UI and retry.
+- **Entry gate:** With synthetic content and an owner-approved credential/cost
+  cap, verify Responses `store: false`, valid/invalid Structured Outputs,
+  application evidence rejection, reported usage and latency. Record the model,
+  prompt and schema versions; do not treat the M00 desk assessment as this test.
 - **Acceptance criteria:** Reports cite actual learner turns; invalid evidence
   rejected; modes/help pass live rubric; provider failures are visible/recoverable;
   routine CI needs no paid provider.
@@ -116,6 +127,10 @@ decision gates before their affected work, especially real learner access.
 ## M06 — Real-time voice experience
 
 - **Objective:** Usable spoken practice on agreed devices.
+- **Entry gate:** Run the disposable credentialed spike from ADR 0002 with
+  synthetic speech: short-lived credential expiry/termination, API-sideband
+  authoritative events, interruption/delivery boundaries, reconnect, latency,
+  usage and cost. Failure reopens the transport decision before implementation.
 - **Scope:** Chosen voice transport/adapter, scoped credentials, microphone,
   captions/playback, mute/stop/interruption, reconnect, authoritative event
   normalization, text fallback and server-enforced session limits.
