@@ -31,12 +31,14 @@ model.
 ### Text and analysis
 
 Select **OpenAI as the first production adapter**, with the **Responses API and
-`gpt-5-mini` as the initial configuration candidate** for text tutoring and
-post-session analysis. This is a configuration default, not a permanent domain
-dependency. Use streaming for tutoring and strict Structured Outputs for report
-drafts. The application still runtime-validates the normalized report, evidence
-spans, referenced turn IDs, account ownership, bounds, and schema version;
-provider schema conformance is not authorization or truth.
+`gpt-5.6-terra` as the initial quality-first configuration candidate** for text
+tutoring and post-session analysis. The model ID belongs to infrastructure/runtime
+configuration, never the domain layer, and is not a permanent dependency. M05's
+versioned evaluations may select another model when measured quality and cost
+support the change. Use streaming for tutoring and strict Structured Outputs for
+report drafts. The application still runtime-validates the normalized report,
+evidence spans, referenced turn IDs, account ownership, bounds, and schema
+version; provider schema conformance is not authorization or truth.
 
 The adapter must expose request deadline/cancellation, provider request ID,
 model snapshot/name, token usage, latency, finish reason, and normalized errors.
@@ -44,6 +46,13 @@ Set maximum input/output tokens and an operation budget before each call. Allow
 at most one bounded malformed-output repair. Reject rather than partially apply
 invalid reports. Do not send arbitrary tools or permit direct application-state
 writes.
+
+Send ordinary tutoring and analysis Responses requests with **`store: false`**.
+No feature currently requires provider-side response state; enabling it later
+requires a separate privacy and architecture review. `store: false` is not a
+zero-retention claim: application retention is controlled in PostgreSQL under
+ADR 0004, while provider abuse-monitoring retention and any approved Zero Data
+Retention (ZDR) or Modified Abuse Monitoring (MAM) controls are separate matters.
 
 Normal development and CI use an application-owned **deterministic fake**. Given
 a versioned synthetic fixture key, operation, and seed, it emits a fixed event
@@ -62,9 +71,11 @@ adapter is not M00 or M02 scope.
 
 ### Voice transport
 
-Select **browser-to-OpenAI WebRTC media with an API sideband control/event
-connection**. The NestJS API authenticates the learner, checks account/session
-state and caps, creates a narrowly configured Realtime session using the
+Select **`gpt-realtime-2.1-mini` as the current cost-efficient voice candidate**
+using **browser-to-OpenAI WebRTC media with an API sideband control/event
+connection**. Like the text model, the realtime model is adapter configuration,
+not a domain constant. The NestJS API authenticates the learner, checks account/
+session state and caps, creates a narrowly configured Realtime session using the
 server-held standard key, and returns only a short-lived client secret or the
 documented SDP bootstrap response. The browser never receives the standard key.
 WebRTC is preferred over relaying audio through our server because the provider
@@ -128,8 +139,8 @@ official documents were not independently fetched during this run.
 ```
 
 The documented design is therefore an evidence-based selection, but the
-following credentialed disposable spike is a **mandatory M06 entry gate**, not a
-passed M00 test:
+following credentialed work is deliberately **not a passed M00 test**. Item 5 is
+the M05 entry gate; the voice items are a mandatory M06 entry gate:
 
 1. In an owner-approved development project with synthetic speech only, create
    a session and record client-secret issued/expiry times without printing it.
@@ -139,8 +150,9 @@ passed M00 test:
    durable delivered boundary excludes unheard output.
 4. Disconnect/reconnect inside and outside the application expiry; verify event
    replay, fresh credentials, terminal-session rejection, and text fallback.
-5. Submit valid and deliberately invalid report schemas/evidence; verify only
-   the fully validated draft can be applied.
+5. Submit ordinary Responses requests with `store: false`, including valid and
+   deliberately invalid report schemas/evidence; verify only the fully validated
+   draft can be applied and record usage/latency.
 6. Record p50/p95 turn latency, disconnects, provider usage and estimated cost.
    Stop automatically at **USD 5 per spike run**.
 

@@ -85,9 +85,11 @@ subject to required evidence/backup handling.
 AI is variable and separate. For budgeting, assume twelve 10-minute pilot voice
 sessions/month, roughly 15,000 uncached input-audio tokens and 7,500 output-audio
 tokens per session, plus bounded text/report calls. At the planning rates of
-`gpt-realtime-mini` ($10/M input-audio and $20/M output-audio tokens), voice is
+`gpt-realtime-2.1-mini` ($10/M input-audio and $20/M output-audio tokens), voice is
 about $0.30/session or $3.60/month; reserve **$6/month** including text analysis.
-This is an estimate, not measured usage or a price guarantee. Cached audio,
+The refreshed model name does not change this planning calculation. This is an
+estimate, not measured usage or a price guarantee; re-check official pricing
+before any spend. Cached audio,
 conversation growth, failed/repeated calls, transcription and taxes can change it.
 
 Controls:

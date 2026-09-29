@@ -2,16 +2,18 @@
 
 ## Status and document map
 
-Milestones M00 and M01 are complete. The repository now has pinned executable tooling,
+M00 architecture/decisions and M01 are complete; M00 live feasibility is formally
+deferred to M05/M06 entry gates. The repository has pinned executable tooling,
 web/API/worker shells, PostgreSQL and Redis development services, validated
 server configuration, health/readiness endpoints, container builds, CI, and
 foundation tests. Product behavior and persistence remain intentionally absent.
 
-M00 selected OpenAI Responses/`gpt-5-mini` behind application ports and a
-deterministic fake, browser-to-provider WebRTC with an API sideband, Auth0 EU
-OIDC, and Render Frankfurt. ADRs 0002–0004 contain the rationale, diagrams,
-privacy/device limits, budget, evidence and live-validation gates. No provider or
-hosting resource has been provisioned.
+M00 selected configurable OpenAI Responses/`gpt-5.6-terra` as the quality-first
+text candidate and `gpt-realtime-2.1-mini` as the cost-efficient voice candidate,
+behind application ports and a deterministic fake. It selected browser-to-provider
+WebRTC with an API sideband, Auth0 EU OIDC, and Render Frankfurt. ADRs 0002–0004
+contain the rationale, diagrams, privacy/device limits, budget, evidence and
+live-validation gates. No provider or hosting resource has been provisioned.
 
 - `SPEC.md`: requirements, decisions, architecture and data model.
 - `PLAN.md`: milestone scope, acceptance and validation gates.
@@ -41,10 +43,15 @@ Trace behavior to SPEC.md requirements and update documents when decisions chang
 - Store no audio by default. Application transcripts/reports target 90 days;
   provider retention, EU processing, DPAs, learner adulthood/consent, actual
   devices and backup/deletion behavior remain real-data release gates.
+- Send ordinary Responses tutoring and analysis requests with `store: false`.
+  This disables provider-side response-state storage; it neither changes the
+  application's retention policy nor by itself eliminates provider abuse-monitoring
+  retention. ZDR/MAM eligibility remains a separately verified pilot gate.
 
 M00's network research command was blocked by the execution proxy (HTTP 403), and
 no credentials were available. Accordingly, the credentialed synthetic WebRTC,
-structured-output, latency and cost procedure in ADR 0002 must run before M06;
+structured-output procedure in ADR 0002 must run at the M05 entry gate and the
+WebRTC latency/cost procedure must run at the M06 entry gate;
 provider/privacy terms must be verified before any real learner data. These
 limitations do not block M02's synthetic account/profile implementation.
 

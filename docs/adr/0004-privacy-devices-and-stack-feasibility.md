@@ -23,6 +23,15 @@ a documented finite window (target at most 35 days) and deletion tombstones must
 be replayed after restore. These are application targets to confirm with the
 learner before pilot, not consent already obtained.
 
+This **application-state retention** is independent of OpenAI response storage.
+Ordinary Responses API tutoring and analysis calls set **`store: false`**, so the
+application does not ask OpenAI to retain response objects for later retrieval.
+That setting does not disable or shorten separate provider **abuse-monitoring
+retention**. **Zero Data Retention (ZDR)** and **Modified Abuse Monitoring (MAM)**
+are provider controls with their own eligibility, endpoint/model compatibility,
+and contractual configuration; they must be verified rather than inferred from
+`store: false`.
+
 Account deletion first disables access, terminates realtime/provider sessions,
 cancels queued work, and establishes a deletion epoch. It then purges transcripts,
 reports and derived state, prevents late jobs from resurrecting data, expires
@@ -86,11 +95,11 @@ in the milestone documentation.
 
 ## Resolved and unresolved gates
 
-Resolved: provider and candidate text model; strict structured-output approach;
-deterministic fake contract; browser WebRTC plus API sideband architecture;
-server-mediated fallback decision rule; Auth0 EU identity shape; Render Frankfurt
-topology; application retention targets; device support target; stack compatibility;
-and initial cost controls.
+Resolved: provider and candidate text/realtime models; strict structured-output
+approach; deterministic fake contract; browser WebRTC plus API sideband
+architecture; server-mediated fallback decision rule; Auth0 EU identity shape;
+Render Frankfurt topology; application retention targets; device support target;
+stack compatibility; and initial cost controls.
 
 Still unresolved by design: learner adulthood/authority and consent; actual
 learner devices; live model quality/latency/cost; realtime credential expiry,
@@ -98,4 +107,4 @@ interruption, event authority and reconnect behavior; physical mobile behavior;
 provider/DPA/regional-processing and independent retention terms; current paid
 plan prices/features; and deployment/rollback/restore measurements. These require
 owner facts, credentials, contracts, physical devices, or paid infrastructure.
-They gate real-data use or M06/M11—not M02's synthetic foundation work.
+They gate real-data use or M05/M06/M11—not M02's synthetic foundation work.

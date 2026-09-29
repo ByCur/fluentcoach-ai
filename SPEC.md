@@ -1,7 +1,8 @@
 # FluentCoach AI — Product and architecture specification
 
-Status: M00 decisions accepted and M01 foundation implemented, 2026-09-29.
-Product behavior remains unimplemented.
+Status: M00 architecture/decisions accepted with live feasibility deferred to
+M05/M06 entry gates; M01 foundation implemented, 2026-09-29. Product behavior
+remains unimplemented.
 
 ## 1. Intent and success
 
@@ -49,7 +50,7 @@ choices in future `docs/adr/` decision records.
 | Practice goal | Editable default of 10 minutes, three days/week | Validate in M02 |
 | Correction timing | Natural: after session; Teaching: after completed turns | Script review M03, live review M05/M06 |
 | Stack | M01 pins Node 20.20.x, pnpm, strict TypeScript, React/Vite, NestJS, PostgreSQL and Redis; Prisma/BullMQ when owned by later milestones | M00 compatibility resolved; review runtime support before production |
-| AI vendor/model | OpenAI Responses with `gpt-5-mini` initial candidate, plus deterministic fake | M00 resolved; live quality/cost/privacy evaluation gates M05/pilot |
+| AI vendor/model | OpenAI Responses with configurable `gpt-5.6-terra` quality-first text/analysis candidate, configurable `gpt-realtime-2.1-mini` voice candidate, plus deterministic fake | M00 direction resolved; M05 may select another text model from quality/cost evidence |
 | Voice transport | Browser-to-OpenAI WebRTC plus API sideband authoritative events; text fallback | M00 architecture resolved; synthetic/live device spike gates M06 |
 | Identity | Auth0 EU OIDC tenant, closed sign-up, secure server sessions | M00 resolved; plan/DPA configuration gates real access |
 | Hosting | Render Frankfurt web/API/worker plus managed PostgreSQL/Key Value | M00 selected; price/service verification and deployment drill gate M11 |
