@@ -1,0 +1,63 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+
+enum AccountStatus { ACTIVE DISABLED DELETING }
+enum CefrLevel { A1 A2 B1 B2 }
+
+model Account {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  oidcIssuer String @map("oidc_issuer")
+  oidcSubject String @map("oidc_subject")
+  status AccountStatus @default(ACTIVE)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  profile LearnerProfile?
+  goals PracticeGoal[]
+  consents ConsentRecord[]
+  @@unique([oidcIssuer, oidcSubject])
+  @@map("accounts")
+}
+
+model LearnerProfile {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId String @unique @map("account_id") @db.Uuid
+  interfaceLanguage String @map("interface_language") @db.VarChar(16)
+  nativeLanguage String @map("native_language") @db.VarChar(16)
+  timezone String @db.VarChar(64)
+  cefrLevel CefrLevel @map("cefr_level")
+  interests String[]
+  onboardingVersion Int? @map("onboarding_version")
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@unique([id, accountId])
+  @@map("learner_profiles")
+}
+
+model PracticeGoal {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId String @unique @map("account_id") @db.Uuid
+  minutesPerDay Int @default(10) @map("minutes_per_day")
+  daysPerWeek Int @default(3) @map("days_per_week")
+  effectiveFrom DateTime @default(now()) @map("effective_from") @db.Timestamptz
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@map("practice_goals")
+}
+
+model ConsentRecord {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId String @map("account_id") @db.Uuid
+  purpose String @db.VarChar(80)
+  policyVersion String @map("policy_version") @db.VarChar(40)
+  providerDisclosureVersion String @map("provider_disclosure_version") @db.VarChar(40)
+  acceptedAt DateTime @default(now()) @map("accepted_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@unique([accountId, purpose, policyVersion, providerDisclosureVersion, acceptedAt])
+  @@index([accountId, purpose, acceptedAt])
+  @@map("consent_records")
+}

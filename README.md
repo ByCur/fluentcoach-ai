@@ -82,3 +82,17 @@ Only non-secret browser settings may use Vite's `VITE_` prefix. Server URLs and
 future credentials must remain server-side. Validation errors name invalid fields
 without printing values, URLs, passwords, or tokens. Do not commit `.env`, learner
 content, provider prompts, exports, credentials, or real-data fixtures.
+
+## M02 identity and onboarding
+
+M02 adds PostgreSQL/Prisma learner state and a Spanish-first onboarding flow. Start PostgreSQL and Redis, apply the migration, then run API and web:
+
+```bash
+cp .env.example .env
+pnpm db:migrate:dev
+pnpm dev
+```
+
+Development uses the deterministic **synthetic** identity button; it is rejected when `NODE_ENV=production`. No password is implemented. Production OIDC is intentionally gated until current Auth0 Free invitation/PKCE/callback/logout capabilities are verified (ADR 0006). Sessions are opaque and server-side in Redis; browser state contains only an HttpOnly cookie. `BILLING_MODE=free_only` is the only accepted value.
+
+M02 checks are `pnpm db:migrate:test`, `pnpm test:integration:identity`, and `pnpm test:e2e:onboarding`. They use synthetic accounts and require local PostgreSQL/Redis, never Auth0 or Gemini credentials.

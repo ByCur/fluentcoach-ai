@@ -17,13 +17,13 @@ services:
     healthcheck: { test: [CMD, redis-cli, ping], interval: 3s, timeout: 3s, retries: 20 }
   api:
     build: { context: ., target: api }
-    environment: { NODE_ENV: development, API_PORT: 3000, DATABASE_URL: "postgresql://fluentcoach:local-development-only@postgres:5432/fluentcoach", REDIS_URL: "redis://redis:6379" }
+    environment: { NODE_ENV: development, API_PORT: 3000, BILLING_MODE: free_only, PUBLIC_ORIGIN: "http://localhost:8080", DATABASE_URL: "postgresql://fluentcoach:local-development-only@postgres:5432/fluentcoach", REDIS_URL: "redis://redis:6379" }
     ports: ["3000:3000"]
     depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
     healthcheck: { test: [CMD, wget, -qO-, http://127.0.0.1:3000/health/ready], interval: 3s, timeout: 3s, retries: 20 }
   worker:
     build: { context: ., target: worker }
-    environment: { NODE_ENV: development, WORKER_HEALTH_PORT: 3001, DATABASE_URL: "postgresql://fluentcoach:local-development-only@postgres:5432/fluentcoach", REDIS_URL: "redis://redis:6379" }
+    environment: { NODE_ENV: development, WORKER_HEALTH_PORT: 3001, BILLING_MODE: free_only, DATABASE_URL: "postgresql://fluentcoach:local-development-only@postgres:5432/fluentcoach", REDIS_URL: "redis://redis:6379" }
     depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
     healthcheck: { test: [CMD, wget, -qO-, http://127.0.0.1:3001/health/ready], interval: 3s, timeout: 3s, retries: 20 }
   web:

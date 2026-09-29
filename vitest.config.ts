@@ -9,7 +9,8 @@ export default defineConfig({
         test: { name: 'unit', include: ['packages/**/*.unit.test.ts', 'apps/**/*.unit.test.ts'] }
       },
       { test: { name: 'boundaries', include: ['tests/boundaries/**/*.test.ts'] } },
-      { test: { name: 'smoke', include: ['tests/smoke/**/*.test.ts'] } }
+      { test: { name: 'smoke', include: ['tests/smoke/**/*.test.ts'] } },
+      { test: { name: 'identity', include: ['tests/integration/**/*.test.ts'], testTimeout: 15000 } }
     ]
   }
 });

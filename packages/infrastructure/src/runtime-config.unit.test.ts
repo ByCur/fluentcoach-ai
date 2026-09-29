@@ -18,6 +18,10 @@ describe('server configuration', () => {
     }
   });
 
+  it('rejects billable modes', () => {
+    expect(() => loadServerConfig({ ...valid, BILLING_MODE: 'paid' })).toThrow('BILLING_MODE');
+  });
+
   it('rejects ports outside the TCP range', () => {
     expect(() => loadServerConfig({ ...valid, API_PORT: '70000' })).toThrow('API_PORT');
   });

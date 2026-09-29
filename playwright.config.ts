@@ -1,0 +1,2 @@
+import{defineConfig}from'@playwright/test';
+export default defineConfig({testDir:'tests/e2e',fullyParallel:false,retries:0,use:{baseURL:'http://127.0.0.1:4173'},webServer:[{command:'pnpm --filter @fluentcoach/api dev',url:'http://127.0.0.1:3000/health/live',reuseExistingServer:true,env:{...process.env,NODE_ENV:'test',API_PORT:'3000',PUBLIC_ORIGIN:'http://127.0.0.1:4173'}},{command:'pnpm --filter @fluentcoach/web dev -- --port 4173',url:'http://127.0.0.1:4173',reuseExistingServer:true}],reporter:'list'});

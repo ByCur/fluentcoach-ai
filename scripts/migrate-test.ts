@@ -1,0 +1,2 @@
+import pg from'pg';import{readFile}from'node:fs/promises';
+async function main(){const p=new pg.Pool({connectionString:process.env.DATABASE_URL});try{await p.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');await p.query(await readFile('packages/infrastructure/prisma/migrations/202609290001_m02_identity/migration.sql','utf8'));console.log('M02 migration applied to an empty PostgreSQL database.');}finally{await p.end();}}void main();

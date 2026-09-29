@@ -3,6 +3,8 @@ import { z } from 'zod';
 const serverConfigSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  PUBLIC_ORIGIN: z.string().url().default('http://localhost:8080'),
+  BILLING_MODE: z.literal('free_only').default('free_only'),
   DATABASE_URL: z.string().url().refine((url) => url.startsWith('postgresql://'), 'must use postgresql://'),
   REDIS_URL: z.string().url().refine((url) => url.startsWith('redis://') || url.startsWith('rediss://'), 'must use redis:// or rediss://')
 });
