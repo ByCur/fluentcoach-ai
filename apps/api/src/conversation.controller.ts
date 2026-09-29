@@ -1,0 +1,8 @@
+import{Body,Controller,Get,Inject,Param,Post,Query,Req,Res,UseGuards}from'@nestjs/common';import type{Response}from'express';import type{ConversationService}from'@fluentcoach/application';import{startSessionInput,turnInput}from'@fluentcoach/contracts';import{AuthGuard,type AuthRequest}from'./auth.guard.js';import{CsrfGuard}from'./csrf.guard.js';import{CONVERSATION_SERVICE}from'./tokens.js';
+@Controller('api/v1')@UseGuards(AuthGuard)export class ConversationController{constructor(@Inject(CONVERSATION_SERVICE)private readonly service:ConversationService){}
+@Get('scenarios')scenarios(){return this.service.scenarios()}@Get('sessions')history(@Req()r:AuthRequest){return this.service.history(r.accountId!)}
+@Post('sessions')@UseGuards(CsrfGuard)start(@Req()r:AuthRequest,@Body()raw:unknown){return this.service.start(r.accountId!,startSessionInput.parse(raw))}
+@Post('sessions/:id/turns')@UseGuards(CsrfGuard)turn(@Req()r:AuthRequest,@Param('id')id:string,@Body()raw:unknown){const x=turnInput.parse(raw);return this.service.turn(r.accountId!,id,x.sourceEventKey,x.text)}
+@Post('sessions/:id/help')@UseGuards(CsrfGuard)help(@Req()r:AuthRequest,@Param('id')id:string){return this.service.help(r.accountId!,id)}
+@Post('sessions/:id/end')@UseGuards(CsrfGuard)end(@Req()r:AuthRequest,@Param('id')id:string){return this.service.end(r.accountId!,id)}
+@Get('sessions/:id/events')async events(@Req()r:AuthRequest,@Param('id')id:string,@Query('cursor')cursor='0',@Res()res:Response){const events=await this.service.events(r.accountId!,id,Number(cursor));res.setHeader('content-type','text/event-stream');for(const e of events)res.write(`id: ${e.sequence}\ndata: ${JSON.stringify(e)}\n\n`);res.end()}}

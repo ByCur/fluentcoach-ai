@@ -1,0 +1,7 @@
+CREATE TYPE "AnalysisStatus" AS ENUM ('PENDING','RUNNING','SUCCEEDED','FAILED','SKIPPED');
+CREATE TABLE analysis_runs(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),session_id UUID NOT NULL,account_id UUID NOT NULL,transcript_revision INTEGER NOT NULL,analyzer_version VARCHAR(40) NOT NULL,status "AnalysisStatus" NOT NULL DEFAULT 'PENDING',attempts INTEGER NOT NULL DEFAULT 0,lease_until TIMESTAMPTZ,error_code VARCHAR(80),created_at TIMESTAMPTZ NOT NULL DEFAULT now(),UNIQUE(session_id,transcript_revision,analyzer_version),UNIQUE(id,account_id));
+CREATE INDEX analysis_runs_account_status_idx ON analysis_runs(account_id,status);
+CREATE TABLE outbox_events(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),account_id UUID NOT NULL,aggregate_id UUID NOT NULL,event_type VARCHAR(80) NOT NULL,envelope_version INTEGER NOT NULL,payload JSONB NOT NULL,dedupe_key VARCHAR(160) NOT NULL UNIQUE,attempts INTEGER NOT NULL DEFAULT 0,published_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX outbox_pending_idx ON outbox_events(published_at,created_at);
+CREATE TABLE provider_runs(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),account_id UUID NOT NULL,analysis_run_id UUID NOT NULL,operation VARCHAR(40) NOT NULL,adapter VARCHAR(40) NOT NULL,model VARCHAR(80) NOT NULL,prompt_version VARCHAR(40) NOT NULL,schema_version VARCHAR(40) NOT NULL,outcome VARCHAR(30) NOT NULL,latency_ms INTEGER NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX provider_runs_account_analysis_idx ON provider_runs(account_id,analysis_run_id);
