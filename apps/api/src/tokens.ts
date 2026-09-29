@@ -1,0 +1,2 @@
+export const LEARNER_SERVICE=Symbol('LEARNER_SERVICE');
+export const ACCOUNT_REPOSITORY=Symbol('ACCOUNT_REPOSITORY');

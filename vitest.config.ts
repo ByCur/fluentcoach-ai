@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   test: {
+    fileParallelism: false,
     projects: [
       {
         resolve: { alias: { '@fluentcoach/infrastructure': fileURLToPath(new URL('./packages/infrastructure/src/index.ts', import.meta.url)) } },

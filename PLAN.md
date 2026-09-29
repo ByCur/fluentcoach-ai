@@ -65,7 +65,7 @@ strict EUR 0/month release gate.
 
 ## M02 — Identity and learner setup
 
-**Status: implementation prepared (2026-09-29), but not marked complete: this environment could not run Docker/PostgreSQL or the browser gate, and production Auth0 Free verification remains blocked as recorded in ADR 0006.**
+**Status: implementation and PostgreSQL/browser gates pass locally (2026-09-29), but M02 is not marked complete until the required Docker Compose gate runs in a daemon-capable environment. Auth0 Free tenant provisioning remains a later deployment gate recorded in ADR 0006.**
 
 - **Objective:** Persist an isolated learner profile.
 - **Scope:** Invitation-only OIDC, secure server sessions, profile/goal/consent
