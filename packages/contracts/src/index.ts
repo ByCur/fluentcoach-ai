@@ -13,3 +13,5 @@ export type LearnerProfileInput = z.infer<typeof learnerProfileInput>;
 export type PracticeGoalInput = z.infer<typeof practiceGoalInput>;
 export type ConsentInput = z.infer<typeof consentInput>;
 export type ApiError = { error: { code: string; message: string } };
+export const startSessionInput=z.object({scenarioSlug:z.enum(['restaurant','travel','hotel','shopping','doctor-visit','free-conversation']),level:z.enum(['A1','A2','B1','B2']),mode:z.enum(['natural','teaching'])}).strict();
+export const turnInput=z.object({sourceEventKey:z.string().min(1).max(100),text:z.string().trim().min(1).max(2000)}).strict();

@@ -4,3 +4,6 @@ export * from './prisma.js';
 export * from './learner-repository.js';
 export * from './auth0-oidc.js';
 export * from './schema-readiness.js';
+export * from './session-repository.js';
+export * from './job-repository.js';
+export * from './qstash-transport.js';
