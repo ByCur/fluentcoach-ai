@@ -24,3 +24,4 @@ export const PROVIDER_DISCLOSURE_VERSION = 'gemini-free-2026-09-29';
 export function validateConsent(input: { purpose: string; policyVersion: string; providerDisclosureVersion: string; accepted: boolean }): void {
   if (!input.accepted || input.purpose !== CONSENT_PURPOSE || input.policyVersion !== POLICY_VERSION || input.providerDisclosureVersion !== PROVIDER_DISCLOSURE_VERSION) throw new Error('INVALID_CONSENT_VERSION');
 }
+export * from './conversation.js';

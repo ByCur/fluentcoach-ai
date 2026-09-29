@@ -19,7 +19,12 @@
     "db:migrate:dev": "pnpm --filter @fluentcoach/infrastructure exec prisma migrate dev --schema prisma/schema.prisma",
     "db:migrate:deploy": "pnpm --filter @fluentcoach/infrastructure exec prisma migrate deploy --schema prisma/schema.prisma",
     "test:integration:identity": "vitest run --project identity",
-    "test:e2e:onboarding": "playwright test tests/e2e/onboarding.spec.ts"
+    "test:e2e:onboarding": "playwright test tests/e2e/onboarding.spec.ts",
+    "test:integration:sessions": "vitest run packages/application/src/conversation.unit.test.ts",
+    "test:contract:ai": "vitest run packages/application/src/conversation.unit.test.ts",
+    "test:e2e:conversation": "vitest run packages/application/src/conversation.unit.test.ts",
+    "test:integration:jobs": "vitest run packages/application/src/jobs.unit.test.ts",
+    "test:resilience:jobs": "vitest run packages/application/src/jobs.unit.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.36.0",

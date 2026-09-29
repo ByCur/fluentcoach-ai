@@ -30,3 +30,5 @@ export interface OidcProvider {
  begin():Promise<{authorizationUrl:string;state:string}>;
  callback(input:{code:string;state:string}):Promise<OidcIdentity>;
 }
+export * from './conversation.js';
+export * from './jobs.js';
