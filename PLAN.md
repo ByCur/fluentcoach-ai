@@ -21,6 +21,11 @@ decision gates before their affected work, especially real learner access.
 
 ## M00 — Decisions and feasibility
 
+**Status: complete (2026-09-29).** Architecture decisions are recorded in ADRs
+0002–0004. Credentialed provider behavior, physical devices, contracts and paid
+deployment remain explicit later entry/release gates; they were not falsely
+treated as completed M00 tests.
+
 - **Objective:** Resolve decisions that could invalidate implementation.
 - **Scope:** Learner/device/age assumptions, budget, identity/hosting selection,
   stack compatibility; synthetic voice and structured-output feasibility spike;
@@ -31,8 +36,9 @@ decision gates before their affected work, especially real learner access.
 - **Required tests:** Disposable synthetic voice interruption, scoped connection
   expiry/termination, authoritative events and invalid structured output;
   record latency and cost observations. Spike follows planning acceptance.
-- **Validation commands:** No repository commands yet; record exact reproducible
-  spike commands/results in `docs/adr/0001-baseline.md`; manually review decisions.
+- **Validation commands:** Run the implemented M01 documentation-adjacent gates
+  (`pnpm lint`, `pnpm typecheck`, `pnpm test:boundaries`, `pnpm build`); exact
+  research commands/results and deferred live spikes are in ADR 0002.
 - **Out of scope:** Production application, real learner data, paid provisioning,
   multiple complete commercial adapters.
 

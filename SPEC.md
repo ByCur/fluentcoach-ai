@@ -1,7 +1,7 @@
 # FluentCoach AI — Product and architecture specification
 
-Status: proposed baseline, 2026-09-29. Planning only: no application, stack,
-service, or command described here is implemented yet.
+Status: M00 decisions accepted and M01 foundation implemented, 2026-09-29.
+Product behavior remains unimplemented.
 
 ## 1. Intent and success
 
@@ -45,15 +45,15 @@ choices in future `docs/adr/` decision records.
 | Learner age/ownership | Adult, private invitation-only account | Verify before collecting real data; minors require separate consent/access design |
 | Initial level | Self-selected A1, A2, B1 or B2; optional onboarding exercise | M02; never silently replace selection with inferred proficiency |
 | Interface | Spanish UI/help, English practice; language preference editable | Validate with learner in M02 |
-| Devices | Responsive web on learner's phone and desktop | Identify in M00; verify actual devices in M06 |
+| Devices | Latest/current-previous iPhone/iPad Safari, Android Chrome, desktop Chrome/Edge; text fallback | M00 target resolved; verify actual devices in M06 |
 | Practice goal | Editable default of 10 minutes, three days/week | Validate in M02 |
 | Correction timing | Natural: after session; Teaching: after completed turns | Script review M03, live review M05/M06 |
-| Stack | TypeScript, pnpm, React/Vite, NestJS, PostgreSQL/Prisma, Redis/BullMQ | M00 compatibility decision, versions pinned in M01 |
-| AI vendor/model | One production adapter plus deterministic fake | M00 capability, quality, cost and retention spike; no model fixed here |
-| Voice transport | Prefer provider WebRTC with scoped credentials and authoritative server events | M00; otherwise server-mediated streaming and remeasure latency |
-| Identity | Managed OIDC with secure server sessions, invitations only | M00 vendor/budget decision; no custom password system |
-| Hosting | EU-region managed containers, managed PostgreSQL/Redis | M00 budget, connection support and data-location decision |
-| Load/cost | Private pilot; five concurrent sessions as initial test envelope | Set monthly/per-session caps in M00; no provisioning in planning |
+| Stack | M01 pins Node 20.20.x, pnpm, strict TypeScript, React/Vite, NestJS, PostgreSQL and Redis; Prisma/BullMQ when owned by later milestones | M00 compatibility resolved; review runtime support before production |
+| AI vendor/model | OpenAI Responses with `gpt-5-mini` initial candidate, plus deterministic fake | M00 resolved; live quality/cost/privacy evaluation gates M05/pilot |
+| Voice transport | Browser-to-OpenAI WebRTC plus API sideband authoritative events; text fallback | M00 architecture resolved; synthetic/live device spike gates M06 |
+| Identity | Auth0 EU OIDC tenant, closed sign-up, secure server sessions | M00 resolved; plan/DPA configuration gates real access |
+| Hosting | Render Frankfurt web/API/worker plus managed PostgreSQL/Key Value | M00 selected; price/service verification and deployment drill gate M11 |
+| Load/cost | Private pilot; five concurrent sessions; $10/month app AI hard cap and $50/month total approval ceiling | M00 resolved; re-quote before any spend |
 | Data retention | No application audio storage; transcripts/reports 90 days; structured learner state until deletion | Confirm before pilot, including independent provider retention |
 | Pedagogical review | Reviewed Spanish-learner examples and tutor rubric | Identify reviewer before pilot; no unsubstantiated validation claim |
 
