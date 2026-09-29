@@ -2,14 +2,16 @@
 
 ## Status and document map
 
-Planning-only repository: no application, dependencies, database, Docker setup,
-tests or deployment exists. Commands below are future contracts, not verified
-instructions for a runnable system.
+Milestone M01 is implemented. The repository now has pinned executable tooling,
+web/API/worker shells, PostgreSQL and Redis development services, validated
+server configuration, health/readiness endpoints, container builds, CI, and
+foundation tests. Product behavior and persistence remain intentionally absent.
 
 - `SPEC.md`: requirements, decisions, architecture and data model.
 - `PLAN.md`: milestone scope, acceptance and validation gates.
 - `AGENTS.md`: contributor/agent rules.
-- Future `README.md`: tested quick start; `docs/adr/`: decision rationale.
+- `README.md`: tested M01 quick start and quality gates.
+- `docs/adr/`: accepted implementation decisions and review triggers.
 
 ## Development workflow
 
@@ -23,7 +25,7 @@ health checks and persistent local volumes. Allow host-run apps against containe
 dependencies for debugging. Document Windows PowerShell commands and exact
 host/container context. Use synthetic seeds, never production data or credentials.
 
-Planned setup after M01, **not runnable now**:
+M01 fresh-clone setup (PowerShell; macOS/Linux equivalents are in `README.md`):
 
 ```powershell
 Copy-Item .env.example .env
@@ -31,10 +33,14 @@ Copy-Item .env.example .env
 pnpm install --frozen-lockfile
 docker compose config --quiet
 docker compose up --build -d
-pnpm db:migrate:dev
-pnpm db:seed:dev
 pnpm test:smoke
 ```
+
+M01 has no owned database entities, so it deliberately has no empty migration or
+seed. Prisma migration commands become executable when M02 introduces the first
+schema. API/worker readiness currently verifies PostgreSQL and Redis connectivity;
+it must add schema compatibility once migrations exist. Compose values are local
+development placeholders only, and host-run apps use the ignored `.env` file.
 
 The future setup must hold application readiness until migrations complete.
 Seeds are idempotent; fake AI supports normal development without paid keys.
@@ -45,7 +51,7 @@ Do not make destructive volume resets part of ordinary setup.
 | `pnpm dev` | Host web/API/worker against documented local dependencies |
 | `pnpm lint` / `pnpm typecheck` | Static quality, boundary rules, strict typing |
 | `pnpm test:unit` | Deterministic domain/application tests |
-| `pnpm test:integration` | All implemented real DB/queue/API suites |
+| `pnpm test:integration` | All implemented real DB/queue/API suites (introduced with later milestones) |
 | `pnpm test:contract:ai` | Normalized adapter contracts and fixtures |
 | `pnpm test:e2e` | Critical browser flows with fake AI |
 | `pnpm build` | Build all packages/apps |
@@ -56,6 +62,12 @@ Do not make destructive volume resets part of ordinary setup.
 
 Add PLAN.md specialized scripts when their real tests exist. Required suites
 fail on missing fixtures, unavailable services, failed assertions or zero tests.
+
+M01 implements `lint`, `typecheck`, `test:unit`, `test:boundaries`, `test:smoke`,
+and `build`. The smoke suite checks the image/Compose contract, while Compose's
+five health checks validate running containers in Docker-capable environments.
+CI runs both and builds each image target. The API distinguishes process liveness
+from dependency readiness and returns a content-free 503 when a dependency fails.
 
 ## Configuration and secrets
 
