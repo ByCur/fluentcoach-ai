@@ -1,5 +1,9 @@
 # ADR 0002: AI provider and realtime voice
 
+> **Amended by ADR 0005.** OpenAI is no longer the initial production provider;
+> Gemini Developer API Free and Gemini Live are selected for the zero-cost pilot.
+> The provider ports, validation and fake-provider decisions remain in force.
+
 - **Status:** accepted for implementation; live-service gates remain
 - **Date:** 2026-09-29
 - **Decision owners:** product owner (spend/privacy approval) and technical owner

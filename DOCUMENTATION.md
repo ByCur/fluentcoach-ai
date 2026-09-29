@@ -2,18 +2,21 @@
 
 ## Status and document map
 
-M00 architecture/decisions and M01 are complete; M00 live feasibility is formally
-deferred to M05/M06 entry gates. The repository has pinned executable tooling,
+M00 architecture/decisions, as amended by ADR 0005, and M01 are complete; live
+feasibility is formally deferred to M05/M06 entry gates. The repository has
+pinned executable tooling,
 web/API/worker shells, PostgreSQL and Redis development services, validated
 server configuration, health/readiness endpoints, container builds, CI, and
 foundation tests. Product behavior and persistence remain intentionally absent.
 
-M00 selected configurable OpenAI Responses/`gpt-5.6-terra` as the quality-first
-text candidate and `gpt-realtime-2.1-mini` as the cost-efficient voice candidate,
-behind application ports and a deterministic fake. It selected browser-to-provider
-WebRTC with an API sideband, Auth0 EU OIDC, and Render Frankfurt. ADRs 0002–0004
-contain the rationale, diagrams, privacy/device limits, budget, evidence and
-live-validation gates. No provider or hosting resource has been provisioned.
+ADR 0005 selects a strict **EUR 0/month** pilot: Render Static Site Free,
+Render Free Web Service, Neon PostgreSQL Free, Upstash Redis Free, Upstash QStash
+Free, conditional Auth0 Free, and Gemini Developer API Free. Configurable
+`gemini-3.8-flash` (text/analysis) and
+`gemini-3.8-live` (Live native audio) are candidates;
+the deterministic fake remains normal development/CI. OpenAI and a dedicated
+BullMQ worker are future non-default alternatives. No provider or hosting resource
+has been provisioned, billing enabled, payment method supplied, or secret added.
 
 - `SPEC.md`: requirements, decisions, architecture and data model.
 - `PLAN.md`: milestone scope, acceptance and validation gates.
@@ -29,29 +32,33 @@ Trace behavior to SPEC.md requirements and update documents when decisions chang
 
 ## M00 operational envelope
 
-- Normal development/CI uses deterministic synthetic AI and costs $0. Paid text
-  evaluations are capped at $10/run, voice spikes at $5/run, and all require
-  owner approval. Development AI has a $20/month provider ceiling.
-- The one-user pilot estimate is $30/month fixed infrastructure plus $6/month AI.
-  Enforce a $10/month application AI stop and a $50/month total approval ceiling;
-  re-quote every service before purchase.
-- Voice sessions are initially capped at 15 minutes. Short-lived browser material
-  and the API sideband replace exposure of a standard provider key. Text remains
-  available when voice permission, connection, reconnect, or compatibility fails.
-- Target devices are modern iPhone/iPad Safari, Android Chrome and desktop
-  Chrome/Edge. This is not physical validation; M06 owns the recorded device run.
-- Store no audio by default. Application transcripts/reports target 90 days;
-  provider retention, EU processing, DPAs, learner adulthood/consent, actual
-  devices and backup/deletion behavior remain real-data release gates.
-- Send ordinary Responses tutoring and analysis requests with `store: false`.
-  This disables provider-side response-state storage; it neither changes the
-  application's retention policy nor by itself eliminates provider abuse-monitoring
-  retention. ZDR/MAM eligibility remains a separately verified pilot gate.
+- `BILLING_MODE=free_only` is mandatory in pilot production. Startup rejects
+  billable providers/plans and paid fallback; quota exhaustion fails closed.
+- Estimated owner operating cost is **EUR 0/month** for one invited learner. Free
+  credits/trials do not qualify, and any future spend requires a new ADR and owner
+  approval. Re-check all plan limits and terms immediately before deployment.
+- Render API cold starts are accepted and shown as startup/reconnecting. No
+  always-on worker is deployed; QStash invokes secure idempotent API endpoints,
+  while PostgreSQL retains pending work and canonical learner state.
+- Voice prefers a direct Gemini Live WebSocket using an API-minted ephemeral token
+  only after M06 verifies official browser support and safe scope. Otherwise test
+  a minimal secure API relay; if that does not fit free capacity, voice is
+  unavailable and text is offered when its quota remains.
+- Store no raw audio. **Gemini's unpaid Developer API terms currently say submitted
+  content may improve Google products and may be human-reviewed.** This provider
+  policy is separate from FluentCoach's 90-day transcript/report retention and
+  deletion. Real use requires a plain, versioned disclosure and explicit consent.
+- Current free-limit planning snapshots and fail-closed behavior are in ADR 0005:
+  Render's 750 hours/cold starts, Neon compute/storage, Upstash Redis/QStash,
+  Auth0 feature/MAU and model-specific Gemini limits all require dated re-checks.
+- Target devices remain modern iPhone/iPad Safari, Android Chrome and desktop
+  Chrome/Edge. M06 owns physical validation and model-lifecycle evidence.
 
 M00's network research command was blocked by the execution proxy (HTTP 403), and
-no credentials were available. Accordingly, the credentialed synthetic WebRTC,
-structured-output procedure in ADR 0002 must run at the M05 entry gate and the
-WebRTC latency/cost procedure must run at the M06 entry gate;
+no credentials were available. Accordingly, the credentialed synthetic
+structured-output procedure must run at the M05 entry gate, and the Gemini Live
+browser-WebSocket/secure-relay latency and quota procedure must run at the M06
+entry gate;
 provider/privacy terms must be verified before any real learner data. These
 limitations do not block M02's synthetic account/profile implementation.
 
@@ -107,7 +114,7 @@ from dependency readiness and returns a content-free 503 when a dependency fails
 
 ## Configuration and secrets
 
-Define typed startup configuration for environment/public origin, DB/Redis URLs,
+Define typed startup configuration for environment/public origin, `BILLING_MODE`, DB/Redis URLs,
 OIDC issuer/audience, server-session secret, adapter/model IDs, AI key, deadlines,
 duration/concurrency/spend caps, telemetry, retention and feature flags.
 
@@ -115,7 +122,8 @@ Browser config is an explicit public allowlist. DB URLs, permanent AI keys,
 identity/session secrets and telemetry credentials remain server-side. Media
 credentials are short-lived and scoped. Redact validation errors/connection URLs.
 Production secrets use the hosting secret store with rotation; local `.env` is
-ignored. Reject fake AI and development auth bypasses in production. Ordinary CI
+ignored. In production reject fake AI/development auth bypasses and, under
+`free_only`, reject any billable provider/plan or paid fallback. Ordinary CI
 must not need provider secrets.
 
 ## Testing strategy
@@ -165,16 +173,20 @@ Proposed GitHub Actions pipeline, subject to the eventual repository host:
 5. Promote the same digest to production through an explicit release gate;
    compatible migration/API/worker rollout and post-deploy smoke.
 
-Paid live evaluations are manual or explicitly budgeted, never untrusted-PR jobs.
+Live evaluations are manual, synthetic, and restricted to verified free quota;
+they are never untrusted-PR jobs. Paid evaluation is forbidden by the pilot
+policy.
 Provider/prompt/schema changes require reviewed evaluation evidence for release.
 Record configuration/migration risks, checks and rollback instructions.
 
 ## Deployment and migrations
 
-Initial topology: managed EU-region containers, static web/HTTPS proxy, API,
-continuously running worker, private managed PostgreSQL/Redis. Use same-origin
-API routing. Select vendor only after M00 budget, long-lived connection, worker,
-region and data-processing checks. No Kubernetes/service mesh initially.
+Initial pilot topology is Render Static Site Free plus one cold-starting Render
+Free API, Neon PostgreSQL Free, Upstash Redis Free and QStash Free. There is no
+deployed worker. QStash calls authenticated idempotent API job endpoints and a
+PostgreSQL reconciler preserves pending work. Use same-origin routing where
+possible; verify regions, data paths and every free-plan term before deployment.
+No Kubernetes/service mesh or automatic paid upgrade is permitted.
 
 Local/staging/prod use independent credentials, queues, databases and AI budgets.
 Do not expose data services to browsers. Deployed microphone access requires
@@ -207,8 +219,10 @@ Playbooks required before pilot:
 
 - **Provider outage:** bounded retries, visible failure or available text fallback,
   preserved history and independently retryable reports; no fabricated success.
-- **Queue outage:** inspect persisted outbox/run state, restore Redis/worker,
-  reconcile and verify idempotent effects. See [BullMQ guidance](https://docs.bullmq.io/patterns/idempotent-jobs).
+- **QStash outage/quota:** keep outbox/analysis pending in PostgreSQL, show pending,
+  reconcile later and verify idempotent effects; do not start a paid worker.
+- **Redis outage:** preserve canonical PostgreSQL data; expire/recreate only
+  non-canonical cache/session state and never infer learner-data loss.
 - **Bad analysis:** reject/quarantine invalid output, retain safe diagnostics,
   reproduce synthetically, version fixes and reanalyze without double counting.
 - **Credential exposure:** revoke/rotate, invalidate affected sessions, review

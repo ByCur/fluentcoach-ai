@@ -1,5 +1,9 @@
 # ADR 0004: Privacy, devices, and stack feasibility
 
+> **Amended by ADR 0005.** Application retention/device decisions remain. Its
+> OpenAI-specific provider-data analysis is historical for the initial pilot;
+> Gemini Free's model-improvement and human-review tradeoff now governs.
+
 - **Status:** accepted targets; real-data and physical-device gates remain
 - **Date:** 2026-09-29
 - **Decision owners:** product owner (learner/privacy facts) and technical owner
@@ -59,11 +63,11 @@ conservative **target**, not physical validation.
 
 | Device/browser target | Text | Voice target | M00 evidence/status | Required fallback |
 | --- | --- | --- | --- | --- |
-| iPhone Safari | Supported target | WebRTC microphone/playback, interruption | Not physically tested; iOS permission, route changes, lock/background behavior unresolved | Same-session text |
-| iPad Safari | Supported target | WebRTC microphone/playback, interruption | Not physically tested; permission and route changes unresolved | Same-session text |
-| Android Chrome | Supported target | WebRTC microphone/playback, interruption | Not physically tested; vendor audio routing/background behavior unresolved | Same-session text |
-| Desktop Chrome (Windows/macOS) | Supported target | WebRTC microphone/playback, interruption | Standards/API fit only; not physically tested | Same-session text |
-| Desktop Edge (Windows) | Supported target | WebRTC microphone/playback, interruption | Chromium/API fit only; not physically tested | Same-session text |
+| iPhone Safari | Supported target | Browser microphone/native-audio playback, interruption | Not physically tested; iOS permission, route changes, lock/background behavior unresolved | Same-session text |
+| iPad Safari | Supported target | Browser microphone/native-audio playback, interruption | Not physically tested; permission and route changes unresolved | Same-session text |
+| Android Chrome | Supported target | Browser microphone/native-audio playback, interruption | Not physically tested; vendor audio routing/background behavior unresolved | Same-session text |
+| Desktop Chrome (Windows/macOS) | Supported target | Browser microphone/native-audio playback, interruption | Browser media/API fit only; not physically tested | Same-session text |
+| Desktop Edge (Windows) | Supported target | Browser microphone/native-audio playback, interruption | Chromium/API fit only; not physically tested | Same-session text |
 
 Firefox, desktop Safari, embedded webviews, older OS/browser releases and native
 apps are best-effort/non-target for the first pilot. They are not declared broken,
@@ -83,7 +87,7 @@ found before M02**:
 | --- | --- |
 | Node 20.20.x / pnpm 10.28.1 | Pinned and suitable for NestJS build/runtime and workspace isolation; review Node support lifecycle before production. |
 | TypeScript 5.9.2 | Strict shared configuration and boundary lint/tests preserve pure domain/application packages. |
-| React 19 / Vite 7 | Suitable for an authenticated responsive SPA and browser WebRTC adapter; media access requires deployed HTTPS. |
+| React 19 / Vite 7 | Suitable for an authenticated responsive SPA and browser Gemini Live transport adapter; media access requires deployed HTTPS. |
 | NestJS 11 | Suitable for OIDC callback/session endpoints, REST/SSE and provider sideband lifecycle outside domain code. |
 | PostgreSQL 17.6 | Correct canonical state/transaction/outbox store; Prisma and first migrations remain M02 work. |
 | Redis 8.2.1 | Appropriate for server sessions, delivery/cache and later BullMQ; never canonical learner state. Managed compatibility must be tested. |
@@ -95,11 +99,11 @@ in the milestone documentation.
 
 ## Resolved and unresolved gates
 
-Resolved: provider and candidate text/realtime models; strict structured-output
-approach; deterministic fake contract; browser WebRTC plus API sideband
-architecture; server-mediated fallback decision rule; Auth0 EU identity shape;
-Render Frankfurt topology; application retention targets; device support target;
-stack compatibility; and initial cost controls.
+Resolved at the time: provider and candidate text/realtime models; strict
+structured-output approach; deterministic fake contract; browser voice transport
+architecture (superseded by ADR 0005); server-mediated fallback decision rule;
+Auth0 EU identity shape; Render Frankfurt topology; application retention targets;
+device support target; stack compatibility; and initial cost controls.
 
 Still unresolved by design: learner adulthood/authority and consent; actual
 learner devices; live model quality/latency/cost; realtime credential expiry,

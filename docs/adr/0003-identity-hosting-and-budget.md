@@ -1,5 +1,9 @@
 # ADR 0003: Identity, hosting, and pilot budget
 
+> **Superseded in part by ADR 0005.** Its paid Render worker/data topology and
+> budget are historical. The initial pilot now uses only conditional free tiers
+> at EUR 0/month; Auth0 remains selected only if required features stay free.
+
 - **Status:** accepted for implementation; purchase requires owner approval
 - **Date:** 2026-09-29
 - **Decision owners:** product owner (contracts/spend) and technical owner
@@ -46,13 +50,13 @@ and private network. Official documentation covers [regions](https://render.com/
 [Key Value](https://render.com/docs/key-value), and
 [rollbacks](https://render.com/docs/rollbacks).
 
-Terminate HTTPS and route same-origin API traffic at the platform edge. Browser
-WebRTC media goes directly to OpenAI, so Render does not relay media; the API's
-long-lived sideband provider connection and browser application event stream do
-require connection-duration testing, shutdown handling, and heartbeats. Deploy
-immutable commit images, run migrations once as a release job, check readiness,
-then promote. Keep a previous compatible image for rollback. Database restoration
-is forward recovery; an image rollback cannot undo a destructive migration.
+Terminate HTTPS and route same-origin API traffic at the platform edge. That
+historical design sent browser media directly to the then-selected provider, so
+Render did not relay media; its API sideband and application event stream required
+connection-duration testing, shutdown handling, and heartbeats. Deploy immutable
+commit images, run migrations once as a release job, check readiness, then promote.
+Keep a previous compatible image for rollback. Database restoration is forward
+recovery; an image rollback cannot undo a destructive migration.
 
 Render is selected over a VM because it supplies independent web/worker lifecycle,
 EU managed data services, TLS/private networking, and practical image rollback
@@ -120,6 +124,6 @@ the environment proxy blocked all official pages; pricing and feature claims
 therefore require owner re-verification before commitment.
 
 Review if Frankfurt lacks a required service/plan, Redis commands required by
-BullMQ are unsupported, WebSocket/sideband lifetimes fail M06 load tests, Auth0
+BullMQ are unsupported, realtime connection lifetimes fail M06 load tests, Auth0
 cannot enforce invitation-only access on the chosen plan, the EU/provider terms
 fail ADR 0004, or monthly cost breaches the approval ceiling.

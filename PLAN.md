@@ -12,7 +12,8 @@ Do not create empty success scripts. Required suites fail on zero collected test
 
 M01 onward, common gates are `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`,
 `pnpm build`. Integration tests use isolated migrated PostgreSQL/Redis and
-synthetic data. Live AI checks require explicit credentials and a cost cap.
+synthetic data. Live AI checks require explicit credentials and must remain
+within verified free quotas; paid calls are forbidden for the initial pilot.
 
 Completion requires demonstrated acceptance, passing required checks, updated
 documentation and recorded limitations. Fake-AI tests do not establish live
@@ -22,13 +23,14 @@ decision gates before their affected work, especially real learner access.
 ## M00 — Decisions and feasibility
 
 **Status: architecture/decision complete (2026-09-29); live feasibility
-validation deferred.** Architecture decisions are recorded in ADRs 0002–0004.
+validation deferred.** Architecture decisions are recorded in ADRs 0002–0005.
 Credentialed provider behavior and physical-device feasibility are now formally
-M05/M06 entry gates; contracts and paid deployment remain later release gates.
+M05/M06 entry gates; ADR 0005 replaces initial paid-capable deployment with a
+strict EUR 0/month release gate.
 
 - **Objective:** Resolve decisions that could invalidate implementation.
 - **Scope:** Learner/device/age assumptions, budget, identity/hosting selection,
-  stack compatibility, desk-based provider feasibility assessment, and ADRs for
+  stack compatibility, zero-cost/free-tier feasibility assessment, and ADRs for
   transport, provider capabilities, retention and deployment.
 - **Acceptance criteria:** Named initial provider/transport and fallback with
   documented evidence and limitations; device matrix and budget limits; decision
@@ -47,7 +49,8 @@ M05/M06 entry gates; contracts and paid deployment remain later release gates.
 
 - **Objective:** Reproducible development before product behavior.
 - **Scope:** Pinned pnpm/TypeScript workspace; web/API/worker shells; dependency
-  boundaries; Docker/Compose; PostgreSQL/Redis; startup config validation;
+  boundaries; Docker/Compose; PostgreSQL/Redis; startup config validation,
+  including the future `BILLING_MODE`;
   `.env.example`, ignores, README, CI, health/readiness and contract conventions.
 - **Acceptance criteria:** Documented fresh-clone startup works; configuration
   fails clearly and safely; no committed secrets; CI runs checks and image build;
@@ -74,7 +77,9 @@ M05/M06 entry gates; contracts and paid deployment remain later release gates.
 - **Validation commands:** Common gates, `pnpm db:migrate:test`,
   `pnpm test:integration:identity`, `pnpm test:e2e:onboarding`.
 - **Out of scope:** Public signup, custom passwords, family roles,
-  AI level assessment, conversations.
+  AI level assessment, conversations. Auth0 Free capability verification and the
+  versioned Gemini Free data-use disclosure/consent are required design inputs;
+  do not implement M02 as part of ADR 0005.
 
 ## M03 — Deterministic text vertical slice
 
@@ -93,11 +98,13 @@ M05/M06 entry gates; contracts and paid deployment remain later release gates.
 ## M04 — Durable background execution
 
 - **Objective:** Reliable, recoverable processing after session end.
-- **Scope:** Outbox, analysis state, worker, transcript finalization/revisions,
-  bounded retry/leases, reconciler, provider-run records, queue metrics, fake job.
+- **Scope:** Outbox, analysis state, transport-neutral job port, QStash-signed
+  idempotent API endpoints, transcript finalization/revisions, bounded retry/leases,
+  PostgreSQL reconciler, provider-run records, queue metrics and fake job. Keep
+  BullMQ/worker as a future adapter; do not require it in the free pilot.
 - **Acceptance criteria:** End/outbox commit atomically; repeated delivery and
-  worker restart produce one persistent effect; Redis loss recoverable; failures
-  inspectable; empty and partial sessions explicitly handled.
+  API/job restart produce one persistent effect; QStash/Redis loss recoverable;
+  failures inspectable; empty and partial sessions explicitly handled.
 - **Required tests:** Rollback, crash after provider response, duplicate jobs,
   late turns/revisions, exhausted retries and queue outage/reconciliation.
 - **Validation commands:** Common gates, `pnpm test:integration:jobs`,
@@ -109,8 +116,9 @@ M05/M06 entry gates; contracts and paid deployment remain later release gates.
 - **Objective:** Useful live tutoring and evidence-backed feedback.
 - **Scope:** One real conversation/analyzer adapter, versioned prompts/schema,
   validation/evidence checks, deadlines/cancellation, budgets, report UI and retry.
-- **Entry gate:** With synthetic content and an owner-approved credential/cost
-  cap, verify Responses `store: false`, valid/invalid Structured Outputs,
+- **Entry gate:** With synthetic content and an owner-approved free-tier
+  credential, verify `gemini-3.8-flash` remains a current Free-Tier candidate,
+  verify its limits/data terms and valid/invalid structured output, and exercise
   application evidence rejection, reported usage and latency. Record the model,
   prompt and schema versions; do not treat the M00 desk assessment as this test.
 - **Acceptance criteria:** Reports cite actual learner turns; invalid evidence
@@ -120,17 +128,20 @@ M05/M06 entry gates; contracts and paid deployment remain later release gates.
   evidence rejection, cost caps, report E2E and reviewed level/mode/scenario eval.
 - **Validation commands:** Common gates, `pnpm test:contract:ai`,
   `pnpm test:integration:analysis`, `pnpm test:e2e:reports`,
-  `pnpm eval:ai -- --suite pilot-text --max-cost-usd 5` (opt-in).
+  `pnpm eval:ai -- --suite pilot-text --billing-mode free_only` (opt-in, free
+  quota only).
 - **Out of scope:** Voice, recurring trends, automatic CEFR promotion,
   second commercial provider.
 
 ## M06 — Real-time voice experience
 
 - **Objective:** Usable spoken practice on agreed devices.
-- **Entry gate:** Run the disposable credentialed spike from ADR 0002 with
-  synthetic speech: short-lived credential expiry/termination, API-sideband
-  authoritative events, interruption/delivery boundaries, reconnect, latency,
-  usage and cost. Failure reopens the transport decision before implementation.
+- **Entry gate:** Run the ADR 0005 Gemini Live spike with synthetic speech: verify
+  `gemini-3.8-live` remains a current Free-Tier Live candidate, ephemeral-token
+  scope/expiry and the direct browser WebSocket architecture, or measure the
+  minimum secure API WebSocket relay; verify event authority, interruption,
+  reconnect, latency and quota behavior. Failure leaves voice unavailable with
+  text fallback; it never permits key exposure or spend.
 - **Scope:** Chosen voice transport/adapter, scoped credentials, microphone,
   captions/playback, mute/stop/interruption, reconnect, authoritative event
   normalization, text fallback and server-enforced session limits.
@@ -142,7 +153,8 @@ M05/M06 entry gates; contracts and paid deployment remain later release gates.
   live device/interruption evaluation.
 - **Validation commands:** Common gates, `pnpm test:contract:voice`,
   `pnpm test:e2e:voice`, `pnpm test:resilience:voice`,
-  `pnpm eval:voice -- --max-cost-usd 5` (opt-in); manual device checklist.
+  `pnpm eval:voice -- --billing-mode free_only` (opt-in, free quota only);
+  manual device checklist.
 - **Out of scope:** Pronunciation scoring, recordings, telephony, native apps.
   Real learner access still requires M10/M11 release/privacy gates.
 
@@ -188,7 +200,7 @@ M05/M06 entry gates; contracts and paid deployment remain later release gates.
   DST/midnight/timezone changes, streak breaks, concurrent plan refresh and rebuild.
 - **Validation commands:** Common gates, `pnpm test:integration:plans`,
   `pnpm test:integration:progress`, `pnpm test:e2e:progress`,
-  `pnpm eval:ai -- --suite plans --max-cost-usd 5` (opt-in).
+  `pnpm eval:ai -- --suite plans --billing-mode free_only` (opt-in, free quota only).
 - **Out of scope:** Official proficiency scores, leaderboards, push alerts,
   exam practice and third-party dashboards.
 
@@ -214,12 +226,14 @@ M05/M06 entry gates; contracts and paid deployment remain later release gates.
 ## M11 — Deployment and private learner pilot
 
 - **Objective:** Operate the tested product with recovery paths.
-- **Scope:** Chosen hosting, staging/prod isolation, secrets, immutable images,
-  release migration job, staging auto-deploy, gated promotion, backups/alerts,
+- **Scope:** ADR 0005 free services, production isolation, secrets, immutable builds,
+  controlled migration, gated release, available free backup/alerts,
   pilot onboarding and learner feedback.
-- **Acceptance criteria:** Same digest promoted; staging smoke passes; migration,
-  rollback and restore drilled to RPO/RTO; provider retention verified; support
-  owner/budget alerts assigned; learner completes voice -> report -> review -> plan.
+- **Acceptance criteria:** Every free tier/term/limit is re-verified; deployment
+  requires no billing; `BILLING_MODE=free_only` rejects billable configuration;
+  no worker is deployed; cold-start, QStash-pending, Redis-loss and quota behavior
+  are exercised; provider data use/consent is verified; learner completes the
+  available voice-or-text -> report -> review -> plan path.
 - **Required tests:** Deployment smoke, previous-schema upgrade, compatible image
   rollback, active-session draining, backup restore, budgeted synthetic prod probe.
 - **Validation commands:** `pnpm test:migrations`, `pnpm test:smoke:staging`,

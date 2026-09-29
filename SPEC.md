@@ -1,8 +1,8 @@
 # FluentCoach AI — Product and architecture specification
 
-Status: M00 architecture/decisions accepted with live feasibility deferred to
-M05/M06 entry gates; M01 foundation implemented, 2026-09-29. Product behavior
-remains unimplemented.
+Status: M00 architecture amended by ADR 0005 for a strict zero-cost pilot;
+live feasibility remains deferred to M05/M06 entry gates. M01 foundation was
+implemented 2026-09-29. Product behavior remains unimplemented.
 
 ## 1. Intent and success
 
@@ -50,11 +50,11 @@ choices in future `docs/adr/` decision records.
 | Practice goal | Editable default of 10 minutes, three days/week | Validate in M02 |
 | Correction timing | Natural: after session; Teaching: after completed turns | Script review M03, live review M05/M06 |
 | Stack | M01 pins Node 20.20.x, pnpm, strict TypeScript, React/Vite, NestJS, PostgreSQL and Redis; Prisma/BullMQ when owned by later milestones | M00 compatibility resolved; review runtime support before production |
-| AI vendor/model | OpenAI Responses with configurable `gpt-5.6-terra` quality-first text/analysis candidate, configurable `gpt-realtime-2.1-mini` voice candidate, plus deterministic fake | M00 direction resolved; M05 may select another text model from quality/cost evidence |
-| Voice transport | Browser-to-OpenAI WebRTC plus API sideband authoritative events; text fallback | M00 architecture resolved; synthetic/live device spike gates M06 |
+| AI vendor/model | Gemini Developer API Free: configurable `gemini-3.8-flash` text/analysis and `gemini-3.8-live` Live candidate; deterministic fake; OpenAI optional future only | Re-check current free models/terms at M05/M06; model lifecycle is a risk |
+| Voice transport | Gemini Live direct browser WebSocket using API-minted ephemeral token if verified safe; otherwise minimum secure API WebSocket relay; text fallback | M06 must prove free-tier support, key safety, authority and target devices |
 | Identity | Auth0 EU OIDC tenant, closed sign-up, secure server sessions | M00 resolved; plan/DPA configuration gates real access |
-| Hosting | Render Frankfurt web/API/worker plus managed PostgreSQL/Key Value | M00 selected; price/service verification and deployment drill gate M11 |
-| Load/cost | Private pilot; five concurrent sessions; $10/month app AI hard cap and $50/month total approval ceiling | M00 resolved; re-quote before any spend |
+| Hosting | Render Static Site Free + one cold-starting Free API; Neon PostgreSQL Free; Upstash Redis/QStash Free; no deployed worker | M11 must re-check every free tier and refuse billing-required configuration |
+| Load/cost | One invited learner; `BILLING_MODE=free_only`; EUR 0/month; exhaustion fails closed; no paid fallback | Re-check limits/terms before deployment; any future spend requires owner approval and a new ADR |
 | Data retention | No application audio storage; transcripts/reports 90 days; structured learner state until deletion | Confirm before pilot, including independent provider retention |
 | Pedagogical review | Reviewed Spanish-learner examples and tutor rubric | Identify reviewer before pilot; no unsubstantiated validation claim |
 
@@ -89,24 +89,21 @@ Review these defaults with the learner before M09 acceptance.
 
 ## 5. High-level architecture
 
-Use a modular monolith, deployed as web, API and background-worker processes from
-one repository. Modules coordinate through application interfaces and events,
-not a network of microservices. PostgreSQL is canonical; Redis holds queue/cache
-state. API and worker share domain/application logic.
+Use a modular monolith from one repository. The zero-cost pilot deploys a static
+web app and API, not an always-on worker. QStash invokes secure idempotent API job
+endpoints; transport-neutral job ports preserve a future dedicated worker path.
+PostgreSQL is canonical; Redis holds non-canonical session/cache state.
 
 ```mermaid
 flowchart LR
-  Web[React web] -->|HTTPS REST and event stream| API[NestJS API]
+  Web[Render Static Site Free] -->|HTTPS REST / SSE| API[Render Free NestJS API]
   API --> App[Application use cases and domain rules]
-  App --> PG[(PostgreSQL)]
-  PG -->|Outbox dispatcher| Queue[(Redis / BullMQ)]
-  Queue --> Worker[Worker]
-  Worker --> App
-  API --> Adapter[AI adapters]
-  Worker --> Adapter
-  Adapter --> AI[External providers]
-  Web -. scoped voice media .-> AI
-  AI -. authoritative events .-> API
+  App --> PG[(Neon PostgreSQL Free: canonical + outbox)]
+  API --> Redis[(Upstash Redis Free: non-canonical)]
+  PG --> Q[Upstash QStash Free]
+  Q -->|signed invocation| API
+  API --> Gemini[Gemini Developer API Free]
+  Web -. ephemeral token or secure relay .-> Gemini
 ```
 
 Dotted paths depend on the voice spike. Without scoped controls and authoritative
@@ -122,7 +119,7 @@ Proposed layout:
 ```text
 apps/web/                 UI, accessibility, browser media
 apps/api/                 HTTP/stream transport, identity, dependency wiring
-apps/worker/              outbox dispatch, analysis, lifecycle jobs
+apps/worker/              local/future BullMQ worker; not deployed in free pilot
 packages/domain/          pure policies, entities and value types
 packages/application/     use cases and ports
 packages/contracts/       runtime-validated DTOs and event schemas
@@ -212,7 +209,7 @@ revision, and atomically commit terminal session, analysis run and outbox event.
 Late events require an explicit new revision, not silent mutation of evidence.
 Reanalysis atomically replaces the current report; exclude superseded observations.
 
-Outbox dispatch and BullMQ are at least once. Unique keys, transactions and
+Outbox dispatch through QStash (and future BullMQ) is at least once. Unique keys, transactions and
 leases make persistent effects idempotent. External provider calls may still
 duplicate after timeouts; do not claim exactly-once billing. Use bounded transient
 retries with jitter; permit at most one malformed-output repair; expose permanent
@@ -249,8 +246,8 @@ Do not silently emulate unsupported features. Apply deadlines, cancellation,
 input/output limits and spend checks to every call. Unknown usage remains
 unknown and is conservatively budgeted, not treated as free.
 
-Start with one real adapter and a deterministic fake; a second commercial vendor
-is not necessary to demonstrate separation. Isolate any browser media SDK behind
+Start with Gemini Free and a deterministic fake. OpenAI is an optional future
+adapter and is never an automatic or billable fallback in the initial pilot. Isolate any browser media SDK behind
 a frontend transport adapter. No invisible mid-session vendor switching: reconnect
 explicitly using saved context and disclose lost live context.
 
@@ -258,9 +255,22 @@ Version prompts, schemas, rubrics and taxonomy. Feedback remains evidence-backed
 and dismissible. Model-reported confidence is not calibrated probability. Do not
 derive pronunciation from text or automatically promote CEFR.
 
+### Zero-cost production policy
+
+Production uses `BILLING_MODE=free_only`. Startup rejects billable providers,
+paid plans and paid fallback configuration. The pilot uses Render Static Site and
+Web Service Free, Neon PostgreSQL Free, Upstash Redis and QStash Free, Auth0 Free
+(conditionally), and Gemini Developer API Free. Exhaustion makes the affected
+feature unavailable: AI rejects new sessions, voice offers text only when text
+quota exists, QStash leaves analysis pending, and Redis loss never compromises
+canonical PostgreSQL data. Render cold starts produce a startup/reconnecting UI.
+No automatic provider switch may generate cost. See ADR 0005 for current planning
+limits, Gemini data-use disclosure, model lifecycle risk, and superseded choices.
+
 ## 10. Quality, security and operations
 
-Proposed targets on the agreed devices/network at five concurrent sessions:
+Non-binding engineering targets on the agreed devices/network (the initial pilot
+has one learner and free-tier/cold-start constraints):
 API p95 <500 ms excluding AI; text first token p95 <2 s; voice utterance-end to
 audible response p95 <2 s; 95% of reports for sessions up to 20 minutes ready
 within 60 s. Record sample sizes and network/provider breakdowns. These are
@@ -282,8 +292,8 @@ targets, not measured claims. Default session limit: 20 minutes, configurable.
   feedback and announced status; no audio/color-only information.
 - Monitor correlation IDs, latency/errors, reconnects, job age/failure, rejected
   output and estimated cost. Health and dependency readiness are separate.
-- Proposed private-pilot availability: 99% monthly; backup RPO 24 h / RTO 4 h,
-  demonstrated in a restore drill before pilot.
+- No availability SLA applies to the free pilot; record cold starts and outages.
+  Backup RPO/RTO depend on verified free capabilities and must not imply paid service.
 
 ## 11. Testing and deployment summary
 
