@@ -1,14 +1,14 @@
 # FluentCoach AI — Incremental delivery plan
 
-Planning only. Implement sequentially in focused, reviewable PRs; split a
-milestone further if its criteria cannot be demonstrated together. No application
-implementation is authorized by the current planning deliverable.
+Implementation proceeds sequentially in focused, reviewable milestone PRs; split
+a milestone further if its criteria cannot be demonstrated together. Completed
+and in-progress work is recorded in each milestone's status and repository history.
 
 ## Command and completion conventions
 
-Every command below is a **planned contract**, not available today. M01 creates
-base tooling; later milestones add their real suites before running commands.
-Do not create empty success scripts. Required suites fail on zero collected tests.
+Commands for completed milestones are executable contracts. Later milestones add
+their named suites as part of their implementation before running them. Do not
+create empty success scripts. Required suites fail on zero collected tests.
 
 M01 onward, common gates are `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`,
 `pnpm build`. Integration tests use isolated migrated PostgreSQL/Redis and
@@ -65,7 +65,8 @@ strict EUR 0/month release gate.
 
 ## M02 — Identity and learner setup
 
-**Status: implementation and PostgreSQL/browser gates pass locally (2026-09-29), but M02 is not marked complete until the required Docker Compose gate runs in a daemon-capable environment. Auth0 Free tenant provisioning remains a later deployment gate recorded in ADR 0006.**
+**Status: complete (2026-09-29). All required M02 gates passed in PR #4. Auth0
+Free tenant provisioning remains a later deployment gate recorded in ADR 0006.**
 
 - **Objective:** Persist an isolated learner profile.
 - **Scope:** Invitation-only OIDC, secure server sessions, profile/goal/consent
