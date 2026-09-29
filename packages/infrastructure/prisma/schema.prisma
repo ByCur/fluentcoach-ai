@@ -1,7 +1,20 @@
-datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
-enum AccountStatus { ACTIVE DISABLED DELETING }
-enum CefrLevel { A1 A2 B1 B2 }
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+  DELETING
+}
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+}
 
 model Account {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
