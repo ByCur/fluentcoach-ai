@@ -2,3 +2,5 @@ export const LEARNER_SERVICE=Symbol('LEARNER_SERVICE');
 export const ACCOUNT_REPOSITORY=Symbol('ACCOUNT_REPOSITORY');
 export const CONVERSATION_SERVICE=Symbol('CONVERSATION_SERVICE');
 export const JOB_SERVICE=Symbol('JOB_SERVICE');
+export const AI_ADAPTERS=Symbol('AI_ADAPTERS');
+export const REPORT_SERVICE=Symbol('REPORT_SERVICE');

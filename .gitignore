@@ -9,3 +9,4 @@ test-results/
 *.log
 *.tsbuildinfo
 .DS_Store
+test-results/

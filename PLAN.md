@@ -125,6 +125,12 @@ duplicate/retry/recovery tests and the signed QStash boundary matrix. See
 
 ## M05 — Real text tutor and automatic reports
 
+**Status: implementation ready for technical review (2026-09-30); offline gates
+passed. Live entry gate and human-reviewed live rubric remain blocked by absent
+owner-approved Free-Tier credentials. M05 is not complete; no live Gemini
+validation is claimed. Revalidated after PR #12 hardening with all existing
+M03/M04 tests preserved. See ADR 0009 and the DOCUMENTATION.md validation notes.**
+
 - **Objective:** Useful live tutoring and evidence-backed feedback.
 - **Scope:** One real conversation/analyzer adapter, versioned prompts/schema,
   validation/evidence checks, deadlines/cancellation, budgets, report UI and retry.
