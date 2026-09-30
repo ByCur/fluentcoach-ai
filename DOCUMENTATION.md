@@ -7,7 +7,9 @@ feasibility is formally deferred to M05/M06 entry gates. The repository has
 pinned executable tooling,
 web/API/worker shells, PostgreSQL and Redis development services, validated
 server configuration, health/readiness endpoints, container builds, CI, and
-foundation tests. Product behavior and persistence remain intentionally absent.
+foundation tests. Identity/onboarding, deterministic text sessions and durable
+jobs are implemented; M05 adds synthetic-tested text AI and reports. Its live
+entry gate remains pending and no live Gemini quality is claimed.
 
 ADR 0005 selects a strict **EUR 0/month** pilot: Render Static Site Free,
 Render Free Web Service, Neon PostgreSQL Free, Upstash Redis Free, Upstash QStash
@@ -247,3 +249,41 @@ remaining assumptions. Distinguish proposed targets from measured results.
 M02 introduces Prisma migrations for account identity, one learner profile per account, one current practice goal per account, and historical versioned consent. PostgreSQL remains canonical; Redis contains expiring opaque sessions and one-time OIDC state only. Compose applies committed Prisma migrations before API startup, and readiness verifies the completed migration plus required M02 columns. The test reset applies the same committed migration SQL to an empty isolated database. API ownership comes solely from the authenticated session, mutations require CSRF plus Origin validation, and disabled accounts invalidate access. See ADR 0006 for the identity/session boundary and Auth0 Free manual-user boundary and remaining live tenant gate, and ADR 0007 for the explicit decision to defer RLS until separate non-owner runtime/migration roles and transaction context can be proven.
 
 The UI is Spanish-first, responsive and keyboard accessible, with profile, self-selected A1–B2 level, IANA timezone, interests, editable 10-minute/three-day goal, and explicit Gemini Free disclosure. No Gemini request or conversation feature exists in M02. `BILLING_MODE=free_only` is runtime validated; no paid fallback exists.
+
+
+## M05 implementation and validation note (2026-09-30)
+
+See ADR 0009 for the text/report decision and README for executable setup/eval
+commands. M05 remains in progress: the credentialed entry gate and human-reviewed
+live level/mode/scenario rubric have not run. The managed environment reports no
+configured provider secret or approval; `eval:ai ... --live` exits before network
+work with `Invalid AI configuration field: AI_FREE_TIER_APPROVED`.
+
+Validated with Node 20.20.0 and pnpm 10.28.1, synthetic fixtures and real local
+PostgreSQL 17.6/Redis 8.2.1:
+
+| Checks | Result |
+| --- | --- |
+| `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`, `pnpm build` | Passed; typecheck now also covers root tests/eval tooling. |
+| `pnpm test:unit`, `pnpm test:boundaries` | 45 and 2 tests passed. |
+| `pnpm db:migrate:test`, Prisma schema validation | Four migrations applied; schema valid. |
+| `pnpm test:integration:identity`, `pnpm test:integration:sessions`, `pnpm test:integration:jobs` | Existing 16, 1 and 2 tests passed unchanged. |
+| `pnpm test:contract:ai`, `pnpm test:integration:analysis` | 25 contracts and 15 real PostgreSQL/HTTP/upgrade tests passed. |
+| `pnpm test:resilience:jobs`, `pnpm test:smoke` | Existing 1 and 3 tests passed unchanged. |
+| Onboarding, conversation and report Playwright suites | All 7 browser tests passed, including five report/recovery flows. |
+| `pnpm eval:ai -- --suite pilot-text --billing-mode free_only` | All 48 fake level/mode/scenario cases passed policy/evidence checks, including help; human live review pending. |
+| Live eval with `--live` | Blocked before any provider call; no live validation claimed. |
+| Container configuration, API/worker/web images and runtime readiness | Passed with the cloud harness adjustments described below. |
+
+The cloud run needed `NODE_OPTIONS=--max-old-space-size=6144` for typed ESLint.
+Browser installation succeeded without the privileged dependency installer;
+Chromium's required libraries were already present and the actual browser tests
+passed. Docker builds used a temporary Dockerfile with the provided CA mounted
+only as a BuildKit secret. Temporary Compose overrides selected those images and
+added `wget -Y off` only to loopback health probes: inherited cloud proxy settings
+otherwise returned HTTP 403 for localhost. All five service health checks then
+passed and migration deployment exited successfully. The committed Dockerfile,
+Compose health checks and existing tests were not weakened or replaced.
+
+No live provider call, paid fallback, voice implementation, real-data pilot,
+merge or pull request was performed. Synthetic eval output stays outside Git.

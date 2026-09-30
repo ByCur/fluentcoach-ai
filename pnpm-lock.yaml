@@ -11,6 +11,18 @@ importers:
       '@eslint/js':
         specifier: 9.36.0
         version: 9.36.0
+      '@fluentcoach/application':
+        specifier: workspace:*
+        version: link:packages/application
+      '@fluentcoach/domain':
+        specifier: workspace:*
+        version: link:packages/domain
+      '@fluentcoach/infrastructure':
+        specifier: workspace:*
+        version: link:packages/infrastructure
+      '@fluentcoach/testing':
+        specifier: workspace:*
+        version: link:packages/testing
       '@nestjs/common':
         specifier: 11.1.6
         version: 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)

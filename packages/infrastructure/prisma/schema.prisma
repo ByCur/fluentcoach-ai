@@ -88,6 +88,8 @@ enum ConversationMode {
   TEACHING
 }
 model PracticeSession {
+ turnLeaseToken String? @map("turn_lease_token") @db.Uuid
+ turnLeaseUntil DateTime? @map("turn_lease_until") @db.Timestamptz
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   accountId String @map("account_id") @db.Uuid
   profileId String @map("profile_id") @db.Uuid
@@ -145,6 +147,7 @@ enum AnalysisStatus {
   SKIPPED
 }
 model AnalysisRun {
+ leaseToken String? @map("lease_token") @db.Uuid
  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  sessionId String @map("session_id") @db.Uuid
  accountId String @map("account_id") @db.Uuid
@@ -175,9 +178,14 @@ model OutboxEvent {
  @@map("outbox_events")
 }
 model ProviderRun {
+ sessionId String? @map("session_id") @db.Uuid
+ requestId String? @map("request_id") @db.VarChar(200)
+ inputTokens Int? @map("input_tokens")
+ outputTokens Int? @map("output_tokens")
+ finishReason String? @map("finish_reason") @db.VarChar(40)
  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  accountId String @map("account_id") @db.Uuid
- analysisRunId String @map("analysis_run_id") @db.Uuid
+ analysisRunId String? @map("analysis_run_id") @db.Uuid
  operation String @db.VarChar(40)
  adapter String @db.VarChar(40)
  model String @db.VarChar(80)
@@ -188,4 +196,36 @@ model ProviderRun {
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
  @@index([accountId,analysisRunId])
  @@map("provider_runs")
+}
+
+model SessionReport {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ analysisRunId String @unique @map("analysis_run_id") @db.Uuid
+ sessionId String @map("session_id") @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ transcriptRevision Int @map("transcript_revision")
+ schemaVersion String @map("schema_version") @db.VarChar(40)
+ content Json
+ partial Boolean @default(false)
+ generatedAt DateTime @default(now()) @map("generated_at") @db.Timestamptz
+ @@unique([sessionId,accountId])
+ @@map("session_reports")
+}
+model AiDailyBudget {
+ model String @db.VarChar(80)
+ day DateTime @db.Date
+ requests Int
+ tokens Int
+ blocked Boolean @default(false)
+ @@id([model,day])
+ @@map("ai_daily_budgets")
+}
+model AiBudgetReservation {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ model String @db.VarChar(80)
+ day DateTime @db.Date
+ reservedTokens Int @map("reserved_tokens")
+ inputTokens Int? @map("input_tokens")
+ outputTokens Int? @map("output_tokens")
+ @@map("ai_budget_reservations")
 }

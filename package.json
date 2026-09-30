@@ -11,7 +11,7 @@
     "build": "pnpm -r --if-present build",
     "dev": "pnpm --parallel --filter @fluentcoach/web --filter @fluentcoach/api --filter @fluentcoach/worker dev",
     "lint": "eslint .",
-    "typecheck": "pnpm -r --if-present typecheck",
+    "typecheck": "pnpm -r --if-present typecheck && tsc --noEmit",
     "test:unit": "vitest run --project unit",
     "test:boundaries": "vitest run --project boundaries",
     "test:smoke": "vitest run --project smoke",
@@ -24,7 +24,10 @@
     "test:contract:ai": "vitest run --project ai-contract",
     "test:e2e:conversation": "playwright test tests/e2e/conversation.spec.ts",
     "test:integration:jobs": "vitest run --project jobs",
-    "test:resilience:jobs": "vitest run --project job-resilience"
+    "test:resilience:jobs": "vitest run --project job-resilience",
+    "test:integration:analysis": "vitest run --project analysis",
+    "test:e2e:reports": "playwright test tests/e2e/reports.spec.ts",
+    "eval:ai": "tsx scripts/eval-ai.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.36.0",
@@ -45,6 +48,10 @@
     "tsx": "4.20.5",
     "typescript": "5.9.2",
     "typescript-eslint": "8.44.1",
-    "vitest": "3.2.4"
+    "vitest": "3.2.4",
+    "@fluentcoach/application": "workspace:*",
+    "@fluentcoach/domain": "workspace:*",
+    "@fluentcoach/infrastructure": "workspace:*",
+    "@fluentcoach/testing": "workspace:*"
   }
 }
