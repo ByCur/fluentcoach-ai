@@ -316,7 +316,8 @@ Revalidated with Node 20.20.0, pnpm 10.28.1, isolated synthetic PostgreSQL
 | Container configuration, API/worker/web builds, migration deployment and five health checks | Passed with the existing temporary cloud CA/proxy harness and an isolated database. |
 
 Total: 149 passing tests, plus the 48-case fake eval. No gates were skipped or
-weakened. The shared development database contained three orphaned synthetic
+weakened. CI stops application containers after their health checks and before
+database gates so the automatic reconciler cannot claim test-owned jobs. The shared development database contained three orphaned synthetic
 analysis outboxes from earlier testing; the hardening correctly rejected that
 invalid upgrade. Container validation used a fresh isolated database, preserving
 the shared database. Nonempty valid M04 and M05 upgrade paths passed the automated

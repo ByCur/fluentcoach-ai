@@ -22,6 +22,8 @@ jobs:
       - run: pnpm build
       - run: docker compose config --quiet
       - run: docker compose up --build --wait --wait-timeout 180
+      # Runtime health is verified above; database gates own their fake job execution.
+      - run: docker compose stop api web worker
       - run: pnpm exec prisma validate --schema packages/infrastructure/prisma/schema.prisma
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
       - run: pnpm db:migrate:test
@@ -38,7 +40,6 @@ jobs:
       - run: pnpm eval:ai -- --suite pilot-text --billing-mode free_only
       - run: pnpm test:resilience:jobs
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
-      - run: docker compose stop api web worker
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:onboarding
         env:
