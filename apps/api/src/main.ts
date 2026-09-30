@@ -7,7 +7,7 @@ import cookieParser from 'cookie-parser';
 import { ApiExceptionFilter } from './api-exception.filter.js';
 
 const config = loadServerConfig(process.env);
-const app = await NestFactory.create(AppModule, { logger: ['error', 'warn', 'log'] });
+const app = await NestFactory.create(AppModule, { rawBody: true, logger: ['error', 'warn', 'log'] });
 app.use(cookieParser());
 app.useGlobalFilters(new ApiExceptionFilter());
 app.enableCors({origin:config.PUBLIC_ORIGIN,credentials:true,allowedHeaders:['content-type','x-csrf-token']});

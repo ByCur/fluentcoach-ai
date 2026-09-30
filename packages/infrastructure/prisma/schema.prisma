@@ -26,6 +26,7 @@ model Account {
   profile LearnerProfile?
   goals PracticeGoal[]
   consents ConsentRecord[]
+  sessions PracticeSession[]
   @@unique([oidcIssuer, oidcSubject])
   @@map("accounts")
 }
@@ -42,6 +43,7 @@ model LearnerProfile {
   version Int @default(1)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  sessions PracticeSession[]
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
   @@unique([id, accountId])
   @@map("learner_profiles")
@@ -72,4 +74,118 @@ model ConsentRecord {
   @@unique([accountId, purpose, policyVersion, providerDisclosureVersion, acceptedAt])
   @@index([accountId, purpose, acceptedAt])
   @@map("consent_records")
+}
+
+enum SessionState {
+  CREATED
+  ACTIVE
+  ENDED
+  ABANDONED
+  FAILED
+}
+enum ConversationMode {
+  NATURAL
+  TEACHING
+}
+model PracticeSession {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId String @map("account_id") @db.Uuid
+  profileId String @map("profile_id") @db.Uuid
+  scenarioSlug String @map("scenario_slug") @db.VarChar(40)
+  scenarioVersion Int @map("scenario_version")
+  level CefrLevel
+  mode ConversationMode
+  promptVersion String @map("prompt_version") @db.VarChar(40)
+  state SessionState @default(CREATED)
+  transcriptRevision Int @default(0) @map("transcript_revision")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  endedAt DateTime? @map("ended_at") @db.Timestamptz
+  turns ConversationTurn[]
+  events SessionEvent[]
+  account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
+  profile LearnerProfile @relation(fields:[profileId,accountId],references:[id,accountId],onDelete:Cascade)
+  @@index([accountId, createdAt])
+  @@unique([id, accountId])
+  @@map("practice_sessions")
+}
+model ConversationTurn {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ sessionId String @map("session_id") @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ sequence Int
+ sourceEventKey String @map("source_event_key") @db.VarChar(100)
+ speaker String @db.VarChar(16)
+ text String
+ language String @db.VarChar(8)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ session PracticeSession @relation(fields:[sessionId,accountId],references:[id,accountId],onDelete:Cascade)
+ @@unique([sessionId,sequence])
+ @@unique([sessionId,sourceEventKey])
+ @@map("conversation_turns")
+}
+model SessionEvent {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ sessionId String @map("session_id") @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ sequence Int
+ kind String @db.VarChar(50)
+ payload Json
+ occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+ session PracticeSession @relation(fields:[sessionId,accountId],references:[id,accountId],onDelete:Cascade)
+ @@unique([sessionId,sequence])
+ @@index([accountId,sessionId,sequence])
+ @@map("session_events")
+}
+
+enum AnalysisStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+model AnalysisRun {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ sessionId String @map("session_id") @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ transcriptRevision Int @map("transcript_revision")
+ analyzerVersion String @map("analyzer_version") @db.VarChar(40)
+ status AnalysisStatus @default(PENDING)
+ attempts Int @default(0)
+ leaseUntil DateTime? @map("lease_until") @db.Timestamptz
+ errorCode String? @map("error_code") @db.VarChar(80)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ @@unique([sessionId,transcriptRevision,analyzerVersion])
+ @@unique([id,accountId])
+ @@index([accountId,status])
+ @@map("analysis_runs")
+}
+model OutboxEvent {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ aggregateId String @map("aggregate_id") @db.Uuid
+ eventType String @map("event_type") @db.VarChar(80)
+ envelopeVersion Int @map("envelope_version")
+ payload Json
+ dedupeKey String @unique @map("dedupe_key") @db.VarChar(160)
+ attempts Int @default(0)
+ publishedAt DateTime? @map("published_at") @db.Timestamptz
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ @@index([publishedAt,createdAt])
+ @@map("outbox_events")
+}
+model ProviderRun {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ analysisRunId String @map("analysis_run_id") @db.Uuid
+ operation String @db.VarChar(40)
+ adapter String @db.VarChar(40)
+ model String @db.VarChar(80)
+ promptVersion String @map("prompt_version") @db.VarChar(40)
+ schemaVersion String @map("schema_version") @db.VarChar(40)
+ outcome String @db.VarChar(30)
+ latencyMs Int @map("latency_ms")
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ @@index([accountId,analysisRunId])
+ @@map("provider_runs")
 }
