@@ -1,10 +1,111 @@
-import type{AnalysisJob,AnalysisRun,JobStore}from'@fluentcoach/application';import{pool,sql}from'./prisma.js';
-type Row={id:string;account_id:string;session_id:string;transcript_revision:number;status:'PENDING'|'RUNNING'|'SUCCEEDED'|'FAILED'|'SKIPPED';attempts:number;lease_until:Date|undefined;error_code:string|undefined};
-const map=(r:Row):AnalysisRun=>({id:r.id,accountId:r.account_id,sessionId:r.session_id,revision:r.transcript_revision,status:r.status.toLowerCase()as AnalysisRun['status'],attempts:r.attempts,...(r.lease_until?{leaseUntil:r.lease_until}:{}),...(r.error_code?{errorCode:r.error_code}:{})});
-export class PostgresJobStore implements JobStore{
- async finalize(i:{accountId:string;sessionId:string;hasTurns:boolean}){const c=await pool.connect();try{await c.query('BEGIN');const session=(await c.query<{state:string;transcript_revision:number}>('SELECT state,transcript_revision FROM practice_sessions WHERE account_id=$1 AND id=$2 FOR UPDATE',[i.accountId,i.sessionId])).rows[0];if(!session)throw Error('SESSION_NOT_FOUND');if(session.state==='ENDED'){const existing=(await c.query<Row>('SELECT * FROM analysis_runs WHERE account_id=$1 AND session_id=$2 AND transcript_revision=$3 ORDER BY created_at DESC LIMIT 1',[i.accountId,i.sessionId,session.transcript_revision])).rows[0];if(!existing)throw Error('FINALIZATION_INCOMPLETE');const outbox=(await c.query<{id:string}>('SELECT id FROM outbox_events WHERE dedupe_key=$1',[`analysis:${existing.id}`])).rows[0];if(!outbox)throw Error('FINALIZATION_INCOMPLETE');await c.query('COMMIT');return{run:map(existing),outboxId:outbox.id}}const revision=session.transcript_revision+1;await c.query(`UPDATE practice_sessions SET state='ENDED',ended_at=now(),transcript_revision=$3 WHERE account_id=$1 AND id=$2`,[i.accountId,i.sessionId,revision]);const run=(await c.query<Row>('INSERT INTO analysis_runs(session_id,account_id,transcript_revision,analyzer_version,status)VALUES($1,$2,$3,$4,$5) RETURNING *',[i.sessionId,i.accountId,revision,'fake-v1',i.hasTurns?'PENDING':'SKIPPED'])).rows[0]!;const outbox=(await c.query<{id:string}>('INSERT INTO outbox_events(account_id,aggregate_id,event_type,envelope_version,payload,dedupe_key,published_at)VALUES($1,$2,$3,1,$4,$5,CASE WHEN $6 THEN NULL ELSE now() END) RETURNING id',[i.accountId,i.sessionId,'analysis.requested',{version:1,analysisRunId:run.id,accountId:i.accountId,sessionId:i.sessionId,transcriptRevision:revision},`analysis:${run.id}`,i.hasTurns])).rows[0]!;await c.query('COMMIT');return{run:map(run),outboxId:outbox.id}}catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}}
- async claim(id:string,now:Date,leaseUntil:Date){const r=(await sql<Row>(`UPDATE analysis_runs SET status='RUNNING',attempts=attempts+1,lease_until=$2 WHERE id=$1 AND (status='PENDING' OR (status='RUNNING' AND lease_until<$3)) RETURNING *`,[id,leaseUntil,now]))[0];return r?map(r):null}
- async succeed(id:string,providerRunId:string){const c=await pool.connect();try{await c.query('BEGIN');await c.query("UPDATE analysis_runs SET status='SUCCEEDED',lease_until=NULL,error_code=NULL WHERE id=$1",[id]);await c.query("INSERT INTO provider_runs(id,account_id,analysis_run_id,operation,adapter,model,prompt_version,schema_version,outcome,latency_ms)SELECT $2,account_id,id,'analysis','fake','deterministic','analysis-v1','report-v1','succeeded',0 FROM analysis_runs WHERE id=$1 ON CONFLICT(id)DO NOTHING",[id,providerRunId]);await c.query('COMMIT')}catch(e){await c.query('ROLLBACK');throw e}finally{c.release()}}
- async fail(id:string,code:string,retry:boolean){await sql(`UPDATE analysis_runs SET status=$2,lease_until=NULL,error_code=$3 WHERE id=$1`,[id,retry?'PENDING':'FAILED',code])}
- async markPublished(id:string){await sql("UPDATE outbox_events SET published_at=now(),attempts=attempts+1 WHERE payload->>'analysisRunId'=$1 AND published_at IS NULL",[id])}
- async pending(){const rows=await sql<{payload:AnalysisJob}>(`SELECT o.payload FROM outbox_events o JOIN analysis_runs a ON a.id=(o.payload->>'analysisRunId')::uuid AND a.account_id=o.account_id WHERE o.published_at IS NULL AND o.event_type='analysis.requested' AND a.status='PENDING' ORDER BY o.created_at`);return rows.map(r=>r.payload)}}
+import { createHash } from 'node:crypto';
+import type { PoolClient } from 'pg';
+import type { AnalysisJob, AnalysisRun, JobStore, TranscriptRevisionInput } from '@fluentcoach/application';
+import type { ConversationTurn } from '@fluentcoach/domain';
+import { pool, sql } from './prisma.js';
+type Row = {id: string; account_id: string; session_id: string; transcript_revision: number; status: 'PENDING'|'RUNNING'|'SUCCEEDED'|'FAILED'|'SKIPPED'; attempts: number; lease_until?: Date; error_code?: string};
+type Session = {state: string; transcript_revision: number};
+const map = (r: Row): AnalysisRun => ({id: r.id, accountId: r.account_id, sessionId: r.session_id, revision: r.transcript_revision, status: r.status.toLowerCase() as AnalysisRun['status'], attempts: r.attempts, ...(r.lease_until ? {leaseUntil: r.lease_until} : {}), ...(r.error_code ? {errorCode: r.error_code} : {})});
+async function transaction<T>(operation: (c: PoolClient) => Promise<T>) {
+  const c = await pool.connect();
+  try { await c.query('BEGIN'); const result = await operation(c); await c.query('COMMIT'); return result; }
+  catch (error) { await c.query('ROLLBACK'); throw error; }
+  finally { c.release(); }
+}
+async function lockSession(c: PoolClient, accountId: string, sessionId: string) {
+  const session = (await c.query<Session>('SELECT state,transcript_revision FROM practice_sessions WHERE account_id=$1 AND id=$2 FOR UPDATE', [accountId, sessionId])).rows[0];
+  if (!session) throw new Error('SESSION_NOT_FOUND');
+  return session;
+}
+async function existing(c: PoolClient, accountId: string, sessionId: string, revision: number) {
+  const row = (await c.query<Row>('SELECT * FROM analysis_runs WHERE account_id=$1 AND session_id=$2 AND transcript_revision=$3 AND analyzer_version=$4', [accountId, sessionId, revision, 'fake-v1'])).rows[0];
+  const outbox = row && (await c.query<{id: string}>('SELECT id FROM outbox_events WHERE account_id=$1 AND dedupe_key=$2', [accountId, `analysis:${row.id}`])).rows[0];
+  if (!row || !outbox) throw new Error('FINALIZATION_INCOMPLETE');
+  return {run: map(row), outboxId: outbox.id};
+}
+function normalize(turns: ConversationTurn[]) {
+  const keys = new Set<string>();
+  return turns.map((t, index) => {
+    if (t.sequence !== index + 1 || !t.sourceEventKey || t.sourceEventKey.length > 100 || keys.has(t.sourceEventKey) || !['learner','tutor','help'].includes(t.speaker) || !['en','es'].includes(t.language) || typeof t.text !== 'string' || !t.text.trim()) throw new Error('INVALID_TRANSCRIPT_REVISION');
+    keys.add(t.sourceEventKey);
+    return {sequence: t.sequence, sourceEventKey: t.sourceEventKey, speaker: t.speaker, text: t.text, language: t.language};
+  });
+}
+const hash = (turns: ConversationTurn[]) => createHash('sha256').update(JSON.stringify(turns)).digest('hex');
+async function createRevision(c: PoolClient, accountId: string, sessionId: string, revision: number, sourceKey: string, turns: ConversationTurn[], partial: boolean) {
+  await c.query('INSERT INTO transcript_revisions(session_id,account_id,revision,source_key,content_hash,turns,partial) VALUES($1,$2,$3,$4,$5,$6,$7)', [sessionId, accountId, revision, sourceKey, hash(turns), JSON.stringify(turns), partial]);
+  await c.query('INSERT INTO transcript_revision_receipts(session_id,account_id,source_key,revision) VALUES($1,$2,$3,$4)', [sessionId,accountId,sourceKey,revision]);
+  const hasTurns = turns.some(t => t.speaker === 'learner');
+  const run = (await c.query<Row>('INSERT INTO analysis_runs(session_id,account_id,transcript_revision,analyzer_version,status) VALUES($1,$2,$3,$4,$5) RETURNING *', [sessionId, accountId, revision, 'fake-v1', hasTurns ? 'PENDING' : 'SKIPPED'])).rows[0]!;
+  const job: AnalysisJob = {version: 1, analysisRunId: run.id, accountId, sessionId, transcriptRevision: revision};
+  const outbox = (await c.query<{id: string}>('INSERT INTO outbox_events(account_id,aggregate_id,event_type,envelope_version,payload,dedupe_key,published_at) VALUES($1,$2,$3,1,$4,$5,CASE WHEN $6 THEN NULL ELSE now() END) RETURNING id', [accountId, sessionId, 'analysis.requested', job, `analysis:${run.id}`, hasTurns])).rows[0]!;
+  return {run: map(run), outboxId: outbox.id};
+}
+export class PostgresJobStore implements JobStore {
+  // hasTurns is advisory; persisted evidence determines whether analysis is skipped.
+  finalize(i: {accountId: string; sessionId: string; hasTurns: boolean}) {
+    return transaction(async c => {
+      const session = await lockSession(c, i.accountId, i.sessionId);
+      if (session.transcript_revision > 0) return existing(c, i.accountId, i.sessionId, session.transcript_revision);
+      const turns = (await c.query<ConversationTurn>('SELECT sequence,source_event_key AS "sourceEventKey",speaker,text,language FROM conversation_turns WHERE account_id=$1 AND session_id=$2 ORDER BY sequence', [i.accountId, i.sessionId])).rows;
+      const partial = ['ABANDONED','FAILED'].includes(session.state);
+      await c.query("UPDATE practice_sessions SET state=CASE WHEN state IN ('ABANDONED','FAILED') THEN state ELSE 'ENDED' END,ended_at=COALESCE(ended_at,now()),transcript_revision=1 WHERE account_id=$1 AND id=$2", [i.accountId, i.sessionId]);
+      return createRevision(c, i.accountId, i.sessionId, 1, 'finalization', normalize(turns), partial);
+    });
+  }
+  revise(i: TranscriptRevisionInput) {
+    return transaction(async c => {
+      const session = await lockSession(c, i.accountId, i.sessionId);
+      if (!['ENDED','ABANDONED','FAILED'].includes(session.state) || !session.transcript_revision) throw new Error('SESSION_NOT_FINALIZED');
+      if (!i.sourceKey || i.sourceKey.length > 100 || i.sourceKey === 'finalization') throw new Error('INVALID_TRANSCRIPT_REVISION');
+      const turns = normalize(i.turns), contentHash = hash(turns);
+      const byKey = (await c.query<{revision: number; turns: ConversationTurn[]}>('SELECT t.revision,t.turns FROM transcript_revision_receipts r JOIN transcript_revisions t ON t.session_id=r.session_id AND t.revision=r.revision AND t.account_id=r.account_id WHERE r.account_id=$1 AND r.session_id=$2 AND r.source_key=$3', [i.accountId, i.sessionId, i.sourceKey])).rows[0];
+      if (byKey) {
+        if (hash(normalize(byKey.turns)) !== contentHash) throw new Error('REVISION_KEY_CONFLICT');
+        return existing(c, i.accountId, i.sessionId, byKey.revision);
+      }
+      // Compare canonical content, also covering snapshots backfilled by the migration.
+      const revisions = (await c.query<{revision: number; turns: ConversationTurn[]}>('SELECT revision,turns FROM transcript_revisions WHERE account_id=$1 AND session_id=$2', [i.accountId, i.sessionId])).rows;
+      const same = revisions.find(r => hash(normalize(r.turns)) === contentHash);
+      if (same) {
+        await c.query('INSERT INTO transcript_revision_receipts(session_id,account_id,source_key,revision) VALUES($1,$2,$3,$4)', [i.sessionId,i.accountId,i.sourceKey,same.revision]);
+        return existing(c, i.accountId, i.sessionId, same.revision);
+      }
+      const revision = session.transcript_revision + 1;
+      await c.query('UPDATE practice_sessions SET transcript_revision=$3 WHERE account_id=$1 AND id=$2', [i.accountId, i.sessionId, revision]);
+      return createRevision(c, i.accountId, i.sessionId, revision, i.sourceKey, turns, session.state !== 'ENDED');
+    });
+  }
+  claim(job: AnalysisJob, now: Date, leaseUntil: Date, maxAttempts: number) {
+    return transaction(async c => {
+      const row = (await c.query<Row>('SELECT * FROM analysis_runs WHERE id=$1 AND account_id=$2 AND session_id=$3 AND transcript_revision=$4 FOR UPDATE', [job.analysisRunId, job.accountId, job.sessionId, job.transcriptRevision])).rows[0];
+      if (!row) throw new Error('JOB_ENVELOPE_MISMATCH');
+      if (row.status !== 'PENDING' && !(row.status === 'RUNNING' && row.lease_until && row.lease_until <= now)) return null;
+      if (row.attempts >= maxAttempts) {
+        await c.query("UPDATE analysis_runs SET status='FAILED',lease_until=NULL,error_code='RETRIES_EXHAUSTED' WHERE id=$1", [row.id]);
+        return null;
+      }
+      const claimed = (await c.query<Row>("UPDATE analysis_runs SET status='RUNNING',attempts=attempts+1,lease_until=$2 WHERE id=$1 RETURNING *", [row.id, leaseUntil])).rows[0]!;
+      return map(claimed);
+    });
+  }
+  async succeed(run: AnalysisRun, providerRunId: string) {
+    await transaction(async c => {
+      const updated = await c.query("UPDATE analysis_runs SET status='SUCCEEDED',lease_until=NULL,error_code=NULL WHERE id=$1 AND account_id=$2 AND status='RUNNING' AND attempts=$3 AND lease_until=$4 RETURNING id", [run.id, run.accountId, run.attempts, run.leaseUntil]);
+      if (!updated.rowCount) throw new Error('JOB_LEASE_LOST');
+      await c.query("INSERT INTO provider_runs(id,account_id,analysis_run_id,operation,adapter,model,prompt_version,schema_version,outcome,latency_ms) VALUES($1,$2,$3,'analysis','fake','deterministic','analysis-v1','report-v1','succeeded',0)", [providerRunId, run.accountId, run.id]);
+    });
+  }
+  async fail(run: AnalysisRun, code: string, retry: boolean) {
+    await transaction(async c => {
+      const updated = await c.query('UPDATE analysis_runs SET status=$3,lease_until=NULL,error_code=$4 WHERE id=$1 AND account_id=$2 AND status=\'RUNNING\' AND attempts=$5 AND lease_until=$6 RETURNING id', [run.id, run.accountId, retry ? 'PENDING' : 'FAILED', code, run.attempts, run.leaseUntil]);
+      if (updated.rowCount && retry) await c.query('UPDATE outbox_events SET published_at=NULL WHERE account_id=$1 AND dedupe_key=$2', [run.accountId, `analysis:${run.id}`]);
+    });
+  }
+  async markPublished(id: string) { await sql('UPDATE outbox_events SET published_at=now(),attempts=attempts+1 WHERE dedupe_key=$1', [`analysis:${id}`]); }
+  async pending() {
+    const rows = await sql<{payload: AnalysisJob}>(`SELECT o.payload FROM outbox_events o JOIN analysis_runs a ON a.id=(o.payload->>'analysisRunId')::uuid AND a.account_id=o.account_id AND a.session_id=o.aggregate_id
+      WHERE o.event_type='analysis.requested' AND ((a.status='PENDING' AND (o.published_at IS NULL OR o.published_at < now()-interval '30 seconds')) OR (a.status='RUNNING' AND a.lease_until<=now())) ORDER BY o.created_at`);
+    return rows.map(r => r.payload);
+  }
+}

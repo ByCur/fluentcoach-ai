@@ -1,10 +1,11 @@
 # FluentCoach AI
 
 FluentCoach is a strict TypeScript modular monolith for a private English-learning
-pilot. M00–M02 are complete: the repository records the architecture and
+pilot. M00–M04 are complete: the repository records the architecture and
 feasibility decisions, provides the executable foundation and quality gates, and
-implements isolated learner identity plus Spanish-first onboarding. Tutoring, AI,
-and voice behavior remain later milestones.
+implements isolated learner identity, Spanish-first onboarding, deterministic
+text practice and durable background execution. Live AI and voice remain later
+milestones. M03/M04 acceptance evidence is recorded in PLAN.md and ADR 0008.
 
 ## Prerequisites
 
@@ -110,3 +111,35 @@ these prompts, replacing the milestone or PR number when appropriate:
 **PR fix**
 
 > Fix PR #N using the fluentcoach-pr-fix skill. Resolve review feedback and CI until green. Do not merge.
+
+## M03/M04 deterministic practice and durable jobs
+
+Practice exposes all six scenarios, A1/A2/B1/B2 and both modes. The fake tutor
+streams three chunks; test mode delays each chunk to demonstrate incremental
+rendering and cursor resume. Spanish help returns to English on the next tutor
+turn. Session end freezes evidence and commits analysis/outbox atomically.
+
+M03/M04 gates require migrated synthetic PostgreSQL data; the resilience gate
+also uses PostgreSQL and fails when DATABASE_URL is missing. Run:
+
+```bash
+pnpm db:migrate:test
+pnpm lint
+pnpm typecheck
+pnpm test:unit
+pnpm test:boundaries
+pnpm build
+pnpm test:integration:sessions
+pnpm test:contract:ai
+pnpm test:integration:jobs
+pnpm test:resilience:jobs
+pnpm test:e2e:conversation
+```
+
+Set DATABASE_URL, REDIS_URL and BILLING_MODE=free_only as in .env.example.
+`db:migrate:test` drops the test schema: use an isolated disposable database.
+Production job delivery requires QSTASH_TOKEN, both rotation signing keys and
+PUBLIC_ORIGIN. The two job endpoints verify the exact signed raw body and public
+URL; reconciliation must be scheduled. Missing transport retains PostgreSQL
+work for recovery. No live or paid provider is used by these gates. See ADR 0008
+for late revision semantics, recovery, migration compatibility and rollback.

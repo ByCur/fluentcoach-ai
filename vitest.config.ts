@@ -17,8 +17,8 @@ export default defineConfig({
       { resolve: { alias: sourceAliases }, test: { name: 'boundaries', include: ['tests/boundaries/**/*.test.ts'] } },
       { resolve: { alias: sourceAliases }, test: { name: 'smoke', include: ['tests/smoke/**/*.test.ts'] } },
       { resolve: { alias: sourceAliases }, test: { name: 'identity', include: ['tests/integration/identity.test.ts','tests/integration/http-security.test.ts'], testTimeout: 15000 } },
-      { resolve: { alias: sourceAliases }, test: { name: 'sessions', include: ['tests/integration/sessions.test.ts'], testTimeout: 15000 } },
-      { resolve: { alias: sourceAliases }, test: { name: 'jobs', include: ['tests/integration/jobs.test.ts'], testTimeout: 15000 } },
+      { resolve: { alias: sourceAliases }, test: { name: 'sessions', include: ['tests/integration/sessions.test.ts','tests/integration/conversation-http.test.ts'], testTimeout: 15000 } },
+      { resolve: { alias: sourceAliases }, test: { name: 'jobs', include: ['tests/integration/jobs.test.ts','tests/integration/hardening-migration.test.ts'], testTimeout: 15000 } },
       { resolve: { alias: sourceAliases }, test: { name: 'ai-contract', include: ['tests/contract/**/*.test.ts'] } },
       { resolve: { alias: sourceAliases }, test: { name: 'job-resilience', include: ['tests/resilience/**/*.test.ts'] } }
     ]
