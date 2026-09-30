@@ -22,13 +22,26 @@ jobs:
       - run: pnpm build
       - run: docker compose config --quiet
       - run: docker compose up --build --wait --wait-timeout 180
+      - run: pnpm exec prisma validate --schema packages/infrastructure/prisma/schema.prisma
+        env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
       - run: pnpm db:migrate:test
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
       - run: pnpm test:integration:identity
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
+      - run: pnpm test:integration:sessions
+        env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
+      - run: pnpm test:contract:ai
+      - run: pnpm test:integration:jobs
+        env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
+      - run: pnpm test:resilience:jobs
       - run: docker compose stop api web worker
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:onboarding
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          REDIS_URL: "redis://localhost:6379"
+          BILLING_MODE: free_only
+      - run: pnpm test:e2e:conversation
         env:
           DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
           REDIS_URL: "redis://localhost:6379"
