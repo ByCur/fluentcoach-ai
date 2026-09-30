@@ -1,6 +1,12 @@
 import { pool } from './prisma.js';
 export const M05_MIGRATION = '202609300004_m05_reports';
 export const M02_MIGRATION = '202609290001_m02_identity';
+const requiredMigrations = [
+  M02_MIGRATION,
+  '202609300001_m03_m04_hardening',
+  M05_MIGRATION,
+  '202609300005_m05_hardening_compatibility',
+];
 const requiredColumns = [
   ['accounts', 'oidc_issuer'],
   ['accounts', 'oidc_subject'],
@@ -13,6 +19,8 @@ const requiredColumns = [
   ['consent_records', 'account_id'],
   ['consent_records', 'provider_disclosure_version'],
   ['practice_sessions', 'turn_lease_token'],
+  ['transcript_revisions', 'turns'],
+  ['transcript_revision_receipts', 'source_key'],
   ['analysis_runs', 'lease_token'],
   ['session_reports', 'content'],
   ['session_reports', 'transcript_revision'],
@@ -23,10 +31,10 @@ const requiredColumns = [
 export async function schemaReady(): Promise<boolean> {
   try {
     const migration = await pool.query(
-      'SELECT 1 FROM _prisma_migrations WHERE migration_name IN ($1,$2) AND finished_at IS NOT NULL AND rolled_back_at IS NULL',
-      [M02_MIGRATION, M05_MIGRATION],
+      'SELECT 1 FROM _prisma_migrations WHERE migration_name IN ($1,$2,$3,$4) AND finished_at IS NOT NULL AND rolled_back_at IS NULL',
+      requiredMigrations,
     );
-    if (migration.rowCount !== 2) return false;
+    if (migration.rowCount !== requiredMigrations.length) return false;
     const values = requiredColumns
       .map((_, index) => `($${index * 2 + 1},$${index * 2 + 2})`)
       .join(',');

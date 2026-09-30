@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  NotFoundException,
   Body,
   Controller,
   Get,
@@ -60,25 +62,34 @@ export class ConversationController {
     @Query('cursor') cursor = '0',
     @Res() res: Response,
   ) {
-    let next = Number(cursor);
-    if (!Number.isSafeInteger(next) || next < 0) throw Error('INVALID_CURSOR');
-    await this.service.events(r.accountId!, id, next);
+    const resume = r.headers['last-event-id'];
+    let next = Number(typeof resume === 'string' ? resume : cursor);
+    if (!Number.isSafeInteger(next) || next < 0)
+      throw new BadRequestException('INVALID_STREAM_CURSOR');
+    // Authorize before committing SSE headers so guessed IDs receive a normal 404.
+    let events;
+    try {
+      events = await this.service.events(r.accountId!, id, next);
+    } catch {
+      throw new NotFoundException('SESSION_NOT_FOUND');
+    }
     res.setHeader('content-type', 'text/event-stream');
     res.setHeader('cache-control', 'no-cache, no-transform');
+    res.setHeader('x-accel-buffering', 'no');
     res.flushHeaders();
-    for (let poll = 0; poll < 100 && !res.destroyed; poll++) {
-      const events = await this.service.events(r.accountId!, id, next);
+    for (let poll = 0; poll < 300 && !res.destroyed; poll++) {
       for (const e of events) {
         res.write(`id: ${e.sequence}\ndata: ${JSON.stringify(e)}\n\n`);
         next = e.sequence;
       }
-      if (
-        events.some(
-          (e) => e.kind === 'turn.completed' || e.kind === 'provider.failed',
-        )
-      )
-        break;
+      if (poll % 50 === 0) res.write(': keepalive\n\n');
       await new Promise((resolve) => setTimeout(resolve, 100));
+      if (res.destroyed) break;
+      try {
+        events = await this.service.events(r.accountId!, id, next);
+      } catch {
+        break;
+      }
     }
     res.end();
   }

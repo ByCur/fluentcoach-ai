@@ -6,9 +6,27 @@
       "node",
       "vitest/globals"
     ],
+    "paths": {
+      "@fluentcoach/domain": [
+        "./packages/domain/src/index.ts"
+      ],
+      "@fluentcoach/application": [
+        "./packages/application/src/index.ts"
+      ],
+      "@fluentcoach/contracts": [
+        "./packages/contracts/src/index.ts"
+      ],
+      "@fluentcoach/infrastructure": [
+        "./packages/infrastructure/src/index.ts"
+      ],
+      "@fluentcoach/testing": [
+        "./packages/testing/src/index.ts"
+      ]
+    },
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": [
     "tests/**/*.ts",

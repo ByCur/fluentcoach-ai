@@ -29,13 +29,17 @@ reopen the outbox; reconciliation also recovers expired leases and published wor
 that never started. Provider execution may repeat after an ambiguous failure.
 Session turn leases prevent overlapping API instances from ordering conflicting
 turns; terminal transcripts are immutable. Partial reports are identified from
-canonical abandoned-session state, never provider claims.
+the immutable revision snapshot, including abandoned/failed sessions, never provider claims.
+Reports read the hardened M04 revision snapshots rather than mutable conversation
+turns; explicit late evidence creates a new report without changing the frozen
+user transcript.
 
 Provider operations have a maximum 25-second deadline, abort propagation, bounded
 input/output and response bytes, strict finish-state checks, and normalized
 content-free errors. Failed text attempts retain the learner turn; retry uses its
 original request key. The UI exposes report pending/failure/retry and cited
-quotes. Ending a session cancels its local generation; a response arriving at
+quotes. Ending a session waits at most five seconds for its in-flight turn, then freezes
+evidence and cancels remaining local generation; a response arriving at
 another API instance is prevented from changing the terminal transcript.
 
 ## Free-only admission
@@ -71,7 +75,12 @@ Migration `202609300004_m05_reports` adds reports, quota reservations, ownership
 foreign keys, provider usage fields and turn/analysis lease tokens. It requeues
 M04 fake successes with usable current transcripts and skips empty ones. It
 preserves transcripts and earlier audit records. Readiness now requires M05
-migration completion and columns. Test both empty creation and M04 upgrade.
+migration completion and columns. Forward migration
+`202609300005_m05_hardening_compatibility` preserves legacy fake-success audits as
+session audits before generating a report, retaining M04's unique provider effect
+per analysis. It also upgrades remaining M04 analyzer versions. Readiness requires
+the hardening, report and compatibility migrations. Tests cover empty creation,
+M04 upgrade and an existing M05 schema that receives the hardening afterward.
 
 The migration is additive but dropping its tables loses reports and quota audit
 history; production downgrade is not a supported rollback. Disable AI and pause

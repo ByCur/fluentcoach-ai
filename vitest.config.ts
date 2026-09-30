@@ -56,7 +56,10 @@ export default defineConfig({
         resolve: { alias: sourceAliases },
         test: {
           name: 'sessions',
-          include: ['tests/integration/sessions.test.ts'],
+          include: [
+            'tests/integration/sessions.test.ts',
+            'tests/integration/conversation-http.test.ts',
+          ],
           testTimeout: 15000,
         },
       },
@@ -64,7 +67,10 @@ export default defineConfig({
         resolve: { alias: sourceAliases },
         test: {
           name: 'jobs',
-          include: ['tests/integration/jobs.test.ts'],
+          include: [
+            'tests/integration/jobs.test.ts',
+            'tests/integration/hardening-migration.test.ts',
+          ],
           testTimeout: 15000,
         },
       },

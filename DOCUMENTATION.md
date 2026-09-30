@@ -287,3 +287,41 @@ Compose health checks and existing tests were not weakened or replaced.
 
 No live provider call, paid fallback, voice implementation, real-data pilot,
 merge or pull request was performed. Synthetic eval output stays outside Git.
+
+
+## M05 validation after M03/M04 hardening (2026-09-30)
+
+Updated the existing M05 branch with `origin/main` at `56ab501` (PR #12).
+All M03/M04 tests are unchanged from that main revision. M05 reports now use its
+immutable revision snapshots; see ADR 0009 for the compatibility migration and
+preserved provider audit history. New regressions cover late revision reports,
+partial terminal sessions and both migration application orders.
+
+Revalidated with Node 20.20.0, pnpm 10.28.1, isolated synthetic PostgreSQL
+17.6/Redis 8.2.1 and deterministic fake AI:
+
+| Command | Result |
+| --- | --- |
+| `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`, `pnpm build` | Passed; lint uses the explicit 6 GiB heap budget. |
+| `pnpm test:unit`, `pnpm test:boundaries` | 55 and 2 passed. |
+| `pnpm db:migrate:test`, Prisma schema validation | Six migrations applied; schema valid. |
+| `pnpm test:integration:identity`, `pnpm test:integration:sessions` | 16 and 7 passed. |
+| `pnpm test:contract:ai` | 25 passed. |
+| `pnpm test:integration:jobs`, `pnpm test:resilience:jobs` | 7 and 8 passed. |
+| `pnpm test:integration:analysis` | 18 passed, including upgrade and authenticated HTTP cases. |
+| `pnpm test:e2e:onboarding`, `pnpm test:e2e:conversation`, `pnpm test:e2e:reports` | 1, 2 and 5 passed. |
+| `pnpm test:smoke` | 3 passed. |
+| `pnpm eval:ai -- --suite pilot-text --billing-mode free_only` | 48/48 cases and 144 synthetic fake calls; policy/evidence checks passed. |
+| Live eval with `--live` | Blocked before network: `AI_FREE_TIER_APPROVED` unavailable. |
+| Container configuration, API/worker/web builds, migration deployment and five health checks | Passed with the existing temporary cloud CA/proxy harness and an isolated database. |
+
+Total: 149 passing tests, plus the 48-case fake eval. No gates were skipped or
+weakened. The shared development database contained three orphaned synthetic
+analysis outboxes from earlier testing; the hardening correctly rejected that
+invalid upgrade. Container validation used a fresh isolated database, preserving
+the shared database. Nonempty valid M04 and M05 upgrade paths passed the automated
+migration tests. Cloud CA/proxy changes remain temporary and outside Git.
+
+PR #13 remains the review target. No PR was merged, and no M06 or voice work was
+started. Live Gemini availability, Free-Tier terms/limits, latency and educational
+quality remain unverified; the live entry gate and human rubric remain blocked.

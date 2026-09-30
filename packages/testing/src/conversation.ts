@@ -7,6 +7,7 @@ import type {
   TutorContext,
 } from '@fluentcoach/application';
 export class FakeConversationProvider implements ConversationProvider {
+  constructor(private readonly delayMs = 0) {}
   async *stream(context: TutorContext, input: string, options?: AiCallOptions) {
     if (options?.signal?.aborted) throw new AiError('cancelled');
     if (options && options.deadline.getTime() <= Date.now())
@@ -23,10 +24,19 @@ export class FakeConversationProvider implements ConversationProvider {
       context.snapshot.mode === 'teaching'
         ? ' Quick tip: use a complete sentence. For example: I would like a room. Would you like to try again?'
         : '';
-    yield {
-      text: `Let's continue: ${input}.${correction} What would you like next?`,
-      done: true,
-    };
+    const parts = [
+      "Let's continue: ",
+      `${input}.`,
+      correction || ' What would you like next?',
+    ];
+    for (let index = 0; index < parts.length; index++) {
+      if (this.delayMs)
+        await new Promise((resolve) => setTimeout(resolve, this.delayMs));
+      if (options?.signal?.aborted) throw new AiError('cancelled');
+      if (options && options.deadline.getTime() <= Date.now())
+        throw new AiError('timeout');
+      yield { text: parts[index]!, done: index === parts.length - 1 };
+    }
   }
 }
 export class MemorySessionRepository implements SessionRepository {

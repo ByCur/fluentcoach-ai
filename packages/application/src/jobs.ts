@@ -1,4 +1,5 @@
 import { AiError, type ReportResult } from './ai.js';
+import type { ConversationTurn } from '@fluentcoach/domain';
 export const JOB_ENVELOPE_VERSION = 1 as const;
 export interface AnalysisJob {
   version: 1;
@@ -18,32 +19,33 @@ export interface AnalysisRun {
   leaseToken?: string;
   errorCode?: string;
 }
+export interface TranscriptRevisionInput {
+  accountId: string;
+  sessionId: string;
+  sourceKey: string;
+  turns: ConversationTurn[];
+}
 export interface JobStore {
   finalize(input: {
     accountId: string;
     sessionId: string;
     hasTurns: boolean;
   }): Promise<{ run: AnalysisRun; outboxId: string }>;
+  revise(
+    input: TranscriptRevisionInput,
+  ): Promise<{ run: AnalysisRun; outboxId: string }>;
   claim(
-    runId: string,
+    job: AnalysisJob,
     now: Date,
     leaseUntil: Date,
-    expected?: AnalysisJob,
+    maxAttempts: number,
   ): Promise<AnalysisRun | null>;
   succeed(
-    runId: string,
+    run: AnalysisRun,
     providerRunId: string,
     result?: ReportResult,
-    attempt?: number,
-    leaseToken?: string,
   ): Promise<void>;
-  fail(
-    runId: string,
-    errorCode: string,
-    retry: boolean,
-    attempt?: number,
-    leaseToken?: string,
-  ): Promise<void>;
+  fail(run: AnalysisRun, errorCode: string, retry: boolean): Promise<void>;
   pending(): Promise<AnalysisJob[]>;
   markPublished?(runId: string): Promise<void>;
 }
@@ -63,45 +65,41 @@ export class JobService {
   finalize(accountId: string, sessionId: string, hasTurns: boolean) {
     return this.store.finalize({ accountId, sessionId, hasTurns });
   }
+  revise(input: TranscriptRevisionInput) {
+    return this.store.revise(input);
+  }
   async dispatch() {
+    let unavailable = false;
     for (const job of await this.store.pending()) {
-      await this.transport.enqueue(job);
-      await this.store.markPublished?.(job.analysisRunId);
+      try {
+        await this.transport.enqueue(job);
+        await this.store.markPublished?.(job.analysisRunId);
+      } catch {
+        unavailable = true;
+      }
     }
+    if (unavailable) throw new Error('JOB_DISPATCH_UNAVAILABLE');
   }
   async execute(job: AnalysisJob, now = new Date()) {
     if (job.version !== JOB_ENVELOPE_VERSION)
       throw new Error('UNSUPPORTED_JOB_VERSION');
     const run = await this.store.claim(
-      job.analysisRunId,
+      job,
       now,
       new Date(now.getTime() + 30_000),
-      job,
+      this.maxAttempts,
     );
     if (!run) return 'duplicate';
     try {
-      if (
-        run.accountId !== job.accountId ||
-        run.sessionId !== job.sessionId ||
-        run.revision !== job.transcriptRevision
-      )
-        throw new AiError('unauthorized');
       const result = await this.provider.analyze(job);
-      await this.store.succeed(
-        run.id,
-        result.providerRunId,
-        result,
-        run.attempts,
-        run.leaseToken,
-      );
+      await this.store.succeed(run, result.providerRunId, result);
       return 'succeeded';
-    } catch (e) {
+    } catch (error) {
+      // Fixed codes only: provider exception names/messages can contain learner data.
       await this.store.fail(
-        run.id,
-        e instanceof AiError ? e.code : 'ANALYSIS_ERROR',
+        run,
+        error instanceof AiError ? error.code : 'ANALYSIS_ATTEMPT_FAILED',
         run.attempts < this.maxAttempts,
-        run.attempts,
-        run.leaseToken,
       );
       return 'failed';
     }

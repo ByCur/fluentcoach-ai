@@ -14,6 +14,12 @@ import {
   type AiCallOptions,
   type ProviderMetadata,
 } from './ai.js';
+class TerminalSessionError extends AiError {
+  constructor() {
+    super('cancelled');
+    this.message = 'SESSION_TERMINAL';
+  }
+}
 export interface TutorContext {
   snapshot: SessionSnapshot;
   recentTurns: readonly ConversationTurn[];
@@ -71,6 +77,10 @@ export interface SessionFinalizer {
   }): Promise<unknown>;
 }
 export class ConversationService {
+  private inFlight = new Map<
+    string,
+    { key: string; result: Promise<SessionRecord> }
+  >();
   private active = new Map<string, AbortController>();
   constructor(
     private repo: SessionRepository,
@@ -99,7 +109,27 @@ export class ConversationService {
       promptVersion: TUTOR_PROMPT_VERSION,
     });
   }
-  async turn(accountId: string, id: string, key: string, text: string) {
+  turn(accountId: string, id: string, key: string, text: string) {
+    const scope = `${accountId}:${id}`,
+      pending = this.inFlight.get(scope);
+    if (pending)
+      return pending.key === key
+        ? pending.result
+        : Promise.reject(new Error('SESSION_BUSY'));
+    const result = this.generateTurn(accountId, id, key, text);
+    this.inFlight.set(scope, { key, result });
+    void result.then(
+      () => this.inFlight.delete(scope),
+      () => this.inFlight.delete(scope),
+    );
+    return result;
+  }
+  private async generateTurn(
+    accountId: string,
+    id: string,
+    key: string,
+    text: string,
+  ) {
     const lockKey = `${accountId}:${id}`;
     if (this.active.has(lockKey)) throw new AiError('unavailable');
     const controller = new AbortController();
@@ -107,6 +137,7 @@ export class ConversationService {
     this.active.set(lockKey, controller);
     const deadline = new Date(Date.now() + 25_000);
     try {
+      await this.required(accountId, id);
       if (
         this.repo.acquireTurn &&
         !(await this.repo.acquireTurn(accountId, id, leaseToken))
@@ -114,7 +145,7 @@ export class ConversationService {
         throw new AiError('unavailable');
       const s = await this.required(accountId, id);
       if (s.state === 'created') s.state = transitionSession(s.state, 'active');
-      if (s.state !== 'active') throw new Error('SESSION_TERMINAL');
+      if (s.state !== 'active') throw new TerminalSessionError();
       const existing = s.turns.find((t) => t.sourceEventKey === key);
       if (s.turns.some((t) => t.sourceEventKey === `${key}:reply`)) return s;
       if (existing && existing.text !== text)
@@ -186,6 +217,12 @@ export class ConversationService {
         await this.repo.save(s, leaseToken);
         return s;
       } catch (error) {
+        if (
+          ['ended', 'abandoned', 'failed'].includes(
+            (await this.required(accountId, id)).state,
+          )
+        )
+          throw new TerminalSessionError();
         const code = error instanceof AiError ? error.code : 'unavailable';
         s.events.push({
           sequence: s.events.length + 1,
@@ -261,8 +298,22 @@ export class ConversationService {
     }
   }
   async end(accountId: string, id: string) {
-    this.active.get(`${accountId}:${id}`)?.abort();
+    const pending = this.inFlight.get(`${accountId}:${id}`);
+    if (pending) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          pending.result.catch(() => undefined),
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, 5000);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
     const s = await this.required(accountId, id);
+    if (s.state === 'ended' && !this.finalizer) return s;
     s.state = transitionSession(s.state, 'ended');
     if (this.finalizer)
       await this.finalizer.finalize({
@@ -271,6 +322,7 @@ export class ConversationService {
         hasTurns: s.turns.some((t) => t.speaker === 'learner'),
       });
     else await this.repo.save(s);
+    this.active.get(`${accountId}:${id}`)?.abort();
     return s;
   }
   events(accountId: string, id: string, cursor = 0) {

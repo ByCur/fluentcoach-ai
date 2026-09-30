@@ -98,19 +98,17 @@ export class PostgresSessionRepository implements SessionRepository {
           current.turn_lease_until.getTime() <= Date.now())
       )
         throw new AiError('cancelled');
-      if (['ENDED', 'ABANDONED', 'FAILED'].includes(current.state)) {
-        if (current.state !== r.state.toUpperCase())
-          throw Error('SESSION_TERMINAL');
-        await c.query('COMMIT');
-        return;
-      }
+      if (['ENDED', 'ABANDONED', 'FAILED'].includes(current.state))
+        throw new Error('SESSION_TERMINAL');
       await c.query(
         'UPDATE practice_sessions SET state=$3::"SessionState",ended_at=CASE WHEN $3::"SessionState"=$4::"SessionState" THEN COALESCE(ended_at,now()) ELSE ended_at END WHERE account_id=$1 AND id=$2',
         [r.accountId, r.id, r.state.toUpperCase(), 'ENDED'],
       );
-      for (const t of r.turns)
-        await c.query(
-          'INSERT INTO conversation_turns(session_id,account_id,sequence,source_event_key,speaker,text,language)VALUES($1,$2,$3,$4,$5,$6,$7)ON CONFLICT DO NOTHING',
+      for (const t of r.turns) {
+        const inserted = await c.query(
+          `INSERT INTO conversation_turns(session_id,account_id,sequence,source_event_key,speaker,text,language) VALUES($1,$2,$3,$4,$5,$6,$7)
+          ON CONFLICT(session_id,source_event_key) DO UPDATE SET source_event_key=EXCLUDED.source_event_key
+          WHERE conversation_turns.sequence=EXCLUDED.sequence AND conversation_turns.text=EXCLUDED.text AND conversation_turns.speaker=EXCLUDED.speaker AND conversation_turns.language=EXCLUDED.language RETURNING id`,
           [
             r.id,
             r.accountId,
@@ -121,11 +119,16 @@ export class PostgresSessionRepository implements SessionRepository {
             t.language,
           ],
         );
-      for (const e of r.events)
-        await c.query(
-          'INSERT INTO session_events(session_id,account_id,sequence,kind,payload)VALUES($1,$2,$3,$4,$5)ON CONFLICT DO NOTHING',
+        if (!inserted.rowCount) throw new Error('TURN_CONFLICT');
+      }
+      for (const e of r.events) {
+        const inserted = await c.query(
+          `INSERT INTO session_events(session_id,account_id,sequence,kind,payload) VALUES($1,$2,$3,$4,$5)
+          ON CONFLICT(session_id,sequence) DO UPDATE SET sequence=EXCLUDED.sequence WHERE session_events.kind=EXCLUDED.kind AND session_events.payload=EXCLUDED.payload RETURNING id`,
           [r.id, r.accountId, e.sequence, e.kind, e.payload],
         );
+        if (!inserted.rowCount) throw new Error('EVENT_CONFLICT');
+      }
       await c.query('COMMIT');
     } catch (e) {
       await c.query('ROLLBACK');

@@ -31,7 +31,9 @@ export function aiAdapters(): {
   const config = loadAiConfig(process.env);
   if (config.provider === 'fake')
     return {
-      conversation: new FakeConversationProvider(),
+      conversation: new FakeConversationProvider(
+        process.env['NODE_ENV'] === 'test' ? 600 : 50,
+      ),
       analyzer: new FakeSessionAnalyzer(),
     };
   if (config.provider === 'disabled')

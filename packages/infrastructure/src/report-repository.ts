@@ -6,6 +6,7 @@ import {
   type ReportRepository,
   type ReportView,
 } from '@fluentcoach/application';
+import type { ConversationTurn } from '@fluentcoach/domain';
 import { pool, sql } from './prisma.js';
 import { PostgresSessionRepository } from './session-repository.js';
 export class PostgresReportRepository implements ReportRepository {
@@ -16,8 +17,8 @@ export class PostgresReportRepository implements ReportRepository {
     sessionId: string;
     transcriptRevision: number;
   }): Promise<AnalysisTranscript> {
-    const rows = await sql<{ state: string }>(
-      `SELECT s.state FROM analysis_runs a JOIN practice_sessions s ON s.id=a.session_id AND s.account_id=a.account_id JOIN accounts owner ON owner.id=a.account_id WHERE a.id=$1 AND a.account_id=$2 AND a.session_id=$3 AND a.transcript_revision=$4 AND s.transcript_revision=a.transcript_revision AND s.state IN ('ENDED','ABANDONED') AND owner.status='ACTIVE'`,
+    const rows = await sql<{ turns: ConversationTurn[]; partial: boolean }>(
+      `SELECT t.turns,t.partial FROM analysis_runs a JOIN transcript_revisions t ON t.session_id=a.session_id AND t.account_id=a.account_id AND t.revision=a.transcript_revision JOIN practice_sessions s ON s.id=a.session_id AND s.account_id=a.account_id JOIN accounts owner ON owner.id=a.account_id WHERE a.id=$1 AND a.account_id=$2 AND a.session_id=$3 AND a.transcript_revision=$4 AND s.transcript_revision=a.transcript_revision AND s.state IN ('ENDED','ABANDONED','FAILED') AND owner.status='ACTIVE'`,
       [job.analysisRunId, job.accountId, job.sessionId, job.transcriptRevision],
     );
     if (!rows[0]) throw new AiError('unauthorized');
@@ -31,8 +32,8 @@ export class PostgresReportRepository implements ReportRepository {
       sessionId: job.sessionId,
       revision: job.transcriptRevision,
       snapshot: session.snapshot,
-      turns: session.turns,
-      partial: rows[0].state === 'ABANDONED',
+      turns: rows[0].turns,
+      partial: rows[0].partial,
       synthetic: this.synthetic,
     };
   }
@@ -49,8 +50,10 @@ export class PostgresReportRepository implements ReportRepository {
         transcript_revision: number;
         content: ReportDraft | null;
         partial: boolean | null;
+        turns: ConversationTurn[];
+        revision_partial: boolean;
       }>(
-        `SELECT a.status,a.error_code,a.transcript_revision,r.content,r.partial FROM analysis_runs a LEFT JOIN session_reports r ON r.analysis_run_id=a.id AND r.account_id=a.account_id JOIN practice_sessions s ON s.id=a.session_id AND s.account_id=a.account_id WHERE a.account_id=$1 AND a.session_id=$2 AND a.transcript_revision=s.transcript_revision ORDER BY a.created_at DESC LIMIT 1`,
+        `SELECT a.status,a.error_code,a.transcript_revision,r.content,r.partial,t.turns,t.partial AS revision_partial FROM analysis_runs a JOIN transcript_revisions t ON t.session_id=a.session_id AND t.account_id=a.account_id AND t.revision=a.transcript_revision LEFT JOIN session_reports r ON r.analysis_run_id=a.id AND r.account_id=a.account_id JOIN practice_sessions s ON s.id=a.session_id AND s.account_id=a.account_id WHERE a.account_id=$1 AND a.session_id=$2 AND a.transcript_revision=s.transcript_revision ORDER BY a.created_at DESC LIMIT 1`,
         [accountId, sessionId],
       )
     )[0];
@@ -60,7 +63,7 @@ export class PostgresReportRepository implements ReportRepository {
         row.status === 'SUCCEEDED' && !row.content
           ? 'failed'
           : (row.status.toLowerCase() as ReportView['status']),
-      partial: row.partial ?? session.state === 'abandoned',
+      partial: row.partial ?? row.revision_partial,
       revision: row.transcript_revision,
       ...(row.status === 'SUCCEEDED' && !row.content
         ? { errorCode: 'report-missing' }
@@ -74,7 +77,7 @@ export class PostgresReportRepository implements ReportRepository {
         sessionId,
         revision: row.transcript_revision,
         snapshot: session.snapshot,
-        turns: session.turns,
+        turns: row.turns,
         partial: result.partial,
         synthetic: this.synthetic,
       });

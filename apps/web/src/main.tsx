@@ -1,5 +1,5 @@
 import { ReportPanel } from './report-panel.js';
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 const API = '/api/v1';
@@ -55,7 +55,9 @@ function App() {
     [reportId, setReportId] = useState<string | null>(null),
     [providerError, setProviderError] = useState(''),
     [busy, setBusy] = useState(false),
-    [turnKey, setTurnKey] = useState('');
+    [turnKey, setTurnKey] = useState(''),
+    [level, setLevel] = useState('A1');
+  const cursorRef = useRef(0);
   const api = async (path: string, options: RequestInit = {}) =>
     fetch(API + path, {
       credentials: 'include',
@@ -91,9 +93,9 @@ function App() {
     });
   }, []);
   useEffect(() => {
-    if (!session) return;
+    if (!session || !practice) return;
     const source = new EventSource(
-      `${API}/sessions/${session.id}/events?cursor=${cursor}`,
+      `${API}/sessions/${session.id}/events?cursor=${cursorRef.current}`,
       { withCredentials: true },
     );
     source.onmessage = (event) => {
@@ -102,6 +104,8 @@ function App() {
         kind: string;
         payload?: { text?: string };
       };
+      if (value.sequence <= cursorRef.current) return;
+      cursorRef.current = value.sequence;
       setCursor(value.sequence);
       if (value.kind === 'provider.failed') {
         setProviderError(
@@ -113,7 +117,7 @@ function App() {
         setStreamed((current) => current + value.payload!.text!);
     };
     return () => source.close();
-  }, [session?.id, cursor]);
+  }, [session?.id, practice]);
   const login = async () => {
     const r = await api('/auth/synthetic-login', {
       method: 'POST',
@@ -177,6 +181,7 @@ function App() {
     const start = async () => {
       try {
         setProviderError('');
+        cursorRef.current = 0;
         setCursor(0);
         setStreamed('');
         setTurnKey('');
@@ -184,7 +189,7 @@ function App() {
           method: 'POST',
           body: JSON.stringify({
             scenarioSlug: scenario,
-            level: data.cefrLevel,
+            level,
             mode,
           }),
         });
@@ -212,12 +217,18 @@ function App() {
           method: 'POST',
           body: JSON.stringify({ sourceEventKey: key, text }),
         });
-        setSession(
-          (await r.json()) as {
-            id: string;
-            turns: { speaker: string; text: string }[];
-          },
+        const record = (await r.json()) as {
+          id: string;
+          turns: { speaker: string; text: string }[];
+          events: { sequence: number }[];
+        };
+        cursorRef.current = Math.max(
+          cursorRef.current,
+          record.events.at(-1)?.sequence ?? 0,
         );
+        setCursor(cursorRef.current);
+        setSession(record);
+        setStreamed('');
         setText('');
         setTurnKey('');
       } catch (e) {
@@ -313,6 +324,16 @@ function App() {
               </select>
             </label>
             <label>
+              Nivel de práctica
+              <select value={level} onChange={(e) => setLevel(e.target.value)}>
+                {['A1', 'A2', 'B1', 'B2'].map((x) => (
+                  <option key={x} value={x}>
+                    {x}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
               Modo
               <select value={mode} onChange={(e) => setMode(e.target.value)}>
                 <option value="natural">Conversación natural</option>
@@ -338,7 +359,7 @@ function App() {
             </button>
             {history.map((h) => (
               <div key={h.id}>
-                <p>
+                <p data-session-history={h.id}>
                   {h.snapshot.scenarioSlug} · {h.state}
                 </p>
                 {['ended', 'abandoned'].includes(h.state) && (
@@ -365,7 +386,7 @@ function App() {
                 </p>
               ))}
               {streamed && (
-                <p>
+                <p data-testid="tutor-stream">
                   <strong>stream:</strong> {streamed}
                 </p>
               )}

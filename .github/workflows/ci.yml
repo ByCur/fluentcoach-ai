@@ -37,6 +37,7 @@ jobs:
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
       - run: pnpm eval:ai -- --suite pilot-text --billing-mode free_only
       - run: pnpm test:resilience:jobs
+        env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
       - run: docker compose stop api web worker
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:onboarding

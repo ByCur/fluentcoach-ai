@@ -1,4 +1,3 @@
-import { analysisJobInput } from '@fluentcoach/contracts';
 import {
   Body,
   Controller,
@@ -8,10 +7,12 @@ import {
   Post,
   Req,
   ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { verifyQStashSignature, JobService } from '@fluentcoach/application';
+import { analysisJobInput } from '@fluentcoach/contracts';
 import { JOB_SERVICE } from './tokens.js';
 @Controller('api/v1/jobs')
 export class JobController {
@@ -23,15 +24,21 @@ export class JobController {
   ) {
     const current = process.env['QSTASH_CURRENT_SIGNING_KEY'],
       next = process.env['QSTASH_NEXT_SIGNING_KEY'];
-    if (!current || !next || !signature || !request.rawBody)
+    if (!current || !next)
       throw new ServiceUnavailableException('QSTASH_NOT_CONFIGURED');
-    await verifyQStashSignature({
-      signature,
-      currentSigningKey: current,
-      nextSigningKey: next,
-      body: request.rawBody,
-      url: `${process.env['PUBLIC_ORIGIN']}${path}`,
-    });
+    if (!signature || !request.rawBody)
+      throw new UnauthorizedException('INVALID_QSTASH_SIGNATURE');
+    try {
+      await verifyQStashSignature({
+        signature,
+        currentSigningKey: current,
+        nextSigningKey: next,
+        body: request.rawBody,
+        url: `${process.env['PUBLIC_ORIGIN']}${path}`,
+      });
+    } catch {
+      throw new UnauthorizedException('INVALID_QSTASH_SIGNATURE');
+    }
   }
   @Post('analysis') @HttpCode(204) async analysis(
     @Headers('upstash-signature') signature: string | undefined,

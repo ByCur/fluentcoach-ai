@@ -86,6 +86,10 @@ Free tenant provisioning remains a later deployment gate recorded in ADR 0006.**
 
 ## M03 — Deterministic text vertical slice
 
+**Status: complete (2026-09-30). Required gates passed on
+`codex/m03-m04-hardening`; demonstrated acceptance and validation results are
+recorded in [M03/M04 validation](docs/m03-m04-validation.md). Fake tutor only.**
+
 - **Objective:** Prove tutoring/session workflows without live AI.
 - **Scope:** Six versioned scenarios, session/turn/events, conversation port and
   fake adapter, streamed text UI, two modes, Spanish help, history/end.
@@ -99,6 +103,11 @@ Free tenant provisioning remains a later deployment gate recorded in ADR 0006.**
 - **Out of scope:** Real AI, voice, analysis reports, adaptive features.
 
 ## M04 — Durable background execution
+
+**Status: complete (2026-09-30). Required gates passed on
+`codex/m03-m04-hardening`, including real PostgreSQL rollback, revision,
+duplicate/retry/recovery tests and the signed QStash boundary matrix. See
+[M03/M04 validation](docs/m03-m04-validation.md) and ADR 0008. No live analysis.**
 
 - **Objective:** Reliable, recoverable processing after session end.
 - **Scope:** Outbox, analysis state, transport-neutral job port, QStash-signed
@@ -119,7 +128,8 @@ Free tenant provisioning remains a later deployment gate recorded in ADR 0006.**
 **Status: implementation ready for technical review (2026-09-30); offline gates
 passed. Live entry gate and human-reviewed live rubric remain blocked by absent
 owner-approved Free-Tier credentials. M05 is not complete; no live Gemini
-validation is claimed. See ADR 0009 and the DOCUMENTATION.md validation note.**
+validation is claimed. Revalidated after PR #12 hardening with all existing
+M03/M04 tests preserved. See ADR 0009 and the DOCUMENTATION.md validation notes.**
 
 - **Objective:** Useful live tutoring and evidence-backed feedback.
 - **Scope:** One real conversation/analyzer adapter, versioned prompts/schema,

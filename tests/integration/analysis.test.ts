@@ -26,7 +26,10 @@ beforeAll(() => {
     'analysis integration requires an isolated migrated PostgreSQL database',
   ).toBeTruthy();
 });
-async function setup(text = 'I need a room') {
+async function setup(
+  text = 'I need a room',
+  terminalState?: 'ABANDONED' | 'FAILED',
+) {
   const account = (
     await sql<{ id: string }>(
       "INSERT INTO accounts(oidc_issuer,oidc_subject)VALUES('synthetic-analysis',$1) RETURNING id",
@@ -51,6 +54,11 @@ async function setup(text = 'I need a room') {
     mode: 'natural',
   });
   if (text) await conversation.turn(account, session.id, 'learner-turn', text);
+  if (terminalState)
+    await sql('UPDATE practice_sessions SET state=$2 WHERE id=$1', [
+      session.id,
+      terminalState,
+    ]);
   const result = await store.finalize({
     accountId: account,
     sessionId: session.id,
@@ -71,6 +79,94 @@ async function setup(text = 'I need a room') {
   return { account, session, store, repo, reports, job, jobs };
 }
 describe('automatic analysis, PostgreSQL report persistence and retry', () => {
+  it('analyzes late immutable revisions and cites their evidence while preserving the original transcript', async () => {
+    const x = await setup(),
+      sessions = new PostgresSessionRepository();
+    const frozen = await sessions.get(x.account, x.session.id);
+    const run = (await x.store.claim(
+      x.job,
+      new Date(),
+      new Date(Date.now() + 30000),
+      3,
+    ))!;
+    const stale = await x.reports.analyze(x.job);
+    const turns = [
+      {
+        sequence: 1,
+        sourceEventKey: 'late-learner',
+        speaker: 'learner' as const,
+        text: 'Updated synthetic learner evidence',
+        language: 'en' as const,
+      },
+    ];
+    const revised = await x.jobs.revise({
+      accountId: x.account,
+      sessionId: x.session.id,
+      sourceKey: 'late-content',
+      turns,
+    });
+    await expect(
+      x.store.succeed(run, stale.providerRunId, stale),
+    ).rejects.toThrow('unauthorized');
+    await expect(x.reports.analyze(x.job)).rejects.toThrow('unauthorized');
+    expect(await sessions.get(x.account, x.session.id)).toEqual(frozen);
+    const job = {
+      ...x.job,
+      analysisRunId: revised.run.id,
+      transcriptRevision: 2,
+    };
+    expect((await x.repo.transcript(job)).turns).toEqual(turns);
+    expect(await x.jobs.execute(job)).toBe('succeeded');
+    const view = await new PostgresReportRepository().view(
+      x.account,
+      x.session.id,
+    );
+    expect(view).toMatchObject({
+      status: 'succeeded',
+      revision: 2,
+      partial: false,
+    });
+    expect(view.report?.strengths[0]?.evidence[0]?.quote).toBe(turns[0]!.text);
+    expect(
+      await x.jobs.revise({
+        accountId: x.account,
+        sessionId: x.session.id,
+        sourceKey: 'late-content',
+        turns,
+      }),
+    ).toMatchObject({
+      run: { id: revised.run.id, revision: 2, status: 'succeeded' },
+      outboxId: revised.outboxId,
+    });
+    expect(
+      await sql('SELECT * FROM session_reports WHERE session_id=$1', [
+        x.session.id,
+      ]),
+    ).toHaveLength(1);
+    expect(
+      await sql('SELECT * FROM provider_runs WHERE analysis_run_id=$1', [
+        revised.run.id,
+      ]),
+    ).toHaveLength(1);
+  });
+  it('reports abandoned and failed sessions from explicit partial snapshots without changing their terminal states', async () => {
+    for (const state of ['ABANDONED', 'FAILED'] as const) {
+      const x = await setup('I need a room', state);
+      expect((await x.repo.transcript(x.job)).partial).toBe(true);
+      expect(await x.jobs.execute(x.job)).toBe('succeeded');
+      expect(await x.repo.view(x.account, x.session.id)).toMatchObject({
+        status: 'succeeded',
+        partial: true,
+      });
+      expect(
+        (
+          await sql('SELECT state FROM practice_sessions WHERE id=$1', [
+            x.session.id,
+          ])
+        )[0]?.state,
+      ).toBe(state);
+    }
+  });
   it('ends atomically, persists one validated report/audit and survives duplicate delivery and reload', async () => {
     const x = await setup();
     await x.store.markPublished(x.job.analysisRunId);
@@ -158,9 +254,9 @@ describe('automatic analysis, PostgreSQL report persistence and retry', () => {
     await expect(
       a.repo.transcript({ ...a.job, accountId: b.account }),
     ).rejects.toThrow('unauthorized');
-    expect(await a.jobs.execute({ ...a.job, accountId: b.account })).toBe(
-      'duplicate',
-    );
+    await expect(
+      a.jobs.execute({ ...a.job, accountId: b.account }),
+    ).rejects.toThrow('JOB_ENVELOPE_MISMATCH');
     expect((await a.reports.view(a.account, a.session.id)).status).toBe(
       'pending',
     );
@@ -175,20 +271,14 @@ describe('automatic analysis, PostgreSQL report persistence and retry', () => {
   it('rolls back report and audit together after a provider response; a fresh delivery persists one effect', async () => {
     const x = await setup();
     const run = await x.store.claim(
-      x.job.analysisRunId,
+      x.job,
       new Date(),
       new Date(Date.now() + 30000),
-      x.job,
+      3,
     );
     const response = await x.reports.analyze(x.job);
     await expect(
-      x.store.succeed(
-        run!.id,
-        'not-a-uuid',
-        response,
-        run!.attempts,
-        run!.leaseToken,
-      ),
+      x.store.succeed(run!, 'not-a-uuid', response),
     ).rejects.toThrow();
     expect(
       await sql('SELECT id FROM session_reports WHERE session_id=$1', [
@@ -198,33 +288,21 @@ describe('automatic analysis, PostgreSQL report persistence and retry', () => {
     expect((await x.reports.view(x.account, x.session.id)).status).toBe(
       'running',
     );
-    await x.store.fail(
-      run!.id,
-      'unavailable',
-      true,
-      run!.attempts,
-      run!.leaseToken,
-    );
+    await x.store.fail(run!, 'unavailable', true);
     expect(await x.jobs.execute(x.job)).toBe('succeeded');
   });
   it('revalidates evidence at persistence rather than trusting a provider wrapper', async () => {
     const x = await setup(),
       run = await x.store.claim(
-        x.job.analysisRunId,
+        x.job,
         new Date(),
         new Date(Date.now() + 30000),
-        x.job,
+        3,
       ),
       response = await x.reports.analyze(x.job);
     response.report!.strengths[0]!.evidence[0]!.quote = 'fabricated';
     await expect(
-      x.store.succeed(
-        run!.id,
-        response.providerRunId,
-        response,
-        run!.attempts,
-        run!.leaseToken,
-      ),
+      x.store.succeed(run!, response.providerRunId, response),
     ).rejects.toThrow('invalid-evidence');
     expect(
       await sql('SELECT id FROM session_reports WHERE session_id=$1', [
@@ -235,10 +313,10 @@ describe('automatic analysis, PostgreSQL report persistence and retry', () => {
   it('fences stale workers after lease recovery and rejects transcript revisions that changed in flight', async () => {
     const x = await setup();
     const old = await x.store.claim(
-      x.job.analysisRunId,
+      x.job,
       new Date(),
       new Date(Date.now() + 30000),
-      x.job,
+      3,
     );
     const response = await x.reports.analyze(x.job);
     await sql(
@@ -246,27 +324,15 @@ describe('automatic analysis, PostgreSQL report persistence and retry', () => {
       [old!.id],
     );
     const current = await x.store.claim(
-      old!.id,
+      x.job,
       new Date(),
       new Date(Date.now() + 30000),
-      x.job,
+      3,
     );
     await expect(
-      x.store.succeed(
-        old!.id,
-        response.providerRunId,
-        response,
-        old!.attempts,
-        old!.leaseToken,
-      ),
+      x.store.succeed(old!, response.providerRunId, response),
     ).rejects.toThrow('cancelled');
-    await x.store.fail(
-      old!.id,
-      'old-error',
-      false,
-      old!.attempts,
-      old!.leaseToken,
-    );
+    await x.store.fail(old!, 'old-error', false);
     expect((await x.reports.view(x.account, x.session.id)).status).toBe(
       'running',
     );
@@ -275,13 +341,7 @@ describe('automatic analysis, PostgreSQL report persistence and retry', () => {
       [x.session.id],
     );
     await expect(
-      x.store.succeed(
-        current!.id,
-        response.providerRunId,
-        response,
-        current!.attempts,
-        current!.leaseToken,
-      ),
+      x.store.succeed(current!, response.providerRunId, response),
     ).rejects.toThrow('unauthorized');
     expect(
       await sql('SELECT id FROM session_reports WHERE session_id=$1', [
@@ -292,30 +352,18 @@ describe('automatic analysis, PostgreSQL report persistence and retry', () => {
   it('blocks disabled/deleting accounts during in-flight persistence and cascades reports on deletion', async () => {
     const x = await setup(),
       run = await x.store.claim(
-        x.job.analysisRunId,
+        x.job,
         new Date(),
         new Date(Date.now() + 30000),
-        x.job,
+        3,
       ),
       response = await x.reports.analyze(x.job);
     await sql("UPDATE accounts SET status='DELETING' WHERE id=$1", [x.account]);
     await expect(
-      x.store.succeed(
-        run!.id,
-        response.providerRunId,
-        response,
-        run!.attempts,
-        run!.leaseToken,
-      ),
+      x.store.succeed(run!, response.providerRunId, response),
     ).rejects.toThrow('unauthorized');
     await sql("UPDATE accounts SET status='ACTIVE' WHERE id=$1", [x.account]);
-    await x.store.succeed(
-      run!.id,
-      response.providerRunId,
-      response,
-      run!.attempts,
-      run!.leaseToken,
-    );
+    await x.store.succeed(run!, response.providerRunId, response);
     await sql('DELETE FROM accounts WHERE id=$1', [x.account]);
     expect(
       await sql('SELECT id FROM session_reports WHERE session_id=$1', [
@@ -325,12 +373,7 @@ describe('automatic analysis, PostgreSQL report persistence and retry', () => {
   });
   it('reconciles expired published leases and never admits an exhausted worker', async () => {
     const x = await setup();
-    await x.store.claim(
-      x.job.analysisRunId,
-      new Date(),
-      new Date(Date.now() + 30000),
-      x.job,
-    );
+    await x.store.claim(x.job, new Date(), new Date(Date.now() + 30000), 3);
     await x.store.markPublished(x.job.analysisRunId);
     await sql(
       "UPDATE analysis_runs SET lease_until=now()-interval '1 second' WHERE id=$1",
