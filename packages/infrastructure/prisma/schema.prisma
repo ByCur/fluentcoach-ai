@@ -102,6 +102,10 @@ model PracticeSession {
   endedAt DateTime? @map("ended_at") @db.Timestamptz
   turns ConversationTurn[]
   events SessionEvent[]
+  analyses AnalysisRun[]
+  revisions TranscriptRevision[]
+  revisionReceipts TranscriptRevisionReceipt[]
+  outbox OutboxEvent[]
   account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
   profile LearnerProfile @relation(fields:[profileId,accountId],references:[id,accountId],onDelete:Cascade)
   @@index([accountId, createdAt])
@@ -155,6 +159,8 @@ model AnalysisRun {
  leaseUntil DateTime? @map("lease_until") @db.Timestamptz
  errorCode String? @map("error_code") @db.VarChar(80)
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ session PracticeSession @relation(fields:[sessionId,accountId],references:[id,accountId],onDelete:Cascade)
+ providers ProviderRun[]
  @@unique([sessionId,transcriptRevision,analyzerVersion])
  @@unique([id,accountId])
  @@index([accountId,status])
@@ -171,6 +177,7 @@ model OutboxEvent {
  attempts Int @default(0)
  publishedAt DateTime? @map("published_at") @db.Timestamptz
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ session PracticeSession @relation(fields:[aggregateId,accountId],references:[id,accountId],onDelete:Cascade)
  @@index([publishedAt,createdAt])
  @@map("outbox_events")
 }
@@ -186,6 +193,37 @@ model ProviderRun {
  outcome String @db.VarChar(30)
  latencyMs Int @map("latency_ms")
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ analysis AnalysisRun @relation(fields:[analysisRunId,accountId],references:[id,accountId],onDelete:Cascade)
+ @@unique([analysisRunId])
  @@index([accountId,analysisRunId])
  @@map("provider_runs")
+}
+
+model TranscriptRevision {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ sessionId String @map("session_id") @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ revision Int
+ sourceKey String @map("source_key") @db.VarChar(100)
+ contentHash String @map("content_hash") @db.VarChar(64)
+ turns Json
+ partial Boolean
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ session PracticeSession @relation(fields:[sessionId,accountId],references:[id,accountId],onDelete:Cascade)
+ receipts TranscriptRevisionReceipt[]
+ @@unique([sessionId,revision])
+ @@unique([sessionId,sourceKey])
+ @@unique([sessionId,contentHash])
+ @@map("transcript_revisions")
+}
+
+model TranscriptRevisionReceipt {
+ sessionId String @map("session_id") @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ sourceKey String @map("source_key") @db.VarChar(100)
+ revision Int
+ session PracticeSession @relation(fields:[sessionId,accountId],references:[id,accountId],onDelete:Cascade)
+ transcript TranscriptRevision @relation(fields:[sessionId,revision],references:[sessionId,revision],onDelete:Cascade)
+ @@id([sessionId,sourceKey])
+ @@map("transcript_revision_receipts")
 }
