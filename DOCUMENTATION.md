@@ -11,11 +11,10 @@ foundation tests. Identity/onboarding, deterministic text sessions and durable
 jobs are implemented; M05 adds synthetic-tested text AI and reports. Its live
 entry gate remains pending and no live Gemini quality is claimed.
 
-ADR 0005 selects a strict **EUR 0/month** pilot: Render Static Site Free,
+ADR 0010 and ADR 0011 select local Ollama text and composed turn-based voice as the normal **EUR 0 recurring API cost** path. ADR 0005 originally selected Render Static Site Free,
 Render Free Web Service, Neon PostgreSQL Free, Upstash Redis Free, Upstash QStash
 Free, conditional Auth0 Free, and Gemini Developer API Free. Configurable
-`gemini-3.8-flash` (text/analysis) and
-`gemini-3.8-live` (Live native audio) are candidates;
+Gemini text and Live are retained only as future explicit candidates; neither is required or an automatic fallback. Local Ollama `llama3.2:3b`, whisper.cpp, and browser speech synthesis are the defaults;
 the deterministic fake remains normal development/CI. OpenAI and a dedicated
 BullMQ worker are future non-default alternatives. No provider or hosting resource
 has been provisioned, billing enabled, payment method supplied, or secret added.
@@ -42,10 +41,7 @@ Trace behavior to SPEC.md requirements and update documents when decisions chang
 - Render API cold starts are accepted and shown as startup/reconnecting. No
   always-on worker is deployed; QStash invokes secure idempotent API endpoints,
   while PostgreSQL retains pending work and canonical learner state.
-- Voice prefers a direct Gemini Live WebSocket using an API-minted ephemeral token
-  only after M06 verifies official browser support and safe scope. Otherwise test
-  a minimal secure API relay; if that does not fit free capacity, voice is
-  unavailable and text is offered when its quota remains.
+- Voice uses one bounded authenticated audio upload at a time, local whisper.cpp transcription, the existing Ollama tutor path, and optional browser speech synthesis. It is not continuous/full-duplex. Browser TTS has no FluentCoach API charge but is not guaranteed offline. See [Windows host setup](docs/local-whisper-windows.md).
 - Store no raw audio. **Gemini's unpaid Developer API terms currently say submitted
   content may improve Google products and may be human-reviewed.** This provider
   policy is separate from FluentCoach's 90-day transcript/report retention and
@@ -58,9 +54,7 @@ Trace behavior to SPEC.md requirements and update documents when decisions chang
 
 M00's network research command was blocked by the execution proxy (HTTP 403), and
 no credentials were available. Accordingly, the credentialed synthetic
-structured-output procedure must run at the M05 entry gate, and the Gemini Live
-browser-WebSocket/secure-relay latency and quota procedure must run at the M06
-entry gate;
+structured-output procedure must run at the M05 entry gate, and the local whisper.cpp host/device procedure must run at the M06A entry gate;
 provider/privacy terms must be verified before any real learner data. These
 limitations do not block M02's synthetic account/profile implementation.
 
@@ -323,6 +317,16 @@ invalid upgrade. Container validation used a fresh isolated database, preserving
 the shared database. Nonempty valid M04 and M05 upgrade paths passed the automated
 migration tests. Cloud CA/proxy changes remain temporary and outside Git.
 
-PR #13 remains the review target. No PR was merged, and no M06 or voice work was
-started. Live Gemini availability, Free-Tier terms/limits, latency and educational
-quality remain unverified; the live entry gate and human rubric remain blocked.
+PR #13 was superseded by the merged local-text work. M06A now implements local composed turn voice; no Gemini Live validation is required or claimed.
+
+
+## M06A local turn-based voice (2026-10-02)
+
+The local voice defaults are `SPEECH_PROVIDER=whisper-cpp`, `WHISPER_BASE_URL=http://127.0.0.1:8080`, `WHISPER_LANGUAGE=auto`, and `WHISPER_TIMEOUT_MS=45000`. Start whisper-server with `--convert` and host ffmpeg for browser WebM/Opus. The API accepts one of WebM, Ogg, WAV, MP4/M4A, or MPEG audio, limited to 8 MiB and a declared 30-second turn. Raw audio is neither persisted nor logged.
+
+Use `pnpm smoke:whisper -- <local-audio-file>` only on a host where whisper.cpp, ffmpeg, and an explicitly selected model are already installed. Normal CI uses fake audio, transcription, conversation, and TTS and makes no Ollama/Whisper/ffmpeg/microphone calls.
+
+
+### M06A validation note
+
+`pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm test:boundaries`, `pnpm test:contract:ai`, `pnpm test:contract:voice`, and `pnpm build` passed. The unit suite has 56 tests, boundaries 2, and the combined AI/voice contract suite 38. PostgreSQL-backed session/voice API tests could not run in this environment because `DATABASE_URL` is absent and Docker is unavailable. The Playwright web-server process could not complete without that service harness. The real `smoke:whisper` command was deliberately not run because no local whisper-server/model/ffmpeg host exists. These checks remain required before milestone completion; no physical-device, latency, live transcription, offline-TTS, or pronunciation claim is made.

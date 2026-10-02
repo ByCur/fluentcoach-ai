@@ -27,8 +27,12 @@
     "test:resilience:jobs": "vitest run --project job-resilience",
     "test:integration:analysis": "vitest run --project analysis",
     "test:e2e:reports": "playwright test tests/e2e/reports.spec.ts",
+    "test:contract:voice": "vitest run --project ai-contract tests/contract/whisper-cpp.test.ts",
+    "test:e2e:voice": "playwright test tests/e2e/voice.spec.ts",
+    "test:resilience:voice": "vitest run --project sessions tests/integration/voice-http.test.ts",
     "eval:ai": "tsx scripts/eval-ai.ts",
-    "smoke:ollama": "tsx scripts/smoke-ollama.ts"
+    "smoke:ollama": "tsx scripts/smoke-ollama.ts",
+    "smoke:whisper": "tsx scripts/smoke-whisper.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.36.0",
