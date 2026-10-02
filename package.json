@@ -27,7 +27,8 @@
     "test:resilience:jobs": "vitest run --project job-resilience",
     "test:integration:analysis": "vitest run --project analysis",
     "test:e2e:reports": "playwright test tests/e2e/reports.spec.ts",
-    "eval:ai": "tsx scripts/eval-ai.ts"
+    "eval:ai": "tsx scripts/eval-ai.ts",
+    "smoke:ollama": "tsx scripts/smoke-ollama.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.36.0",

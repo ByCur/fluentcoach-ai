@@ -2,7 +2,8 @@
 
 FluentCoach is a strict TypeScript modular monolith for a private English-learning
 pilot. The foundation, isolated identity/onboarding, deterministic text sessions,
-and durable jobs are implemented. M05 adds a bounded Gemini text adapter and
+and durable jobs are implemented. Text AI is local-first through Ollama, with a
+bounded Gemini adapter retained as an explicit optional provider, and M05 adds
 validated automatic reports with retry and cited learner turns. Its offline
 checks pass; the live entry gate remains blocked by unavailable owner-approved
 Free-Tier credentials. Voice remains outside this implementation.
@@ -102,7 +103,26 @@ An existing authenticated browser refreshes its CSRF value through `GET /api/v1/
 
 ## M05 text and reports
 
-Development and CI use deterministic synthetic providers. Ending a session
+The default text provider is the local Ollama service at
+`http://127.0.0.1:11434`, using `llama3.2:3b`; it requires no API key and does
+not automatically fall back to Gemini. Install/pull the model outside the app,
+then configure `.env` as follows:
+
+```dotenv
+AI_PROVIDER=ollama
+AI_FALLBACK_PROVIDER=none
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=llama3.2:3b
+```
+
+On Windows, run Ollama on the host and run the API directly from the same host
+for the default loopback URL. If the API runs in a container, set an explicitly
+reachable host URL appropriate to that environment. Verify the real local model
+with `pnpm smoke:ollama`; this sends one short synthetic teacher request and
+prints provider, model, status, response, and elapsed time.
+
+CI uses deterministic providers and mocked Ollama/Gemini HTTP; it never requires
+a running model or paid call. Ending a session
 atomically schedules analysis; the API reconciles durable work and the UI shows
 pending, failed/retry, skipped-empty, or evidence-backed reports. History can
 reopen a persisted report. Failed text responses retain the learner turn and
@@ -124,7 +144,7 @@ The eval command defaults to the 48-case fake baseline and writes synthetic
 results to `/tmp/fluentcoach-pilot-text-eval.json`; this does not pass the live
 gate or establish educational quality.
 
-Live checks are explicit and synthetic-only:
+Gemini checks are explicit and synthetic-only:
 
 ```sh
 pnpm eval:ai -- --suite pilot-text --billing-mode free_only --live --max-calls 6 --offset 0
@@ -154,8 +174,6 @@ these prompts, replacing the milestone or PR number when appropriate:
 **PR fix**
 
 > Fix PR #N using the fluentcoach-pr-fix skill. Resolve review feedback and CI until green. Do not merge.
-
-
 
 ## M03/M04 deterministic practice and durable jobs
 

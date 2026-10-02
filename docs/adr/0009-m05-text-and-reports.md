@@ -1,5 +1,9 @@
 # ADR 0009: Bounded text AI and evidence-backed reports
 
+> **Text-provider amendment (2026-10-02):** ADR 0010 makes local Ollama the
+> default text provider. Gemini remains available only through explicit opt-in;
+> the validation and safety decisions below still apply.
+
 - **Status:** accepted for synthetic implementation; credentialed feasibility pending
 - **Date:** 2026-09-30
 - **Scope:** M05 text tutoring and automatic reports

@@ -14,6 +14,7 @@ import {
 import {
   GeminiTextAdapter,
   loadAiConfig,
+  OllamaTextAdapter,
   PostgresAiBudget,
   PostgresJobStore,
   PostgresReportRepository,
@@ -48,6 +49,10 @@ export function aiAdapters(): {
         analyzeTranscript: () => Promise.reject(new AiError('unavailable')),
       },
     };
+  if (config.provider === 'ollama') {
+    const ollama = new OllamaTextAdapter(config.ollama);
+    return { conversation: ollama, analyzer: ollama };
+  }
   const gemini = new GeminiTextAdapter(
     config.gemini,
     new PostgresAiBudget(config.gemini.quota, config.gemini.model),

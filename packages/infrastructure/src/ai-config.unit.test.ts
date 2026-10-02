@@ -15,14 +15,35 @@ const approved = {
   AI_MAX_OUTPUT_TOKENS: '1000',
 };
 describe('free-only AI startup', () => {
-  it('uses fake only outside production and keeps production disabled by default', () => {
-    expect(loadAiConfig({})).toEqual({ provider: 'fake' });
-    expect(loadAiConfig({ NODE_ENV: 'production' })).toEqual({
-      provider: 'disabled',
+  it('defaults to local Ollama in every environment', () => {
+    expect(loadAiConfig({})).toEqual({
+      provider: 'ollama',
+      ollama: {
+        baseUrl: 'http://127.0.0.1:11434',
+        model: 'llama3.2:3b',
+        timeoutMs: 25_000,
+      },
     });
+    expect(loadAiConfig({ NODE_ENV: 'production' }).provider).toBe('ollama');
     expect(() =>
       loadAiConfig({ NODE_ENV: 'production', AI_PROVIDER: 'fake' }),
     ).toThrow('AI_PROVIDER');
+  });
+  it('accepts explicit Ollama settings and rejects unsafe values', () => {
+    expect(
+      loadAiConfig({
+        AI_PROVIDER: 'ollama',
+        OLLAMA_BASE_URL: 'http://localhost:11434',
+        OLLAMA_MODEL: 'llama3.2:3b',
+      }),
+    ).toMatchObject({ provider: 'ollama' });
+    for (const delta of [
+      { OLLAMA_BASE_URL: 'ftp://localhost:11434' },
+      { OLLAMA_BASE_URL: 'http://user:secret@localhost:11434' },
+      { OLLAMA_BASE_URL: 'http://localhost:11434/api' },
+      { OLLAMA_MODEL: 'bad model' },
+    ])
+      expect(() => loadAiConfig({ AI_PROVIDER: 'ollama', ...delta })).toThrow();
   });
   it('requires explicit owner approval and verified quota for Gemini', () => {
     expect(loadAiConfig(approved).provider).toBe('gemini-free');

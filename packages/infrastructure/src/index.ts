@@ -10,5 +10,6 @@ export * from './qstash-transport.js';
 export * from './ai-budget.js';
 export * from './ai-prompts.js';
 export * from './gemini-text.js';
+export * from './ollama-text.js';
 export * from './report-repository.js';
 export * from './ai-config.js';
