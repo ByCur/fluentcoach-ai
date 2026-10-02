@@ -9,7 +9,8 @@ export function speechTranscriber(): SpeechTranscriber {
   if (config.provider === 'fake')
     return {
       provider: 'fake',
-      transcribe: async () => ({ transcript: 'Synthetic spoken turn', elapsedMs: 0 }),
+      transcribe: () =>
+        Promise.resolve({ transcript: 'Synthetic spoken turn', elapsedMs: 0 }),
     };
   if (config.provider === 'disabled')
     return {

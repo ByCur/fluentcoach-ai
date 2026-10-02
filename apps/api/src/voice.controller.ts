@@ -15,7 +15,6 @@ import {
   VOICE_MIME_TYPES,
   type VoiceTurnService,
 } from '@fluentcoach/application';
-import type { Express } from 'express';
 import { AuthGuard, type AuthRequest } from './auth.guard.js';
 import { CsrfGuard } from './csrf.guard.js';
 import { VOICE_TURN_SERVICE } from './tokens.js';
@@ -42,11 +41,15 @@ export class VoiceController {
   turn(
     @Req() request: AuthRequest,
     @Param('id') sessionId: string,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedAudioFile,
   ) {
     if (!file) throw new BadRequestException('AUDIO_REQUIRED');
-    const sourceEventKey = String(request.body?.sourceEventKey ?? '');
-    const durationMs = Number(request.body?.durationMs);
+    const body: unknown = request.body;
+    const fields = isMultipartFields(body) ? body : {};
+    const sourceEventKey =
+      typeof fields.sourceEventKey === 'string' ? fields.sourceEventKey : '';
+    const durationMs =
+      typeof fields.durationMs === 'string' ? Number(fields.durationMs) : NaN;
     if (!sourceEventKey || sourceEventKey.length > 100)
       throw new BadRequestException('INVALID_SOURCE_EVENT_KEY');
     return this.service.turn({
@@ -59,4 +62,16 @@ export class VoiceController {
       durationMs,
     });
   }
+}
+
+interface UploadedAudioFile {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+}
+
+function isMultipartFields(
+  value: unknown,
+): value is { sourceEventKey?: unknown; durationMs?: unknown } {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

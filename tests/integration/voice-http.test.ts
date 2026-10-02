@@ -16,10 +16,10 @@ let app: INestApplication;
 let transcriberError: AiError | undefined;
 const transcriber: SpeechTranscriber = {
   provider: 'fake',
-  transcribe: async () => {
-    if (transcriberError) throw transcriberError;
-    return { transcript: 'A spoken synthetic request', elapsedMs: 1 };
-  },
+  transcribe: () =>
+    transcriberError
+      ? Promise.reject(transcriberError)
+      : Promise.resolve({ transcript: 'A spoken synthetic request', elapsedMs: 1 }),
 };
 
 beforeAll(async () => {

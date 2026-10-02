@@ -51,7 +51,13 @@ describe('WhisperCppTranscriber contract', () => {
   it('normalizes timeout and caller cancellation', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) =>
       new Promise((_resolve, reject) =>
-        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason)),
+        init?.signal?.addEventListener('abort', () =>
+          reject(
+            init.signal?.reason instanceof Error
+              ? init.signal.reason
+              : new Error('aborted'),
+          ),
+        ),
       ),
     );
     await expect(adapter(5).transcribe(input, options())).rejects.toMatchObject({ code: 'timeout' });
@@ -60,5 +66,14 @@ describe('WhisperCppTranscriber contract', () => {
     await expect(
       adapter().transcribe(input, { ...options(), signal: controller.signal }),
     ).rejects.toBeInstanceOf(AiError);
+  });
+
+  it('applies the timeout while reading the response body', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new ReadableStream({ start: () => undefined })),
+    );
+    await expect(adapter(5).transcribe(input, options())).rejects.toMatchObject({
+      code: 'timeout',
+    });
   });
 });

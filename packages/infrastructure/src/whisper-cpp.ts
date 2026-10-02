@@ -46,17 +46,17 @@ export class WhisperCppTranscriber implements SpeechTranscriber {
               : new AiError('cancelled');
           throw error;
         }),
-        {
-          deadline: options.deadline,
-          ...(options.signal ? { signal: options.signal } : {}),
-        },
+        { deadline: options.deadline, signal: controller.signal },
       );
       if (!response.ok) throw new AiError('unavailable');
       const declaredLength = Number(response.headers.get('content-length') ?? 0);
       if (declaredLength > 64 * 1024) throw new AiError('invalid-output');
       let raw: unknown;
       try {
-        const body = await response.text();
+        const body = await beforeDeadline(response.text(), {
+          deadline: options.deadline,
+          signal: controller.signal,
+        });
         if (body.length > 64 * 1024) throw new AiError('invalid-output');
         raw = JSON.parse(body);
       } catch (error) {

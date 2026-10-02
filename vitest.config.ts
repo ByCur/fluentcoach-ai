@@ -89,7 +89,21 @@ export default defineConfig({
       },
       {
         resolve: { alias: sourceAliases },
-        test: { name: 'ai-contract', include: ['tests/contract/**/*.test.ts'] },
+        test: {
+          name: 'ai-contract',
+          include: [
+            'tests/contract/conversation-provider.test.ts',
+            'tests/contract/gemini-text.test.ts',
+            'tests/contract/ollama-text.test.ts',
+          ],
+        },
+      },
+      {
+        resolve: { alias: sourceAliases },
+        test: {
+          name: 'voice-contract',
+          include: ['tests/contract/whisper-cpp.test.ts'],
+        },
       },
       {
         resolve: { alias: sourceAliases },
