@@ -31,12 +31,16 @@ jobs:
       - run: pnpm test:integration:identity
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
       - run: pnpm test:integration:sessions
-        env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          AI_PROVIDER: fake
       - run: pnpm test:contract:ai
       - run: pnpm test:integration:jobs
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
       - run: pnpm test:integration:analysis
-        env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          AI_PROVIDER: fake
       - run: pnpm eval:ai -- --suite pilot-text --billing-mode free_only
       - run: pnpm test:resilience:jobs
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
@@ -46,11 +50,13 @@ jobs:
           DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
           REDIS_URL: "redis://localhost:6379"
           BILLING_MODE: free_only
+          AI_PROVIDER: fake
       - run: pnpm test:e2e:conversation
         env:
           DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
           REDIS_URL: "redis://localhost:6379"
           BILLING_MODE: free_only
+          AI_PROVIDER: fake
       - run: pnpm test:e2e:reports
         env:
           DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"

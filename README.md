@@ -5,8 +5,9 @@ pilot. The foundation, isolated identity/onboarding, deterministic text sessions
 and durable jobs are implemented. Text AI is local-first through Ollama, with a
 bounded Gemini adapter retained as an explicit optional provider, and M05 adds
 validated automatic reports with retry and cited learner turns. Its offline
-checks pass; the live entry gate remains blocked by unavailable owner-approved
-Free-Tier credentials. Voice remains outside this implementation.
+checks pass; real local-model performance still requires host smoke validation,
+while Gemini's optional live checks require separately approved Free-Tier
+credentials. Voice remains outside this implementation.
 
 ## Prerequisites
 
