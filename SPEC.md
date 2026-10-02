@@ -50,7 +50,7 @@ choices in future `docs/adr/` decision records.
 | Practice goal | Editable default of 10 minutes, three days/week | Validate in M02 |
 | Correction timing | Natural: after session; Teaching: after completed turns | Script review M03, live review M05/M06 |
 | Stack | M01 pins Node 20.20.x, pnpm, strict TypeScript, React/Vite, NestJS, PostgreSQL and Redis; Prisma/BullMQ when owned by later milestones | M00 compatibility resolved; review runtime support before production |
-| AI vendor/model | Gemini Developer API Free: configurable `gemini-3.8-flash` text/analysis and `gemini-3.8-live` Live candidate; deterministic fake; OpenAI optional future only | Re-check current free models/terms at M05/M06; model lifecycle is a risk |
+| AI vendor/model | Local Ollama `llama3.2:3b` is the default text/analysis provider; Gemini Developer API Free remains explicit optional text and Live candidate; deterministic fake in tests | Local text has no recurring API cost; re-check Gemini models/terms before optional use |
 | Voice transport | Gemini Live direct browser WebSocket using API-minted ephemeral token if verified safe; otherwise minimum secure API WebSocket relay; text fallback | M06 must prove free-tier support, key safety, authority and target devices |
 | Identity | Auth0 EU OIDC tenant, closed sign-up, secure server sessions | M00 resolved; plan/DPA configuration gates real access |
 | Hosting | Render Static Site Free + one cold-starting Free API; Neon PostgreSQL Free; Upstash Redis/QStash Free; no deployed worker | M11 must re-check every free tier and refuse billing-required configuration |
@@ -102,7 +102,8 @@ flowchart LR
   API --> Redis[(Upstash Redis Free: non-canonical)]
   PG --> Q[Upstash QStash Free]
   Q -->|signed invocation| API
-  API --> Gemini[Gemini Developer API Free]
+  API --> Ollama[Local Ollama text AI]
+  API -. explicit opt-in only .-> Gemini[Gemini Developer API Free]
   Web -. ephemeral token or secure relay .-> Gemini
 ```
 
@@ -246,8 +247,9 @@ Do not silently emulate unsupported features. Apply deadlines, cancellation,
 input/output limits and spend checks to every call. Unknown usage remains
 unknown and is conservatively budgeted, not treated as free.
 
-Start with Gemini Free and a deterministic fake. OpenAI is an optional future
-adapter and is never an automatic or billable fallback in the initial pilot. Isolate any browser media SDK behind
+Start with local Ollama text AI and a deterministic fake. Gemini Free remains an
+explicit optional adapter and is never an automatic fallback; OpenAI is an
+optional future adapter. Isolate any browser media SDK behind
 a frontend transport adapter. No invisible mid-session vendor switching: reconnect
 explicitly using saved context and disclose lost live context.
 
