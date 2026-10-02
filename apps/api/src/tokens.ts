@@ -4,3 +4,5 @@ export const CONVERSATION_SERVICE=Symbol('CONVERSATION_SERVICE');
 export const JOB_SERVICE=Symbol('JOB_SERVICE');
 export const AI_ADAPTERS=Symbol('AI_ADAPTERS');
 export const REPORT_SERVICE=Symbol('REPORT_SERVICE');
+export const VOICE_TURN_SERVICE=Symbol('VOICE_TURN_SERVICE');
+export const SPEECH_TRANSCRIBER=Symbol('SPEECH_TRANSCRIBER');
