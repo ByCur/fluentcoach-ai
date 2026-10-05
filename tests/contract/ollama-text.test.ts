@@ -8,7 +8,7 @@ const context = {
     scenarioVersion: 1,
     level: 'A1' as const,
     mode: 'natural' as const,
-    promptVersion: 'tutor-v2',
+    promptVersion: 'tutor-v3',
   },
   recentTurns: [],
 };

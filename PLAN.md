@@ -81,7 +81,8 @@ Free tenant provisioning remains a later deployment gate recorded in ADR 0006.**
   `pnpm test:integration:identity`, `pnpm test:e2e:onboarding`.
 - **Out of scope:** Public signup, custom passwords, family roles,
   AI level assessment, conversations. Auth0 Free capability verification and the
-  versioned Gemini Free data-use disclosure/consent are required design inputs;
+  versioned provider/privacy disclosure and consent are required design inputs;
+  Gemini terms apply only to explicit optional Gemini configuration;
   do not implement M02 as part of ADR 0005.
 
 ## M03 — Deterministic text vertical slice
@@ -153,7 +154,7 @@ M03/M04 tests preserved. See ADR 0009 and the DOCUMENTATION.md validation notes.
 
 ## M06A — Local-first turn-based voice
 
-**Status: implementation ready for technical review (2026-10-02). Offline unit, boundary, contract, lint, type and build gates pass. PostgreSQL-backed API and browser gates require the unavailable local service harness; real whisper.cpp/device validation remains manual and is not claimed.**
+**Status: implementation ready for technical review. Owner-reported Windows host gate passed (2026-10-05): multilingual whisper.cpp base, microphone WebM/Opus, Ollama llama3.2:3b, browser speechSynthesis, spoken "No entiendo", and end-to-end voice. Stream reconciliation, explicit Spanish help, local privacy copy and browser voice/rate preferences have regression coverage. Host validation of this polish remains manual.**
 
 - **Objective:** Usable zero-recurring-API-cost spoken turns on agreed devices.
 - **Entry gate:** Local whisper.cpp and ffmpeg host setup is operator-controlled; no cloud speech credential or Gemini is required. Real host/device validation remains manual and must use synthetic or consented speech.

@@ -1,5 +1,5 @@
 import type { ConversationTurn, SessionSnapshot } from '@fluentcoach/domain';
-export const TUTOR_PROMPT_VERSION = 'tutor-v2';
+export const TUTOR_PROMPT_VERSION = 'tutor-v3';
 export const ANALYSIS_PROMPT_VERSION = 'analysis-v2';
 export const REPORT_SCHEMA_VERSION = 'report-v1';
 export const RUBRIC_VERSION = 'pilot-text-v1';
