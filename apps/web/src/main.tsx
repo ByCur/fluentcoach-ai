@@ -56,8 +56,16 @@ function App() {
     [providerError, setProviderError] = useState(''),
     [busy, setBusy] = useState(false),
     [turnKey, setTurnKey] = useState(''),
+    [voiceState, setVoiceState] = useState<
+      'idle' | 'recording' | 'transcribing' | 'thinking' | 'speaking'
+    >('idle'),
+    [muted, setMuted] = useState(false),
     [level, setLevel] = useState('A1');
   const cursorRef = useRef(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingStartedRef = useRef(0);
+  const spokenTurnCountRef = useRef(0);
   const api = async (path: string, options: RequestInit = {}) =>
     fetch(API + path, {
       credentials: 'include',
@@ -118,6 +126,20 @@ function App() {
     };
     return () => source.close();
   }, [session?.id, practice]);
+  useEffect(() => {
+    if (!session || muted || !('speechSynthesis' in window)) return;
+    const tutorTurns = session.turns.filter((turn) => turn.speaker === 'tutor');
+    if (tutorTurns.length <= spokenTurnCountRef.current) return;
+    spokenTurnCountRef.current = tutorTurns.length;
+    const utterance = new SpeechSynthesisUtterance(tutorTurns.at(-1)!.text);
+    const voices = window.speechSynthesis.getVoices();
+    utterance.voice =
+      voices.find((voice) => /^en([-_]|$)/i.test(voice.lang)) ?? null;
+    utterance.lang = utterance.voice?.lang ?? 'en-US';
+    utterance.onstart = () => setVoiceState('speaking');
+    utterance.onend = utterance.onerror = () => setVoiceState('idle');
+    window.speechSynthesis.speak(utterance);
+  }, [session, muted]);
   const login = async () => {
     const r = await api('/auth/synthetic-login', {
       method: 'POST',
@@ -239,6 +261,99 @@ function App() {
         );
       } finally {
         setBusy(false);
+      }
+    };
+    const stopSpeech = () => {
+      window.speechSynthesis?.cancel();
+      setVoiceState('idle');
+    };
+    const startRecording = async () => {
+      if (busy || voiceState !== 'idle') return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const preferred = [
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/ogg;codecs=opus',
+        ].find((type) => MediaRecorder.isTypeSupported(type));
+        const recorder = new MediaRecorder(
+          stream,
+          preferred ? { mimeType: preferred } : undefined,
+        );
+        audioChunksRef.current = [];
+        recorder.ondataavailable = (event) => {
+          if (event.data.size) audioChunksRef.current.push(event.data);
+        };
+        recorder.onstop = () =>
+          stream.getTracks().forEach((track) => track.stop());
+        recorderRef.current = recorder;
+        recordingStartedRef.current = Date.now();
+        recorder.start();
+        setVoiceState('recording');
+      } catch {
+        setProviderError(
+          'No se concedió permiso para usar el micrófono. Puedes escribir tu respuesta.',
+        );
+      }
+    };
+    const stopAndSend = async () => {
+      const recorder = recorderRef.current;
+      if (!session || !recorder || recorder.state === 'inactive') return;
+      const durationMs = Math.max(1, Date.now() - recordingStartedRef.current);
+      const stopped = new Promise<void>((resolve) =>
+        recorder.addEventListener('stop', () => resolve(), { once: true }),
+      );
+      recorder.stop();
+      await stopped;
+      if (durationMs > 30_000) {
+        setProviderError('El turno de voz debe durar como máximo 30 segundos.');
+        setVoiceState('idle');
+        return;
+      }
+      const blob = new Blob(audioChunksRef.current, {
+        type: recorder.mimeType || 'audio/webm',
+      });
+      if (!blob.size || blob.size > 8 * 1024 * 1024) {
+        setProviderError('El audio está vacío o supera el límite de 8 MiB.');
+        setVoiceState('idle');
+        return;
+      }
+      setBusy(true);
+      setProviderError('');
+      setVoiceState('transcribing');
+      const form = new FormData();
+      form.set('audio', blob, 'spoken-turn.webm');
+      form.set('durationMs', String(durationMs));
+      form.set('sourceEventKey', crypto.randomUUID());
+      try {
+        setVoiceState('thinking');
+        const response = await fetch(
+          `${API}/sessions/${session.id}/voice-turns`,
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'x-csrf-token': csrf },
+            body: form,
+          },
+        );
+        if (!response.ok) {
+          const body = (await response.json()) as {
+            error?: { message?: string };
+          };
+          throw Error(body.error?.message ?? 'No pudimos procesar el audio.');
+        }
+        setSession((await response.json()) as typeof session);
+        setVoiceState('idle');
+      } catch (error) {
+        setProviderError(
+          error instanceof Error
+            ? error.message
+            : 'No pudimos procesar el audio.',
+        );
+        setVoiceState('idle');
+      } finally {
+        setBusy(false);
+        recorderRef.current = null;
       }
     };
     const help = async () => {
@@ -402,6 +517,29 @@ function App() {
                 }}
               />
             </label>
+            <div className="voice-controls">
+              <p role="status" aria-live="polite">
+                Voz: {voiceState === 'idle' ? 'lista' : voiceState}
+              </p>
+              {voiceState === 'recording' ? (
+                <button type="button" onClick={() => void stopAndSend()}>
+                  Detener y enviar
+                </button>
+              ) : (
+                <button type="button" disabled={busy || voiceState !== 'idle'} onClick={() => void startRecording()}>
+                  Iniciar turno de voz
+                </button>
+              )}
+              <button className="secondary" type="button" onClick={() => { setMuted((value) => !value); stopSpeech(); }}>
+                {muted ? 'Activar voz del tutor' : 'Silenciar voz del tutor'}
+              </button>
+              <button className="secondary" type="button" onClick={stopSpeech}>
+                Detener voz del tutor
+              </button>
+              <small>
+                La reproducción usa la voz del navegador; FluentCoach no paga una API de TTS y no garantiza que funcione sin conexión.
+              </small>
+            </div>
             <nav>
               <button disabled={busy} onClick={() => void send()}>
                 {busy

@@ -14,12 +14,14 @@ import {
   type AiCallOptions,
   type ProviderMetadata,
 } from './ai.js';
-class TerminalSessionError extends AiError {
+class TerminalSessionError extends Error {
+  override name = 'TerminalSessionError';
   constructor() {
-    super('cancelled');
-    this.message = 'SESSION_TERMINAL';
+    super('SESSION_TERMINAL');
   }
 }
+const isTerminalSession = (state: SessionState) =>
+  state === 'ended' || state === 'abandoned' || state === 'failed';
 export interface TutorContext {
   snapshot: SessionSnapshot;
   recentTurns: readonly ConversationTurn[];
@@ -90,6 +92,11 @@ export class ConversationService {
   scenarios() {
     return SCENARIOS;
   }
+  async assertTurnAllowed(accountId: string, id: string) {
+    const session = await this.required(accountId, id);
+    if (!['created', 'active'].includes(session.state))
+      throw new TerminalSessionError();
+  }
   async start(
     accountId: string,
     input: {
@@ -137,13 +144,21 @@ export class ConversationService {
     this.active.set(lockKey, controller);
     const deadline = new Date(Date.now() + 25_000);
     try {
-      await this.required(accountId, id);
-      if (
-        this.repo.acquireTurn &&
-        !(await this.repo.acquireTurn(accountId, id, leaseToken))
-      )
-        throw new AiError('unavailable');
-      const s = await this.required(accountId, id);
+      let s = await this.required(accountId, id);
+      if (isTerminalSession(s.state)) throw new TerminalSessionError();
+      if (this.repo.acquireTurn) {
+        const acquired = await this.repo.acquireTurn(
+          accountId,
+          id,
+          leaseToken,
+        );
+        if (!acquired) {
+          s = await this.required(accountId, id);
+          if (isTerminalSession(s.state)) throw new TerminalSessionError();
+          throw new AiError('unavailable');
+        }
+      }
+      s = await this.required(accountId, id);
       if (s.state === 'created') s.state = transitionSession(s.state, 'active');
       if (s.state !== 'active') throw new TerminalSessionError();
       const existing = s.turns.find((t) => t.sourceEventKey === key);
