@@ -1,3 +1,5 @@
+import { PlanProgressPanel } from './plan-progress-panel.js';
+import { ActiveTypingTimer } from './active-typing.js';
 import { IssuesPanel } from './issues-panel.js';
 import { ReportPanel } from './report-panel.js';
 import { VocabularyPanel } from './vocabulary-panel.js';
@@ -78,7 +80,19 @@ function App() {
       'idle' | 'recording' | 'transcribing' | 'thinking' | 'speaking'
     >('idle'),
     [muted, setMuted] = useState(false),
+    [practiceObjective, setPracticeObjective] = useState(''),
     [level, setLevel] = useState('A1');
+  const typing = useRef(new ActiveTypingTimer());
+  const pendingDuration = useRef<number | null>(null);
+  useEffect(() => {
+    const pause = () => typing.current.pause();
+    window.addEventListener('blur', pause);
+    document.addEventListener('visibilitychange', pause);
+    return () => {
+      window.removeEventListener('blur', pause);
+      document.removeEventListener('visibilitychange', pause);
+    };
+  }, []);
   const cursorRef = useRef(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -234,11 +248,14 @@ function App() {
     const start = async () => {
       try {
         setProviderError('');
+        setPracticeObjective('');
         cursorRef.current = 0;
         setCursor(0);
         setStreamed('');
         setTurnKey('');
         spokenTurnCountRef.current = 0;
+        typing.current.reset();
+        pendingDuration.current = null;
         const r = await checked('/sessions', {
           method: 'POST',
           body: JSON.stringify({
@@ -266,13 +283,21 @@ function App() {
       setStreamed('');
       const key = turnKey || crypto.randomUUID();
       setTurnKey(key);
+      typing.current.pause();
+      pendingDuration.current ??= typing.current.duration();
       try {
         const r = await checked(`/sessions/${session.id}/turns`, {
           method: 'POST',
-          body: JSON.stringify({ sourceEventKey: key, text }),
+          body: JSON.stringify({
+            sourceEventKey: key,
+            text,
+            activeDurationMs: pendingDuration.current,
+          }),
         });
         reconcileSession((await r.json()) as SessionResponse);
         setText('');
+        typing.current.reset();
+        pendingDuration.current = null;
         setTurnKey('');
       } catch (e) {
         setProviderError(
@@ -438,7 +463,44 @@ function App() {
             onClose={() => setReportId(null)}
           />
         )}{' '}
-        {!session && <><IssuesPanel csrf={csrf} /><VocabularyPanel csrf={csrf} /></>}
+        {!session && (
+          <>
+            <PlanProgressPanel
+              csrf={csrf}
+              onEvidence={setReportId}
+              onStart={(id, activity) => {
+                setPracticeObjective(
+                  activity.title + ' · ' + activity.rationale,
+                );
+                spokenTurnCountRef.current = 0;
+                typing.current.reset();
+                pendingDuration.current = null;
+                setTurnKey('');
+                setText('');
+                cursorRef.current = 0;
+                setCursor(0);
+                setSession({ id, turns: [] });
+                void checked('/sessions')
+                  .then(async (r) => {
+                    const records = (await r.json()) as (SessionResponse & {
+                      snapshot: { level: string; mode: string };
+                    })[];
+                    const record = records.find((s) => s.id === id);
+                    if (record) {
+                      reconcileSession(record);
+                      setLevel(record.snapshot.level);
+                      setMode(record.snapshot.mode);
+                    }
+                  })
+                  .catch(() =>
+                    setProviderError('No pudimos cargar la sesión.'),
+                  );
+              }}
+            />
+            <IssuesPanel csrf={csrf} />
+            <VocabularyPanel csrf={csrf} />
+          </>
+        )}
         {!session ? (
           <section>
             <label>
@@ -513,6 +575,9 @@ function App() {
           </section>
         ) : (
           <section>
+            {practiceObjective && (
+              <p aria-label="Objetivo de esta actividad">{practiceObjective}</p>
+            )}
             <div
               aria-live="polite"
               data-cursor={cursor}
@@ -534,7 +599,12 @@ function App() {
               <input
                 value={text}
                 readOnly={busy || !!turnKey}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => {
+                  if (!document.hidden && document.hasFocus())
+                    typing.current.input(performance.now());
+                  setText(e.target.value);
+                }}
+                onBlur={() => typing.current.pause()}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void send();
                 }}
@@ -723,7 +793,9 @@ function App() {
         <section>
           <h2>Privacidad y práctica con IA</h2>
           <div className="notice">
-            <strong>Privacidad · práctica local con IA · versión 2026-10-05</strong>
+            <strong>
+              Privacidad · práctica local con IA · versión 2026-10-05
+            </strong>
             <p>
               Por defecto, Ollama genera las respuestas del tutor y whisper.cpp
               transcribe tu voz en el equipo local. La reproducción usa
@@ -733,14 +805,15 @@ function App() {
             <p>
               FluentCoach conserva la transcripción y las respuestas, pero no
               almacena audio sin procesar. Las voces disponibles dependen del
-              navegador y del sistema; no se garantiza que funcionen sin conexión.
+              navegador y del sistema; no se garantiza que funcionen sin
+              conexión.
             </p>
             <p>
               Gemini es una opción explícita para el futuro, no el proveedor
               predeterminado. No se envía contenido a Gemini por defecto ni se
               cambia a Gemini automáticamente. Su uso requiere configuración
-              explícita y una revisión de sus condiciones de privacidad.
-              Puedes decidir no continuar con la práctica basada en IA.
+              explícita y una revisión de sus condiciones de privacidad. Puedes
+              decidir no continuar con la práctica basada en IA.
             </p>
           </div>
           <label className="check">

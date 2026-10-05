@@ -14,7 +14,8 @@
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "vite": "7.1.7",
-    "@fluentcoach/domain": "workspace:*"
+    "@fluentcoach/domain": "workspace:*",
+    "@fluentcoach/application": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "19.1.16",

@@ -44,7 +44,7 @@ export async function writeIssueObservations(
   }
 }
 /** Serialized with report persistence by the existing account row lock. No AI call, no aggregate cache. */
-async function rebuild(
+export async function rebuildIssueObservations(
   c: PoolClient,
   accountId: string,
 ): Promise<IssueObservation[]> {
@@ -142,7 +142,7 @@ export class PostgresIssueRepository implements IssueRepository {
   /** Also repairs pre-M07 reports, missing observations, invalid evidence and removed sources. */
   list(accountId: string) {
     return this.transaction(accountId, async (c) => {
-      const observations = await rebuild(c, accountId);
+      const observations = await rebuildIssueObservations(c, accountId);
       const dismissed = (
         await c.query<{ issue_key: string }>(
           'SELECT issue_key FROM issue_dismissals WHERE account_id=$1 AND taxonomy_version=$2 AND restored_at IS NULL',
@@ -162,7 +162,7 @@ export class PostgresIssueRepository implements IssueRepository {
   setDismissed(accountId: string, key: string, dismissed: boolean) {
     taxonomyIssue(ISSUE_TAXONOMY_VERSION, key);
     return this.transaction(accountId, async (c) => {
-      const observations = await rebuild(c, accountId);
+      const observations = await rebuildIssueObservations(c, accountId);
       const now = (
         await c.query<{ now: Date }>('SELECT CURRENT_TIMESTAMP AS now')
       ).rows[0]!.now;

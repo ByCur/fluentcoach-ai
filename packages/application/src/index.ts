@@ -38,3 +38,5 @@ export * from './speech.js';
 export * from './voice-turn.js';
 export * from './issues.js';
 export * from './vocabulary.js';
+export * from './plans.js';
+export * from './progress.js';

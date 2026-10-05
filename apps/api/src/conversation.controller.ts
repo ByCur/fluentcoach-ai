@@ -42,7 +42,10 @@ export class ConversationController {
     @Body() raw: unknown,
   ) {
     const x = turnInput.parse(raw);
-    return this.service.turn(r.accountId!, id, x.sourceEventKey, x.text);
+    return this.service.turn(r.accountId!, id, x.sourceEventKey, x.text, {
+      kind: 'text',
+      durationMs: x.activeDurationMs ?? 0,
+    });
   }
   @Post('sessions/:id/help') @UseGuards(CsrfGuard) help(
     @Req() r: AuthRequest,

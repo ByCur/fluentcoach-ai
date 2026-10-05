@@ -150,6 +150,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fluentcoach/application':
+        specifier: workspace:*
+        version: link:../../packages/application
       '@fluentcoach/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

@@ -516,3 +516,50 @@ Manual validation remains: review real local Ollama `analysis-v3` category and
 correction quality on synthetic multi-session practice; inspect Spanish wording,
 keyboard evidence/dismiss/restore controls, and local browser/voice behavior.
 M07 does not authorize real learner access before the existing M10/M11 gates.
+
+
+## Plans, goals and active progress (M09)
+
+**Implementation ready for technical review.** PostgreSQL/Redis/Chromium CI gates
+must pass before milestone completion. The normal plan generator is deterministic
+and free of AI API dependencies. It uses current validated M07 issues, current
+due M08 vocabulary, selected A1–B2, the current goal and completed scenario
+history. `plan-v1`, `plan-generator-v1` and `plan-catalog-v1` enforce a bounded
+catalog: conversation, recurring-issue-practice, vocabulary-review. With no
+history, two simple conversations explain the level/goal basis explicitly.
+No model quality or scientifically validated improvement is claimed.
+
+The Spanish practice screen contains **Tu plan de práctica**, **Tu progreso**,
+linked report evidence and existing **Prioridades**. Generate, accept, omit,
+refresh and start activities use authenticated, strict, CSRF/origin-protected
+transport. Refresh retains the active plan until acceptance. SQL constraints and
+optimistic versions protect concurrent mutations. Starting is not completion;
+linked successful session ends or distinct target-card reviews supply evidence.
+
+Active voice milliseconds count only when a successful accepted turn commits.
+Active text intervals between edits are bounded and exclude idle >30 seconds,
+blur/hidden and tutor latency; legacy text duration is zero. Speaking/text totals
+stay separate. Speaking streak qualifies at two minutes of accepted voice per
+saved local date. Current-week goals start Monday in the current learner zone,
+while all historical local dates remain immutable snapshots of their event zone.
+M08 review events supply counts directly. ENDED counts once; ABANDONED/FAILED do
+not count as completed. Transparent issue buckets make no direction/level claim.
+
+See [ADR 0014](docs/adr/0014-plans-and-active-progress.md) for precise selection,
+streak, weekly-boundary, active-time, issue-trend and legacy-UTC definitions, and
+[M09 data lifecycle](docs/m09-data-lifecycle.md) for rebuild/deletion/migration
+semantics. Apply forward migration `202610050003_m09_plans_progress` before API
+startup. Readiness rejects missing M09 migration/columns. No aggregate cache is
+the sole source of truth.
+
+New required gates are `pnpm test:integration:plans`,
+`pnpm test:integration:progress`, and `pnpm test:e2e:progress`; CI runs them with
+PostgreSQL, Redis and fake text/speech. Existing unit, boundary, build, migration,
+identity, sessions, jobs, analysis, issues, reviews, resilience, AI/voice contract,
+onboarding, conversation, reports, priorities, vocabulary, voice and smoke gates
+remain mandatory. A plans model-eval suite is inapplicable because no plan AI is
+used. Real Ollama/whisper and physical-browser active typing/voice playback
+validation remain manual; fake CI does not prove live educational/device quality.
+
+The exact local command results and remaining manual gates are recorded in
+[M09 validation](docs/m09-validation.md).

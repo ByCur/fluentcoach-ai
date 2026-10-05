@@ -54,6 +54,20 @@ jobs:
           BILLING_MODE: free_only
           AI_PROVIDER: fake
           SPEECH_PROVIDER: fake
+      - run: pnpm test:integration:plans
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          REDIS_URL: "redis://localhost:6379"
+          BILLING_MODE: free_only
+          AI_PROVIDER: fake
+          SPEECH_PROVIDER: fake
+      - run: pnpm test:integration:progress
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          REDIS_URL: "redis://localhost:6379"
+          BILLING_MODE: free_only
+          AI_PROVIDER: fake
+          SPEECH_PROVIDER: fake
       - run: pnpm eval:ai -- --suite pilot-text --billing-mode free_only
       - run: pnpm test:resilience:jobs
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
@@ -91,6 +105,13 @@ jobs:
           AI_PROVIDER: fake
           SPEECH_PROVIDER: fake
       - run: pnpm test:e2e:voice
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          REDIS_URL: "redis://localhost:6379"
+          BILLING_MODE: free_only
+          AI_PROVIDER: fake
+          SPEECH_PROVIDER: fake
+      - run: pnpm test:e2e:progress
         env:
           DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
           REDIS_URL: "redis://localhost:6379"

@@ -34,9 +34,12 @@
     "smoke:ollama": "tsx scripts/smoke-ollama.ts",
     "smoke:whisper": "tsx scripts/smoke-whisper.ts",
     "test:integration:issues": "vitest run --project issues",
-    "test:e2e:issues": "playwright test tests/e2e/issues.spec.ts"
-    ,"test:integration:reviews": "vitest run --project reviews"
-    ,"test:e2e:vocabulary": "playwright test tests/e2e/vocabulary.spec.ts"
+    "test:e2e:issues": "playwright test tests/e2e/issues.spec.ts",
+    "test:integration:reviews": "vitest run --project reviews",
+    "test:e2e:vocabulary": "playwright test tests/e2e/vocabulary.spec.ts",
+    "test:integration:plans": "vitest run --project plans",
+    "test:integration:progress": "vitest run --project progress",
+    "test:e2e:progress": "playwright test tests/e2e/progress.spec.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.36.0",

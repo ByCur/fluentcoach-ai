@@ -20,3 +20,9 @@ Confirmed cards remain until the learner/account lifecycle removes them, but
 their provenance fields are cleared and `source_available=false`. Account
 deletion cascades all three tables. No audio, shared deck, dictionary scrape,
 provider prompt, or cloud dependency is introduced.
+
+M09 extends canonical review events with immutable `timezone_at_event` and
+`local_date` snapshots. It reads these events directly for review activity; it
+does not create duplicate review progress records. Scheduling still uses UTC
+instants and the existing M08 algorithm. Pre-M09 review dates are explicitly
+backfilled in UTC; see [M09 lifecycle](m09-data-lifecycle.md).

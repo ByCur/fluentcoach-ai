@@ -38,3 +38,4 @@ export function validateConsent(input: { purpose: string; policyVersion: string;
 export * from './conversation.js';
 export * from './issues.js';
 export * from './vocabulary.js';
+export * from './progress.js';

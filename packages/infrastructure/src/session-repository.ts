@@ -4,7 +4,12 @@ import {
   type SessionRepository,
   type ProviderMetadata,
 } from '@fluentcoach/application';
-import type { ConversationTurn, SessionSnapshot } from '@fluentcoach/domain';
+import {
+  boundedPracticeTelemetry,
+  type PracticeTelemetry,
+  type ConversationTurn,
+  type SessionSnapshot,
+} from '@fluentcoach/domain';
 import { pool, sql } from './prisma.js';
 type SessionRow = {
   id: string;
@@ -76,7 +81,16 @@ export class PostgresSessionRepository implements SessionRepository {
     )[0];
     return row ? hydrate(row) : null;
   }
-  async save(r: SessionRecord, leaseToken?: string) {
+  async save(
+    r: SessionRecord,
+    leaseToken?: string,
+    practice?: PracticeTelemetry & { sourceEventKey: string },
+  ) {
+    if (practice)
+      practice = {
+        ...boundedPracticeTelemetry(practice),
+        sourceEventKey: practice.sourceEventKey,
+      };
     const c = await pool.connect();
     try {
       await c.query('BEGIN');
@@ -128,6 +142,36 @@ export class PostgresSessionRepository implements SessionRepository {
           [r.id, r.accountId, e.sequence, e.kind, e.payload],
         );
         if (!inserted.rowCount) throw new Error('EVENT_CONFLICT');
+      }
+      if (practice) {
+        // Only accepted learner turns with committed successful replies can produce progress.
+        const event = await c.query(
+          `INSERT INTO practice_events(account_id,session_id,turn_id,source_key,kind,duration_ms,occurred_at,timezone_at_event,local_date)
+          SELECT t.account_id,t.session_id,t.id,'turn:'||t.source_event_key,$4,$5,stamp.instant,p.timezone,(stamp.instant AT TIME ZONE p.timezone)::date
+          FROM conversation_turns t JOIN learner_profiles p ON p.account_id=t.account_id
+          CROSS JOIN (SELECT clock_timestamp() instant) stamp
+          WHERE t.account_id=$1 AND t.session_id=$2 AND t.source_event_key=$3 AND t.speaker='learner'
+          AND t.text !~* 'no entiendo|i don.t understand'
+          AND EXISTS(SELECT 1 FROM conversation_turns reply WHERE reply.account_id=t.account_id AND reply.session_id=t.session_id AND reply.source_event_key=t.source_event_key||':reply' AND reply.speaker='tutor')
+          ON CONFLICT(account_id,session_id,source_key) DO NOTHING RETURNING id`,
+          [
+            r.accountId,
+            r.id,
+            practice.sourceEventKey,
+            practice.kind,
+            practice.durationMs,
+          ],
+        );
+        if (
+          !event.rowCount &&
+          !(
+            await c.query(
+              "SELECT 1 FROM practice_events WHERE account_id=$1 AND session_id=$2 AND source_key='turn:'||$3",
+              [r.accountId, r.id, practice.sourceEventKey],
+            )
+          ).rowCount
+        )
+          throw Error('INVALID_PRACTICE_SOURCE');
       }
       await c.query('COMMIT');
     } catch (e) {

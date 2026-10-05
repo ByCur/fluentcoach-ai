@@ -55,6 +55,7 @@ export class VoiceTurnService {
       input.sessionId,
       input.sourceEventKey,
       result.transcript,
+      { kind: 'voice', durationMs: input.durationMs },
     );
   }
 }

@@ -25,7 +25,7 @@ test('learner confirms, reviews, reloads, and cannot double advance a card',asyn
   await page.getByRole('button',{name:'Bien',exact:true}).click();
   const request=await reviewRequest,response=await reviewResponse,payload=request.postDataJSON() as {rating:string;reviewKey:string;expectedVersion:number};
   const first=await response.json() as {review:{id:string}};
-  await expect(page.getByRole('status')).toContainText('Próximo repaso');
+  await expect(page.getByRole('region',{name:'Vocabulario para repasar'}).getByRole('status')).toContainText('Próximo repaso');
   const repeated=await page.evaluate(async({url,payload})=>{const csrf=(await (await fetch('/api/v1/auth/csrf')).json() as {csrfToken:string}).csrfToken;const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-csrf-token':csrf},body:JSON.stringify(payload)});return {status:response.status,body:await response.json() as {review:{id:string}}};},{url:request.url(),payload});
   expect(repeated.status).toBe(201);expect(repeated.body.review.id).toBe(first.review.id);
   const cardId=request.url().split('/cards/')[1]!.split('/')[0]!;
