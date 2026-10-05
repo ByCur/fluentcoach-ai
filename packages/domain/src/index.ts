@@ -17,11 +17,22 @@ export function validateProfile(input: { interfaceLanguage: string; nativeLangua
   if (input.interests.length > 10 || input.interests.some((interest) => interest.trim().length < 1 || interest.length > 40)) throw new Error('INVALID_INTERESTS');
 }
 
-export const CONSENT_PURPOSE = 'gemini-free-ai-practice';
-export const POLICY_VERSION = 'privacy-2026-09-29';
-export const PROVIDER_DISCLOSURE_VERSION = 'gemini-free-2026-09-29';
+export const CONSENT_PURPOSE = 'local-ai-practice';
+export const POLICY_VERSION = 'privacy-2026-10-05';
+export const PROVIDER_DISCLOSURE_VERSION = 'local-first-2026-10-05';
+export const LEGACY_GEMINI_CONSENT = {
+  purpose: 'gemini-free-ai-practice',
+  policyVersion: 'privacy-2026-09-29',
+  providerDisclosureVersion: 'gemini-free-2026-09-29',
+} as const;
 
 export function validateConsent(input: { purpose: string; policyVersion: string; providerDisclosureVersion: string; accepted: boolean }): void {
-  if (!input.accepted || input.purpose !== CONSENT_PURPOSE || input.policyVersion !== POLICY_VERSION || input.providerDisclosureVersion !== PROVIDER_DISCLOSURE_VERSION) throw new Error('INVALID_CONSENT_VERSION');
+  const current = input.purpose === CONSENT_PURPOSE &&
+    input.policyVersion === POLICY_VERSION &&
+    input.providerDisclosureVersion === PROVIDER_DISCLOSURE_VERSION;
+  const legacy = input.purpose === LEGACY_GEMINI_CONSENT.purpose &&
+    input.policyVersion === LEGACY_GEMINI_CONSENT.policyVersion &&
+    input.providerDisclosureVersion === LEGACY_GEMINI_CONSENT.providerDisclosureVersion;
+  if (input.accepted !== true || (!current && !legacy)) throw new Error('INVALID_CONSENT_VERSION');
 }
 export * from './conversation.js';

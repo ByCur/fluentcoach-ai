@@ -12,7 +12,17 @@ type ProfileResponse = {
   interests: string[];
 };
 type GoalResponse = { minutesPerDay: number; daysPerWeek: number };
-type ConsentResponse = unknown[];
+type ConsentResponse = {
+  purpose: string;
+  policyVersion: string;
+  providerDisclosureVersion: string;
+  revokedAt: string | null;
+}[];
+const currentConsent = {
+  purpose: 'local-ai-practice',
+  policyVersion: 'privacy-2026-10-05',
+  providerDisclosureVersion: 'local-first-2026-10-05',
+} as const;
 type CsrfResponse = { csrfToken: string };
 type SessionResponse = {
   id: string;
@@ -112,7 +122,11 @@ function App() {
           ...pv,
           interests: pv.interests.join(', '),
           ...(gv ?? {}),
-          accepted: cv.length > 0,
+          accepted: cv.some((consent) =>
+            consent.purpose === currentConsent.purpose &&
+            consent.policyVersion === currentConsent.policyVersion &&
+            consent.providerDisclosureVersion === currentConsent.providerDisclosureVersion &&
+            consent.revokedAt === null),
         }));
     });
   }, []);
@@ -187,10 +201,7 @@ function App() {
         daysPerWeek: data.daysPerWeek,
       },
       consent: {
-        // Legacy wire identifiers remain compatible with existing consent records.
-        purpose: 'gemini-free-ai-practice',
-        policyVersion: 'privacy-2026-09-29',
-        providerDisclosureVersion: 'gemini-free-2026-09-29',
+        ...currentConsent,
         accepted: true,
       },
     };
@@ -709,7 +720,7 @@ function App() {
         <section>
           <h2>Privacidad y práctica con IA</h2>
           <div className="notice">
-            <strong>Privacidad · práctica local con IA</strong>
+            <strong>Privacidad · práctica local con IA · versión 2026-10-05</strong>
             <p>
               Por defecto, Ollama genera las respuestas del tutor y whisper.cpp
               transcribe tu voz en el equipo local. La reproducción usa

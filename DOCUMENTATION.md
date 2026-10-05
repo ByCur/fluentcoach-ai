@@ -245,7 +245,7 @@ remaining assumptions. Distinguish proposed targets from measured results.
 
 M02 introduces Prisma migrations for account identity, one learner profile per account, one current practice goal per account, and historical versioned consent. PostgreSQL remains canonical; Redis contains expiring opaque sessions and one-time OIDC state only. Compose applies committed Prisma migrations before API startup, and readiness verifies the completed migration plus required M02 columns. The test reset applies the same committed migration SQL to an empty isolated database. API ownership comes solely from the authenticated session, mutations require CSRF plus Origin validation, and disabled accounts invalidate access. See ADR 0006 for the identity/session boundary and Auth0 Free manual-user boundary and remaining live tenant gate, and ADR 0007 for the explicit decision to defer RLS until separate non-owner runtime/migration roles and transaction context can be proven.
 
-The UI is Spanish-first, responsive and keyboard accessible, with profile, self-selected A1–B2 level, IANA timezone, interests, editable 10-minute/three-day goal, and an explicit local-first privacy disclosure. Legacy consent wire/storage identifiers are retained for compatibility (see README); they do not select a provider. No Gemini request or conversation feature exists in M02. `BILLING_MODE=free_only` is runtime validated; no paid fallback exists.
+The UI is Spanish-first, responsive and keyboard accessible, with profile, self-selected A1–B2 level, IANA timezone, interests, editable 10-minute/three-day goal, and an explicit local-first privacy disclosure. New onboarding records the local-first tuple `local-ai-practice` / `privacy-2026-10-05` / `local-first-2026-10-05`. The exact legacy Gemini tuple remains accepted for historical client compatibility; old records remain unchanged and do not count as current local-first acceptance (see README). No Gemini request or conversation feature exists in M02. `BILLING_MODE=free_only` is runtime validated; no paid fallback exists.
 
 
 ## M05 implementation and validation note (2026-09-30)
@@ -352,8 +352,9 @@ Browser English voice/rate controls persist locally, prefer local/enhanced
 voices, handle `voiceschanged`, and fall back to the browser default when no
 English voice is available. Mute/stop remain available. Onboarding now describes
 the default local providers, no recurring AI API cost, no raw-audio persistence,
-and browser TTS offline limits. No provider, upload validation or security
-contract changes are introduced.
+and browser TTS offline limits. No provider, upload validation or session-security changes are introduced.
+Consent validation accepts only the exact historical Gemini and current
+local-first disclosure tuples; mixed versions are rejected.
 
 Manual validation of this polish is still needed on the Windows host: confirm
 short Spanish-first help for “No entiendo”, two consecutive voice turns without
@@ -372,3 +373,27 @@ avoid concurrent-build startup contention; all final browser runs passed. API, w
 proxy-CA mount outside the repository. Compose migration/service health passed
 with a temporary overlay that routes loopback probes directly instead of through
 the workspace proxy; repository Docker/Compose files remain unchanged.
+
+
+### Local-first consent audit provenance correction (2026-10-05)
+
+New acceptances now store `local-ai-practice`, `privacy-2026-10-05`, and
+`local-first-2026-10-05`, matching the version shown during onboarding. The
+historical Gemini tuple remains compatible in consent/onboarding input and
+history without any record rewrite or database migration. A legacy-only history
+does not pre-check the current disclosure checkbox; the learner must accept the
+local-first disclosure separately. Domain validation and the HTTP discriminated
+union require exact tuples and reject mixed versions before persistence.
+
+These records identify the disclosure actually accepted, not provider routing.
+If Gemini is enabled later, it requires its own explicit disclosure and consent
+against reviewed current terms; neither a local-first acceptance nor historical
+compatibility silently authorizes Gemini processing.
+
+Audit-correction validation passed: `pnpm lint`, `pnpm typecheck`, 88 unit tests,
+19 identity integration tests, 2 onboarding browser tests and 8 voice browser
+tests. Boundary/build, AI/voice contract, session/job/analysis integration,
+job/voice resilience, conversation/report browser, smoke and 48-case synthetic
+evaluation gates also passed. Updated API/worker/web images and Compose
+migration/service health passed with the same temporary proxy-trust/loopback
+validation overlays. No migration or historical-record rewrite was added.

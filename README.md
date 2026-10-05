@@ -226,13 +226,18 @@ The browser can load voices asynchronously. Mute prevents playback, and stop
 cancels it. Browser/system TTS may use a remote service, so offline operation is
 not guaranteed even though FluentCoach does not configure a cloud TTS provider.
 
-Onboarding describes this local-first default. Existing consent purpose and
-version identifiers (`gemini-free-ai-practice`, `privacy-2026-09-29`,
-`gemini-free-2026-09-29`) remain unchanged for wire/storage compatibility; they
-are legacy identifiers, not provider routing settings or authorization to send
-learner content to Gemini. Gemini text is explicit optional configuration behind
-its existing approval gates; Gemini Live is only a future option. Neither is a
-silent fallback. Review provider terms/disclosure before any optional use.
+New onboarding acceptances identify the local-first disclosure with
+`local-ai-practice`, `privacy-2026-10-05`, and `local-first-2026-10-05`.
+Historical records with the exact tuple `gemini-free-ai-practice`,
+`privacy-2026-09-29`, `gemini-free-2026-09-29` remain valid historical records;
+they are not rewritten or treated as acceptance of the local-first disclosure.
+Contracts/domain validation accept these two exact tuples for compatibility and
+reject mixed or unrelated versions. Existing string columns need no migration.
+
+Gemini text remains explicit optional configuration behind its approval gates;
+Gemini Live is only a future option. Neither is a silent fallback. Enabling
+Gemini later requires its own explicit provider disclosure/consent and review
+of then-current terms; local-first acceptance does not authorize Gemini use.
 
 Explicit Spanish help starts with short Spanish help, then one simpler English
 sentence/question (under 60 words); normal tutor turns remain in English.
