@@ -13,3 +13,5 @@ export * from './gemini-text.js';
 export * from './ollama-text.js';
 export * from './report-repository.js';
 export * from './ai-config.js';
+export * from './speech-config.js';
+export * from './whisper-cpp.js';
