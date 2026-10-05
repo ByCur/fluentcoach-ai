@@ -151,30 +151,17 @@ M03/M04 tests preserved. See ADR 0009 and the DOCUMENTATION.md validation notes.
 - **Out of scope:** Voice, recurring trends, automatic CEFR promotion,
   second commercial provider.
 
-## M06 — Real-time voice experience
+## M06A — Local-first turn-based voice
 
-- **Objective:** Usable spoken practice on agreed devices.
-- **Entry gate:** Run the ADR 0005 Gemini Live spike with synthetic speech: verify
-  `gemini-3.8-live` remains a current Free-Tier Live candidate, ephemeral-token
-  scope/expiry and the direct browser WebSocket architecture, or measure the
-  minimum secure API WebSocket relay; verify event authority, interruption,
-  reconnect, latency and quota behavior. Failure leaves voice unavailable with
-  text fallback; it never permits key exposure or spend.
-- **Scope:** Chosen voice transport/adapter, scoped credentials, microphone,
-  captions/playback, mute/stop/interruption, reconnect, authoritative event
-  normalization, text fallback and server-enforced session limits.
-- **Acceptance criteria:** Spoken sessions in both modes produce history/report;
-  browser has no permanent AI key; interrupted output is not marked delivered;
-  actual devices pass; latency measured with sample sizes; expiry stops media.
-- **Required tests:** Permission denial, fake-audio browser flows, disconnects,
-  duplicate/out-of-order events, expired credentials, cross-account media denial,
-  live device/interruption evaluation.
-- **Validation commands:** Common gates, `pnpm test:contract:voice`,
-  `pnpm test:e2e:voice`, `pnpm test:resilience:voice`,
-  `pnpm eval:voice -- --billing-mode free_only` (opt-in, free quota only);
-  manual device checklist.
-- **Out of scope:** Pronunciation scoring, recordings, telephony, native apps.
-  Real learner access still requires M10/M11 release/privacy gates.
+**Status: implementation ready for technical review (2026-10-02). Offline unit, boundary, contract, lint, type and build gates pass. PostgreSQL-backed API and browser gates require the unavailable local service harness; real whisper.cpp/device validation remains manual and is not claimed.**
+
+- **Objective:** Usable zero-recurring-API-cost spoken turns on agreed devices.
+- **Entry gate:** Local whisper.cpp and ffmpeg host setup is operator-controlled; no cloud speech credential or Gemini is required. Real host/device validation remains manual and must use synthetic or consented speech.
+- **Scope:** Push-to-talk MediaRecorder capture, authenticated bounded upload, application-owned SpeechTranscriber, local whisper.cpp `POST /inference`, existing Ollama conversation path, captions, optional browser speechSynthesis playback, mute/stop, and text fallback.
+- **Acceptance criteria:** One spoken learner turn follows existing ownership/state/idempotency rules; no raw audio is stored or logged; browser has no AI key; ended/foreign sessions and invalid audio fail closed; transcript and tutor text remain visible without TTS.
+- **Required tests:** Permission denial, fake-audio browser flows, unauthenticated/foreign/ended sessions, MIME/size/duration limits, transcription unavailable/timeout/invalid output/cancellation, and text fallback.
+- **Validation commands:** Common gates, `pnpm test:contract:voice`, `pnpm test:integration:sessions`, `pnpm test:e2e:voice`, `pnpm test:resilience:voice`; optional host-only `pnpm smoke:whisper -- <audio-file>` and manual device checklist.
+- **Out of scope:** Pronunciation scoring, recordings, continuous/full-duplex realtime voice, telephony, native apps, and automatic provider fallback. Gemini Live is an optional future provider requiring a new decision and explicit configuration. Real learner access still requires M10/M11 release/privacy gates.
 
 ## M07 — Recurring learner issues
 
