@@ -15,8 +15,13 @@ describe('versioned tutor language policy', () => {
       it(`${level}/${mode}: explicit help starts in Spanish and returns to one simple English prompt`, () => {
         const prompt = tutorPrompt({ ...context, helpLanguage: 'es' });
         expect(prompt).toContain(`[${TUTOR_PROMPT_VERSION};`);
-        expect(prompt).toContain('First give a brief Spanish explanation or help in Spanish');
-        expect(prompt).toContain('Then give exactly one simpler English sentence or question');
+        expect(prompt).toContain('Use the most recent tutor turn in the conversation data as the source of the help');
+        expect(prompt).toContain('explain or translate the meaning of that specific tutor turn briefly in Spanish');
+        expect(prompt).toContain('Do not ask what "No entiendo" means');
+        expect(prompt).toContain('exactly one simpler English paraphrase or question');
+        expect(prompt).toContain('preserves the intent of that same tutor turn');
+        expect(prompt).toContain('Do not introduce new requests, options, or scenario details');
+        expect(prompt).toContain('If there is no earlier tutor turn');
         expect(prompt).toContain('under 60 words total');
         expect(prompt).toContain('Do not treat help as a grammar error');
         expect(prompt).toContain('do not correct or evaluate the help request, even in teaching mode');
@@ -26,7 +31,7 @@ describe('versioned tutor language policy', () => {
         const prompt = tutorPrompt(context);
         expect(prompt).toContain('Respond primarily in English');
         expect(prompt).toContain('Spanish help is only for an explicit help request');
-        expect(prompt).not.toContain('First give a brief Spanish explanation');
+        expect(prompt).not.toContain('Use the most recent tutor turn');
         expect(prompt).toContain(mode === 'natural' ? 'Defer grammar' : 'at most one');
       });
     }
