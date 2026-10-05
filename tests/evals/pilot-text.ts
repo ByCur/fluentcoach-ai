@@ -23,7 +23,7 @@ export const PILOT_TEXT_CASES = SCENARIOS.flatMap((scenario) =>
         scenarioVersion: scenario.version,
         level,
         mode,
-        promptVersion: 'tutor-v3',
+        promptVersion: 'tutor-v4',
       } satisfies SessionSnapshot,
       input: inputs[scenario.slug]!,
       rubric: {
