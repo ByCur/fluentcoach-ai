@@ -43,6 +43,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
       error instanceof Error &&
       [
         'SESSION_NOT_FOUND',
+        'ISSUE_NOT_FOUND',
         'SESSION_TERMINAL',
         'IDEMPOTENCY_CONFLICT',
         'UNSUPPORTED_AUDIO_TYPE',
@@ -52,7 +53,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
     ) {
       response
         .status(
-          error.message === 'SESSION_NOT_FOUND'
+          ['SESSION_NOT_FOUND', 'ISSUE_NOT_FOUND'].includes(error.message)
             ? 404
             : error.message.startsWith('AUDIO_') || error.message === 'UNSUPPORTED_AUDIO_TYPE'
               ? 400

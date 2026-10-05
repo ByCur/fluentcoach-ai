@@ -453,3 +453,48 @@ Expected example:
 
 Confirm that Spanish explains that exact preceding sentence, the single English
 question preserves its intent, and the next normal turn returns to English.
+
+## M07 recurring learning priorities (2026-10-05)
+
+M07 adds the Spanish-first “Prioridades recurrentes” section with counts,
+expandable exact learner examples, dismissal and explicit restoration. Recurrence
+requires **3 validated observations across 2 distinct practice sessions within a
+rolling 30-day window**. One issue per learner turn counts once; repeated findings,
+retry, duplicate delivery and reanalysis do not inflate sessions or observations.
+Session completion time anchors the window, so reanalysis cannot refresh old work.
+
+The domain owns eight `language-issues-v1` grammar/vocabulary categories.
+`analysis-v3` requests stable category headings while retaining `report-v1` JSON,
+existing evidence validation and local Ollama. A deterministic classifier accepts
+explicit keys or a small versioned English/Spanish alias list; strengths and
+unknown headings produce no observation. These are learning priorities, not
+psychological profiles, proficiency scores, diagnoses or certified CEFR weaknesses.
+Quote validation does not establish that the model's language explanation is right.
+
+Current successful validated reports are authoritative. Materialized observations
+record taxonomy/source identities and accepted exact evidence; a SQL view and
+pure domain algorithm derive recurrence. Reads rebuild and revalidate per account,
+repairing missing/invalid/deleted sources. Superseded reports stop contributing
+as soon as the transcript revision changes. Report success and observation writes
+commit together with the existing provider audit/job effect. No extra AI call,
+paid/cloud dependency, audio storage, review scheduling or generated plan is added.
+
+Dismissal is separate account-scoped state and remains effective until explicit
+restoration, including after new evidence, disappearance and rebuild. The UI hides
+it from active priorities and offers a collapsed restore list for currently
+recurring dismissed issues. The API can also restore a saved dismissal below the
+threshold. Account deletion removes observations and dismissals; source deletion
+removes observations and preserves dismissal preference.
+
+See [ADR 0012](docs/adr/0012-recurring-language-priorities.md) and
+[M07 schema/data lifecycle](docs/m07-data-lifecycle.md) for classification,
+source constraints, authenticated contracts, rebuild, migration and rollback.
+Run `pnpm test:integration:issues` with migrated PostgreSQL and `AI_PROVIDER=fake`;
+run `pnpm test:e2e:issues` with PostgreSQL, Redis and fake text/speech providers.
+These gates fail on missing infrastructure or zero tests. Normal builds retain
+Ollama / whisper.cpp / browser speechSynthesis defaults.
+
+Manual validation remains: review real local Ollama `analysis-v3` category and
+correction quality on synthetic multi-session practice; inspect Spanish wording,
+keyboard evidence/dismiss/restore controls, and local browser/voice behavior.
+M07 does not authorize real learner access before the existing M10/M11 gates.

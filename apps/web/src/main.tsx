@@ -1,3 +1,4 @@
+import { IssuesPanel } from './issues-panel.js';
 import { ReportPanel } from './report-panel.js';
 import { SPEECH_RATES, useTutorSpeechPreferences } from './tutor-speech.js';
 import { StrictMode, useEffect, useRef, useState } from 'react';
@@ -436,6 +437,7 @@ function App() {
             onClose={() => setReportId(null)}
           />
         )}{' '}
+        {!session && <IssuesPanel csrf={csrf} />}
         {!session ? (
           <section>
             <label>

@@ -153,6 +153,9 @@ importers:
       '@fluentcoach/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@fluentcoach/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@vitejs/plugin-react':
         specifier: 5.0.4
         version: 5.0.4(vite@7.1.7(@types/node@20.19.17)(jiti@2.7.0)(terser@5.51.2)(tsx@4.20.5))

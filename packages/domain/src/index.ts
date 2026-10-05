@@ -36,3 +36,4 @@ export function validateConsent(input: { purpose: string; policyVersion: string;
   if (input.accepted !== true || (!current && !legacy)) throw new Error('INVALID_CONSENT_VERSION');
 }
 export * from './conversation.js';
+export * from './issues.js';

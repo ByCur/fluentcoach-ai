@@ -58,7 +58,11 @@ export class FakeSessionAnalyzer implements SessionAnalyzer {
               schemaVersion: REPORT_SCHEMA_VERSION,
               rubricVersion: RUBRIC_VERSION,
               strengths: [finding],
-              corrections: [],
+              corrections: transcript.turns.some((turn) => turn.speaker === 'learner' && /^Yesterday I go\b/.test(turn.text))
+                ? [{ ...finding, text: 'Past tense: use went for a completed past event', uncertainty: 'low',
+                    evidence: transcript.turns.filter((turn) => turn.speaker === 'learner' && /^Yesterday I go\b/.test(turn.text))
+                      .slice(0, 3).map((turn) => ({ turnSequence: turn.sequence, start: 0, end: turn.text.length, quote: turn.text })) }]
+                : [],
             },
       metadata: {
         adapter: 'fake',

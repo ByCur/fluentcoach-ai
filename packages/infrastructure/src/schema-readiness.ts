@@ -2,12 +2,15 @@ import { pool } from './prisma.js';
 export const M05_MIGRATION = '202609300004_m05_reports';
 export const M02_MIGRATION = '202609290001_m02_identity';
 const requiredMigrations = [
+  '202610050001_m07_recurring_issues',
   M02_MIGRATION,
   '202609300001_m03_m04_hardening',
   M05_MIGRATION,
   '202609300005_m05_hardening_compatibility',
 ];
 const requiredColumns = [
+  ['issue_observations', 'quote'],
+  ['issue_dismissals', 'restored_at'],
   ['accounts', 'oidc_issuer'],
   ['accounts', 'oidc_subject'],
   ['accounts', 'status'],
@@ -31,7 +34,7 @@ const requiredColumns = [
 export async function schemaReady(): Promise<boolean> {
   try {
     const migration = await pool.query(
-      'SELECT 1 FROM _prisma_migrations WHERE migration_name IN ($1,$2,$3,$4) AND finished_at IS NOT NULL AND rolled_back_at IS NULL',
+      'SELECT 1 FROM _prisma_migrations WHERE migration_name IN ($1,$2,$3,$4,$5) AND finished_at IS NOT NULL AND rolled_back_at IS NULL',
       requiredMigrations,
     );
     if (migration.rowCount !== requiredMigrations.length) return false;
