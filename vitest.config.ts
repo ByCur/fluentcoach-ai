@@ -81,6 +81,10 @@ export default defineConfig({
       },
       {
         resolve: { alias: sourceAliases },
+        test: { name: 'reviews', include: ['tests/integration/reviews*.test.ts'], testTimeout: 15000 },
+      },
+      {
+        resolve: { alias: sourceAliases },
         test: {
           name: 'analysis',
           include: [
