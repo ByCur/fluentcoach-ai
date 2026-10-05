@@ -206,6 +206,9 @@ depends on the required PostgreSQL/Redis/Chromium CI gates. See ADR 0013 and
 
 ## M09 — Plans, goals and progress
 
+- **Status:** Implementation ready for technical review. Required CI PostgreSQL/Redis/Chromium gates must pass before completion.
+- **Design:** Deterministic `plan-generator-v1`, `plan-v1`, `plan-catalog-v1`; no plan AI call. See [ADR 0014](docs/adr/0014-plans-and-active-progress.md) and [M09 data lifecycle](docs/m09-data-lifecycle.md).
+
 - **Objective:** Convert learning evidence into manageable practice.
 - **Scope:** Plan generator/activities, practice events/aggregates, minutes,
   sessions/goals, speaking streaks, review activity and evidence-linked trends.
@@ -216,7 +219,7 @@ depends on the required PostgreSQL/Redis/Chromium CI gates. See ADR 0013 and
   DST/midnight/timezone changes, streak breaks, concurrent plan refresh and rebuild.
 - **Validation commands:** Common gates, `pnpm test:integration:plans`,
   `pnpm test:integration:progress`, `pnpm test:e2e:progress`,
-  `pnpm eval:ai -- --suite plans --billing-mode free_only` (opt-in, free quota only).
+  `pnpm eval:ai -- --suite plans --billing-mode free_only` only if a model-backed plan generator is added; M09 uses no model and verifies the generator in deterministic unit/integration gates.
 - **Out of scope:** Official proficiency scores, leaderboards, push alerts,
   exam practice and third-party dashboards.
 

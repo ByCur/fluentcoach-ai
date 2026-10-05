@@ -1,4 +1,8 @@
 import {
+  boundedPracticeTelemetry,
+  type PracticeTelemetry,
+} from '@fluentcoach/domain';
+import {
   SCENARIOS,
   correctionPolicy,
   transitionSession,
@@ -27,7 +31,9 @@ const isTerminalSession = (state: SessionState) =>
 function recentTutorContext(turns: ConversationTurn[], help = false) {
   const recent = turns.slice(-40);
   if (help && !recent.some((turn) => turn.speaker === 'tutor')) {
-    const source = [...turns].reverse().find((turn) => turn.speaker === 'tutor');
+    const source = [...turns]
+      .reverse()
+      .find((turn) => turn.speaker === 'tutor');
     // Repeated button help must not evict the actual latest tutor turn and
     // incorrectly trigger the no-previous-tutor fallback. Keep the 40-turn cap.
     if (source) return [source, ...recent.slice(-39)];
@@ -65,7 +71,11 @@ export interface SessionRecord {
 export interface SessionRepository {
   create(accountId: string, snapshot: SessionSnapshot): Promise<SessionRecord>;
   get(accountId: string, id: string): Promise<SessionRecord | null>;
-  save(record: SessionRecord, leaseToken?: string): Promise<void>;
+  save(
+    record: SessionRecord,
+    leaseToken?: string,
+    practice?: PracticeTelemetry & { sourceEventKey: string },
+  ): Promise<void>;
   history(accountId: string): Promise<SessionRecord[]>;
   acquireTurn?(
     accountId: string,
@@ -128,14 +138,21 @@ export class ConversationService {
       promptVersion: TUTOR_PROMPT_VERSION,
     });
   }
-  turn(accountId: string, id: string, key: string, text: string) {
+  turn(
+    accountId: string,
+    id: string,
+    key: string,
+    text: string,
+    telemetry: PracticeTelemetry = { kind: 'text', durationMs: 0 },
+  ) {
+    const practice = boundedPracticeTelemetry(telemetry);
     const scope = `${accountId}:${id}`,
       pending = this.inFlight.get(scope);
     if (pending)
       return pending.key === key
         ? pending.result
         : Promise.reject(new Error('SESSION_BUSY'));
-    const result = this.generateTurn(accountId, id, key, text);
+    const result = this.generateTurn(accountId, id, key, text, practice);
     this.inFlight.set(scope, { key, result });
     void result.then(
       () => this.inFlight.delete(scope),
@@ -148,6 +165,7 @@ export class ConversationService {
     id: string,
     key: string,
     text: string,
+    practice: PracticeTelemetry,
   ) {
     const lockKey = `${accountId}:${id}`;
     if (this.active.has(lockKey)) throw new AiError('unavailable');
@@ -159,11 +177,7 @@ export class ConversationService {
       let s = await this.required(accountId, id);
       if (isTerminalSession(s.state)) throw new TerminalSessionError();
       if (this.repo.acquireTurn) {
-        const acquired = await this.repo.acquireTurn(
-          accountId,
-          id,
-          leaseToken,
-        );
+        const acquired = await this.repo.acquireTurn(accountId, id, leaseToken);
         if (!acquired) {
           s = await this.required(accountId, id);
           if (isTerminalSession(s.state)) throw new TerminalSessionError();
@@ -241,7 +255,11 @@ export class ConversationService {
             correction: correctionPolicy(s.snapshot.mode),
           },
         });
-        await this.repo.save(s, leaseToken);
+        await this.repo.save(
+          s,
+          leaseToken,
+          explicitHelp ? undefined : { ...practice, sourceEventKey: key },
+        );
         return s;
       } catch (error) {
         if (

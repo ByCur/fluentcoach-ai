@@ -17,3 +17,4 @@ export * from './speech-config.js';
 export * from './whisper-cpp.js';
 export * from './issue-repository.js';
 export * from './vocabulary-repository.js';
+export * from './plan-progress-repository.js';

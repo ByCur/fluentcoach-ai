@@ -42,6 +42,11 @@ export class ApiExceptionFilter implements ExceptionFilter {
     if (
       error instanceof Error &&
       [
+        'PLAN_NOT_FOUND',
+        'STALE_PLAN_VERSION',
+        'PLAN_SOURCES_CHANGED',
+        'ACTIVITY_STATE_CONFLICT',
+        'PLAN_GENERATION_RETRYABLE',
         'SESSION_NOT_FOUND',
         'ISSUE_NOT_FOUND',
         'VOCABULARY_NOT_FOUND',
@@ -55,8 +60,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
     ) {
       response
         .status(
-          ['SESSION_NOT_FOUND', 'ISSUE_NOT_FOUND', 'VOCABULARY_NOT_FOUND'].includes(error.message)
+          ['PLAN_NOT_FOUND', 'SESSION_NOT_FOUND', 'ISSUE_NOT_FOUND', 'VOCABULARY_NOT_FOUND'].includes(error.message)
             ? 404
+            : error.message === 'PLAN_GENERATION_RETRYABLE' ? 503
             : error.message.startsWith('AUDIO_') || error.message === 'UNSUPPORTED_AUDIO_TYPE'
               ? 400
               : 409,
@@ -78,6 +84,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
     if (
       error instanceof Error &&
       [
+        'PROFILE_REQUIRED',
+        'INVALID_ACTIVE_DURATION',
         'INVALID_CURSOR',
         'SESSION_NOT_ACTIVE',
         'INVALID_CEFR_LEVEL',

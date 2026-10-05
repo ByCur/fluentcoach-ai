@@ -1,3 +1,4 @@
+import { PlanProgressController } from './plan-progress.controller.js';
 import { IssueController } from './issue.controller.js';
 import { VocabularyController } from './vocabulary.controller.js';
 import {
@@ -15,6 +16,8 @@ import {
   ReportService,
   VoiceTurnService,
   VocabularyService,
+  PlanService,
+  ProgressService,
 } from '@fluentcoach/application';
 import {
   Auth0OidcAdapter,
@@ -24,8 +27,10 @@ import {
   PostgresIssueRepository,
   PostgresSessionRepository,
   PostgresVocabularyRepository,
+  PostgresPlanRepository,
+  PostgresProgressRepository,
 } from '@fluentcoach/infrastructure';
-import { FakeOidcProvider } from '@fluentcoach/testing';
+import { FakeOidcProvider, FakePlanGenerator } from '@fluentcoach/testing';
 import { HealthController } from './health.controller.js';
 import { IdentityController, OIDC_PROVIDER } from './identity.controller.js';
 import { JobController } from './job.controller.js';
@@ -58,8 +63,11 @@ import {
     ReportController,
     IssueController,
     VocabularyController,
+    PlanProgressController,
   ],
   providers: [
+    { provide: PlanService, useFactory: () => new PlanService(new PostgresPlanRepository(process.env['AI_PROVIDER'] === 'fake' ? new FakePlanGenerator() : undefined)) },
+    { provide: ProgressService, useFactory: () => new ProgressService(new PostgresProgressRepository()) },
     {
       provide: IssueService,
       useFactory: () => new IssueService(new PostgresIssueRepository()),

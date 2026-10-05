@@ -23,6 +23,9 @@ model Account {
   status AccountStatus @default(ACTIVE)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  learningPlans LearningPlan[]
+  planRequests LearningPlanRequest[]
+  practiceEvents PracticeEvent[]
   issueDismissals IssueDismissal[]
   profile LearnerProfile?
   goals PracticeGoal[]
@@ -84,6 +87,8 @@ model VocabularyCard {
  @@map("vocabulary_cards")
 }
 model VocabularyReviewEvent {
+ timezoneAtEvent String @map("timezone_at_event") @db.VarChar(64)
+ localDate DateTime @map("local_date") @db.Date
  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  cardId String @map("card_id") @db.Uuid
  accountId String @map("account_id") @db.Uuid
@@ -157,6 +162,8 @@ enum ConversationMode {
   TEACHING
 }
 model PracticeSession {
+ practiceEvents PracticeEvent[]
+ planActivities LearningPlanActivity[]
  turnLeaseToken String? @map("turn_lease_token") @db.Uuid
  turnLeaseUntil DateTime? @map("turn_lease_until") @db.Timestamptz
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -184,6 +191,7 @@ model PracticeSession {
   @@map("practice_sessions")
 }
 model ConversationTurn {
+ practiceEvents PracticeEvent[]
  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  sessionId String @map("session_id") @db.Uuid
  accountId String @map("account_id") @db.Uuid
@@ -195,6 +203,7 @@ model ConversationTurn {
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
  session PracticeSession @relation(fields:[sessionId,accountId],references:[id,accountId],onDelete:Cascade)
  @@unique([sessionId,sequence])
+ @@unique([id,accountId,sessionId],map:"turns_id_account_session_key")
  @@unique([sessionId,sourceEventKey])
  @@map("conversation_turns")
 }
@@ -373,4 +382,73 @@ model IssueDismissal {
  account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
  @@id([accountId,taxonomyVersion,issueKey])
  @@map("issue_dismissals")
+}
+
+// Partial current-plan indexes, checks, date/immutability triggers are owned by M09 SQL.
+model LearningPlan {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ schemaVersion String @map("schema_version") @db.VarChar(40)
+ generatorVersion String @map("generator_version") @db.VarChar(40)
+ catalogVersion String @map("catalog_version") @db.VarChar(40)
+ version Int @default(1)
+ state String @default("proposal") @db.VarChar(12)
+ sourceSnapshot Json @map("source_snapshot")
+ rationale String
+ insufficientData Boolean @map("insufficient_data")
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ acceptedAt DateTime? @map("accepted_at") @db.Timestamptz
+ acceptedFromVersion Int? @map("accepted_from_version")
+ account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
+ activities LearningPlanActivity[]
+ requests LearningPlanRequest[]
+ @@unique([id,accountId])
+ @@map("learning_plans")
+}
+model LearningPlanActivity {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ planId String @map("plan_id") @db.Uuid
+ catalogVersion String @map("catalog_version") @db.VarChar(40)
+ candidateId String @map("candidate_id") @db.VarChar(100)
+ activityType String @map("activity_type") @db.VarChar(30)
+ definition Json
+ state String @default("pending") @db.VarChar(12)
+ startedAt DateTime? @map("started_at") @db.Timestamptz
+ sessionId String? @unique @map("session_id") @db.Uuid
+ skippedFromVersion Int? @map("skipped_from_version")
+ plan LearningPlan @relation(fields:[planId,accountId],references:[id,accountId],onDelete:Cascade)
+ // SQL clears only session_id, preserving non-null owner on source deletion.
+ session PracticeSession? @relation(fields:[sessionId,accountId],references:[id,accountId],onDelete:NoAction)
+ @@unique([planId,candidateId])
+ @@unique([id,accountId])
+ @@map("learning_plan_activities")
+}
+model LearningPlanRequest {
+ accountId String @map("account_id") @db.Uuid
+ requestKey String @map("request_key") @db.VarChar(100)
+ planId String @map("plan_id") @db.Uuid
+ signature String
+ plan LearningPlan @relation(fields:[planId,accountId],references:[id,accountId],onDelete:Cascade)
+ account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
+ @@id([accountId,requestKey])
+ @@map("learning_plan_requests")
+}
+model PracticeEvent {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ sessionId String @map("session_id") @db.Uuid
+ turnId String? @map("turn_id") @db.Uuid
+ sourceKey String @map("source_key") @db.VarChar(110)
+ kind String @db.VarChar(20)
+ durationMs Int @map("duration_ms")
+ occurredAt DateTime @default(dbgenerated("clock_timestamp()")) @map("occurred_at") @db.Timestamptz
+ timezoneAtEvent String @map("timezone_at_event") @db.VarChar(64)
+ localDate DateTime @map("local_date") @db.Date
+ account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
+ session PracticeSession @relation(fields:[sessionId,accountId],references:[id,accountId],onDelete:Cascade)
+ turn ConversationTurn? @relation(fields:[turnId,accountId,sessionId],references:[id,accountId,sessionId],onDelete:Cascade)
+ @@unique([accountId,sessionId,sourceKey])
+ @@index([accountId,localDate],map:"practice_events_account_date_idx")
+ @@map("practice_events")
 }
