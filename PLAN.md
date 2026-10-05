@@ -156,6 +156,10 @@ M03/M04 tests preserved. See ADR 0009 and the DOCUMENTATION.md validation notes.
 
 **Status: implementation ready for technical review. Owner-reported Windows host gate passed (2026-10-05): multilingual whisper.cpp base, microphone WebM/Opus, Ollama llama3.2:3b, browser speechSynthesis, spoken "No entiendo", and end-to-end voice. Stream reconciliation, explicit Spanish help, local privacy copy and browser voice/rate preferences have regression coverage. Host validation of this polish remains manual.**
 
+PR #22 strengthens `tutor-v4` help grounding to the most recent tutor turn, with
+Spanish first and one equivalent simpler English sentence. The exact-sentence
+Windows host validation remains pending; see DOCUMENTATION.md's PR #22 notes.
+
 - **Objective:** Usable zero-recurring-API-cost spoken turns on agreed devices.
 - **Entry gate:** Local whisper.cpp and ffmpeg host setup is operator-controlled; no cloud speech credential or Gemini is required. Real host/device validation remains manual and must use synthetic or consented speech.
 - **Scope:** Push-to-talk MediaRecorder capture, authenticated bounded upload, application-owned SpeechTranscriber, local whisper.cpp `POST /inference`, existing Ollama conversation path, captions, optional browser speechSynthesis playback, mute/stop, and text fallback.

@@ -3,7 +3,7 @@ import {
   type ConversationMode,
   type SessionSnapshot,
 } from '@fluentcoach/domain';
-export const PILOT_TEXT_SUITE_VERSION = 'pilot-text-fixtures-v1';
+export const PILOT_TEXT_SUITE_VERSION = 'pilot-text-fixtures-v2';
 // Synthetic-only review matrix: each case checks policy and evidence mechanically.
 // Human live review must additionally score usefulness, level fit, scenario coherence and Spanish clarity.
 const inputs: Record<string, string> = {
@@ -45,6 +45,9 @@ export const PILOT_TEXT_CASES = SCENARIOS.flatMap((scenario) =>
           'scenario coherence',
           'correction usefulness',
           'Spanish help clarity',
+          'Spanish help explains the most recent tutor turn, never the help phrase',
+          'exactly two short parts: Spanish first, then one simpler English equivalent under 60 words',
+          'English help preserves tutor intent without new requests, choices, details or information',
           'evidence supports finding',
         ],
       },

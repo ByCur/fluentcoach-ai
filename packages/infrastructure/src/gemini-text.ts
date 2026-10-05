@@ -13,7 +13,7 @@ import {
   type SessionAnalyzer,
   type TutorContext,
 } from '@fluentcoach/application';
-import { analysisPrompt, tutorPrompt } from './ai-prompts.js';
+import { analysisPrompt, tutorInput, tutorPrompt } from './ai-prompts.js';
 import type { AiBudget, FreeQuota } from './ai-budget.js';
 const eventSchema = z.object({
   responseId: z.string().max(200).optional(),
@@ -396,7 +396,7 @@ export class GeminiTextAdapter
     if (!context.synthetic) throw new AiError('unauthorized');
     const call = await this.begin(
       tutorPrompt(context),
-      { snapshot: context.snapshot, turns: context.recentTurns, input },
+      tutorInput(context, input),
       false,
       options,
     );

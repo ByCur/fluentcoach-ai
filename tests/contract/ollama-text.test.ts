@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AiError, type AnalysisTranscript } from '@fluentcoach/application';
 import { OllamaTextAdapter } from '@fluentcoach/infrastructure';
+import { HELP_EXAMPLES, helpTurns } from './tutor-help-fixtures.js';
 
 const context = {
   snapshot: {
@@ -52,6 +53,9 @@ describe('Ollama normalized text adapter (network-free)', () => {
     expect(body.model).toBe('llama3.2:3b');
     expect(body.messages[0]).toMatchObject({ role: 'system' });
     expect(body.messages[0]!.content).toContain('English tutor');
+    expect(body.messages[0]!.content).toContain('[tutor-v4;');
+    expect(body.messages[0]!.content).toContain('Respond primarily in English');
+    expect(JSON.parse(body.messages[1]!.content)).not.toHaveProperty('helpSourceTurn');
     expect(body.messages[1]!.content).toContain('I want soup.');
     expect(chunks).toEqual([
       { text: 'What would you like to order?', done: false },
@@ -64,9 +68,37 @@ describe('Ollama normalized text adapter (network-free)', () => {
           inputTokens: 42,
           outputTokens: 8,
           schemaVersion: 'text-v1',
+          promptVersion: 'tutor-v4',
         }),
       },
     ]);
+  });
+
+  it('preserves latest-tutor grounding for every level/mode and the no-tutor fallback', async () => {
+    for (const level of ['A1', 'A2', 'B1', 'B2'] as const) {
+      for (const mode of ['natural', 'teaching'] as const) {
+        for (const example of [...HELP_EXAMPLES, { tutor: '', response: 'No te preocupes.\nHow can I help you?' }]) {
+          const turns = example.tutor ? helpTurns(example.tutor) : helpTurns('').slice(2);
+          const request = vi.fn<typeof fetch>().mockResolvedValue(response(completion(example.response)));
+          const chunks = [];
+          for await (const chunk of new OllamaTextAdapter({}, request).stream({
+            ...context, snapshot: { ...context.snapshot, level, mode }, recentTurns: turns, helpLanguage: 'es',
+          }, 'No entiendo.', options())) chunks.push(chunk);
+          const body = JSON.parse(request.mock.calls[0]![1]!.body as string);
+          const system = body.messages[0].content as string;
+          const data = JSON.parse(body.messages[1].content);
+          expect(data.helpSourceTurn).toEqual(example.tutor ? turns[1] : null);
+          expect(data.input).toBe('No entiendo.');
+          expect(system).toContain('most recent tutor turn');
+          expect(system).toContain('do not explain or translate the help phrase itself');
+          expect(system).toContain('Do not introduce new requests, choices, options, scenario details, or information');
+          expect(system).toContain('helpSourceTurn is null');
+          expect(system).toContain('even in teaching mode');
+          expect(chunks.map(c => c.text).join('')).toBe(example.response);
+          expect(chunks.at(-1)?.metadata?.promptVersion).toBe('tutor-v4');
+        }
+      }
+    }
   });
 
   it('requests schema-constrained JSON and returns a normalized report draft', async () => {

@@ -128,11 +128,7 @@ export function validateReport(
     r['rubricVersion'] !== RUBRIC_VERSION
   )
     return invalid();
-  const parseFindings = (
-    value: unknown,
-    max: number,
-    correction = false,
-  ): Finding[] => {
+  const parseFindings = (value: unknown, max: number): Finding[] => {
     if (!Array.isArray(value) || value.length > max) return invalid();
     return value.map((rawFinding: unknown) => {
       const f = object(rawFinding, [
@@ -168,7 +164,7 @@ export function validateReport(
         if (
           !turn ||
           turn.speaker !== 'learner' ||
-          (correction && /no entiendo|i don.t understand/i.test(turn.text)) ||
+          /no entiendo|i don.t understand/i.test(turn.text) ||
           result.end <= result.start ||
           result.end > turn.text.length ||
           turn.text.slice(result.start, result.end) !== result.quote
@@ -189,7 +185,7 @@ export function validateReport(
     schemaVersion: REPORT_SCHEMA_VERSION,
     rubricVersion: RUBRIC_VERSION,
     strengths: parseFindings(r['strengths'], 3),
-    corrections: parseFindings(r['corrections'], 3, true),
+    corrections: parseFindings(r['corrections'], 3),
   };
   if (
     !transcript.turns.some((t) => t.speaker === 'learner') ||

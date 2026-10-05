@@ -115,7 +115,17 @@ async function main() {
     for await (const chunk of conversation.stream(
       {
         snapshot: fixture.snapshot,
-        recentTurns: turns,
+        recentTurns: [
+          ...turns,
+          {
+            sequence: 2, sourceEventKey: `${fixture.id}:reply`,
+            speaker: 'tutor', text: reply, language: 'en',
+          },
+          {
+            sequence: 3, sourceEventKey: `${fixture.id}:help`,
+            speaker: 'learner', text: "I don't understand", language: 'en',
+          },
+        ],
         synthetic: true,
         helpLanguage: 'es',
       },
@@ -157,6 +167,8 @@ async function main() {
       }
     })();
     const words = reply.trim().split(/\s+/).length;
+    const helpParts = help.trim().split(/\r?\n/)
+      .map((part) => part.trim()).filter(Boolean);
     const checks = {
       boundedLevelLength: words <= fixture.rubric.maxWords,
       hasFollowUp: /\?/.test(reply),
@@ -165,7 +177,11 @@ async function main() {
           ? !/quick tip|correction:|you should say/i.test(reply)
           : (reply.match(/quick tip|correction:|you should say/gi)?.length ??
               0) <= 1 && /example|for instance/i.test(reply),
-      helpReturnsToEnglish: /english|ingl[eé]s/i.test(help),
+      // Language/meaning/intent require the human rubric. These checks enforce
+      // structure without requiring the literal word "English" in the reply.
+      helpTwoParts: helpParts.length === 2,
+      helpOneEnglishSentence: (helpParts[1]?.match(/[.!?]/g)?.length ?? 0) === 1,
+      helpBoundedLength: help.trim().split(/\s+/).length < 60,
       evidenceValidated: true,
       fabricatedRejected,
       malformedRejected,
@@ -178,6 +194,7 @@ async function main() {
       helpMetadata: helpMetadata ?? null,
       syntheticReply: reply,
       syntheticHelp: help,
+      helpSourceTutorTurn: reply,
       syntheticReport: report,
       humanReviewRequired: fixture.rubric.humanReview,
     });

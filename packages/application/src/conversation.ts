@@ -23,6 +23,17 @@ export class TerminalSessionError extends AiError {
 }
 const isTerminalSession = (state: SessionState) =>
   state === 'ended' || state === 'abandoned' || state === 'failed';
+
+function recentTutorContext(turns: ConversationTurn[], help = false) {
+  const recent = turns.slice(-40);
+  if (help && !recent.some((turn) => turn.speaker === 'tutor')) {
+    const source = [...turns].reverse().find((turn) => turn.speaker === 'tutor');
+    // Repeated button help must not evict the actual latest tutor turn and
+    // incorrectly trigger the no-previous-tutor fallback. Keep the 40-turn cap.
+    if (source) return [source, ...recent.slice(-39)];
+  }
+  return recent;
+}
 export interface TutorContext {
   snapshot: SessionSnapshot;
   recentTurns: readonly ConversationTurn[];
@@ -183,7 +194,7 @@ export class ConversationService {
         const stream = this.provider.stream(
           {
             snapshot: s.snapshot,
-            recentTurns: s.turns.slice(-40),
+            recentTurns: recentTutorContext(s.turns, explicitHelp),
             accountId,
             sessionId: id,
             ...(explicitHelp ? { helpLanguage: 'es' as const } : {}),
@@ -278,7 +289,7 @@ export class ConversationService {
       const stream = this.provider.stream(
         {
           snapshot: s.snapshot,
-          recentTurns: s.turns.slice(-40),
+          recentTurns: recentTutorContext(s.turns, true),
           accountId,
           sessionId: id,
           helpLanguage: 'es',
