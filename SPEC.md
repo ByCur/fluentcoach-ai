@@ -51,7 +51,7 @@ choices in future `docs/adr/` decision records.
 | Correction timing | Natural: after session; Teaching: after completed turns | Script review M03, live review M05/M06 |
 | Stack | M01 pins Node 20.20.x, pnpm, strict TypeScript, React/Vite, NestJS, PostgreSQL and Redis; Prisma/BullMQ when owned by later milestones | M00 compatibility resolved; review runtime support before production |
 | AI vendor/model | Local Ollama `llama3.2:3b` is the default text/analysis provider; Gemini Developer API Free remains explicit optional text and Live candidate; deterministic fake in tests | Local text has no recurring API cost; re-check Gemini models/terms before optional use |
-| Voice transport | Gemini Live direct browser WebSocket using API-minted ephemeral token if verified safe; otherwise minimum secure API WebSocket relay; text fallback | M06 must prove free-tier support, key safety, authority and target devices |
+| Voice transport | Turn-based local composition: authenticated browser MediaRecorder upload -> local whisper.cpp -> existing Ollama conversation -> optional browser speechSynthesis; text fallback | M06A validates target devices; Gemini Live is future explicit-only, never fallback |
 | Identity | Auth0 EU OIDC tenant, closed sign-up, secure server sessions | M00 resolved; plan/DPA configuration gates real access |
 | Hosting | Render Static Site Free + one cold-starting Free API; Neon PostgreSQL Free; Upstash Redis/QStash Free; no deployed worker | M11 must re-check every free tier and refuse billing-required configuration |
 | Load/cost | One invited learner; `BILLING_MODE=free_only`; EUR 0/month; exhaustion fails closed; no paid fallback | Re-check limits/terms before deployment; any future spend requires owner approval and a new ADR |
@@ -104,12 +104,12 @@ flowchart LR
   Q -->|signed invocation| API
   API --> Ollama[Local Ollama text AI]
   API -. explicit opt-in only .-> Gemini[Gemini Developer API Free]
-  Web -. ephemeral token or secure relay .-> Gemini
+  Web -->|bounded authenticated audio turn| API
+  API -->|local POST /inference| Whisper[Local whisper.cpp]
+  Web -->|optional tutor playback| TTS[Browser speechSynthesis]
 ```
 
-Dotted paths depend on the voice spike. Without scoped controls and authoritative
-events, use a backend media adapter. Client transcripts are untrusted and cannot
-be authoritative provider usage or assessment evidence.
+The M06A media path is backend-authorized and turn-based. Raw audio is held only in memory; the server-side whisper.cpp transcript becomes authoritative only after normal ownership, state and idempotency checks. Client duration metadata is bounded but untrusted; size is independently enforced. Gemini remains an optional future provider and is never an automatic fallback.
 
 Modules: Identity/Access, Learners, Scenarios, Tutoring/Sessions, Analysis,
 Vocabulary/Reviews, Learning Plans, Progress, Operations. Each owns its writes.
@@ -229,10 +229,11 @@ Application-owned ports express product capabilities rather than vendor APIs:
 | Port | Input/output |
 | --- | --- |
 | ConversationProvider | Versioned TutorContext, bounded turns, deadline/cancellation -> normalized streamed output/events and usage |
-| RealtimeVoiceProvider | Policy, scoped identity and required capabilities -> expiring connection descriptor; end/cancel and authoritative events |
+| SpeechTranscriber | Bounded in-memory audio, MIME/language and deadline/cancellation -> normalized transcript |
+| RealtimeVoiceProvider | Optional future explicit provider; policy and scoped identity -> expiring connection descriptor |
 | SessionAnalyzer | Immutable transcript + rubric -> validated ReportDraft with evidence and uncertainty |
 | LearningPlanGenerator | Bounded structured learner snapshot + allowed activities -> validated proposed plan |
-| SpeechTranscriber / SpeechSynthesizer | Optional only if M00 selects a composed voice pipeline |
+| Browser speechSynthesis | Presentation-only optional tutor playback; captions never depend on it |
 
 TutorContext contains level, scenario, correction/help policy, bounded recent
 turns and selected structured priorities. User/provider content is untrusted,
@@ -262,9 +263,8 @@ derive pronunciation from text or automatically promote CEFR.
 Production uses `BILLING_MODE=free_only`. Startup rejects billable providers,
 paid plans and paid fallback configuration. The pilot uses Render Static Site and
 Web Service Free, Neon PostgreSQL Free, Upstash Redis and QStash Free, Auth0 Free
-(conditionally), and Gemini Developer API Free. Exhaustion makes the affected
-feature unavailable: AI rejects new sessions, voice offers text only when text
-quota exists, QStash leaves analysis pending, and Redis loss never compromises
+(conditionally), and local Ollama/whisper.cpp for normal AI use. Exhaustion or local dependency failure makes the affected
+feature unavailable: AI rejects new sessions and voice offers text fallback, QStash leaves analysis pending, and Redis loss never compromises
 canonical PostgreSQL data. Render cold starts produce a startup/reconnecting UI.
 No automatic provider switch may generate cost. See ADR 0005 for current planning
 limits, Gemini data-use disclosure, model lifecycle risk, and superseded choices.
