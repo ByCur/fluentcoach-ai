@@ -14,7 +14,8 @@ export class FakeConversationProvider implements ConversationProvider {
       throw new AiError('timeout');
     if (context.helpLanguage === 'es') {
       yield {
-        text: 'Explicación breve en español. Try simpler English. Continuamos en inglés.',
+        // Structural fake only; semantic grounding is reviewed with a live tutor.
+        text: 'Explicación breve en español.\nTry simpler English.',
         done: true,
       };
       return;

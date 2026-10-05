@@ -23,7 +23,9 @@ export class FakeSessionAnalyzer implements SessionAnalyzer {
       return Promise.reject(new AiError('timeout'));
     if (this.scenario === 'rate-limited')
       return Promise.reject(new AiError('rate-limited'));
-    const learner = transcript.turns.find((t) => t.speaker === 'learner');
+    const learner = transcript.turns.find(
+      (t) => t.speaker === 'learner' && !/no entiendo|i don.t understand/i.test(t.text),
+    );
     if (!learner) return Promise.reject(new AiError('invalid-evidence'));
     if (learner.text === 'SYNTHETIC_REPORT_FAILURE') {
       const count = this.failures.get(transcript.sessionId) ?? 0;

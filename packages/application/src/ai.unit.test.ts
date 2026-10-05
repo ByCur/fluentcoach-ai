@@ -130,17 +130,19 @@ describe('application report trust boundary', () => {
     await expect(cancelled).rejects.toThrow('cancelled');
     expect(vi.getTimerCount()).toBe(0);
   });
-  it('rejects treating an explicit help request as a grammar correction', () => {
-    const r = report();
-    r.corrections.push({
-      ...r.strengths[0]!,
-      evidence: [{ turnSequence: 1, start: 0, end: 11, quote: 'No entiendo' }],
-    } as never);
-    expect(() =>
-      validateReport(r, {
-        ...transcript,
-        turns: [{ ...transcript.turns[0]!, text: 'No entiendo' }],
-      }),
-    ).toThrow('invalid-evidence');
-  });
+  it.each(['No entiendo', "I don't understand"])(
+    'excludes explicit help (%s) from strength and correction evidence',
+    (text) => {
+      const r = report();
+      const finding = {
+        ...r.strengths[0]!,
+        evidence: [{ turnSequence: 1, start: 0, end: text.length, quote: text }],
+      };
+      for (const field of ['strengths', 'corrections'] as const) {
+        expect(() => validateReport({ ...r, [field]: [finding] }, {
+          ...transcript, turns: [{ ...transcript.turns[0]!, text }],
+        })).toThrow('invalid-evidence');
+      }
+    },
+  );
 });

@@ -13,7 +13,7 @@ import {
   type SessionAnalyzer,
   type TutorContext,
 } from '@fluentcoach/application';
-import { analysisPrompt, tutorPrompt } from './ai-prompts.js';
+import { analysisPrompt, tutorInput, tutorPrompt } from './ai-prompts.js';
 
 const responseSchema = z.object({
   model: z.string().min(1).max(200),
@@ -139,7 +139,7 @@ export class OllamaTextAdapter
   ) {
     const result = await this.generate(
       tutorPrompt(context),
-      { snapshot: context.snapshot, turns: context.recentTurns, input },
+      tutorInput(context, input),
       false,
       options,
     );

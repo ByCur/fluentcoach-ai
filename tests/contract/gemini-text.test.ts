@@ -11,6 +11,7 @@ import {
   type GeminiTextConfig,
 } from '@fluentcoach/infrastructure';
 import { FakeSessionAnalyzer } from '@fluentcoach/testing';
+import { HELP_EXAMPLES, helpTurns } from './tutor-help-fixtures.js';
 const quota = {
   dailyRequests: 10,
   dailyTokens: 100000,
@@ -32,7 +33,7 @@ const context: TutorContext = {
     scenarioVersion: 1,
     level: 'A1',
     mode: 'natural',
-    promptVersion: 'tutor-v3',
+    promptVersion: 'tutor-v4',
   },
   recentTurns: [
     {
@@ -89,9 +90,9 @@ const sse = (frames: unknown[]) =>
   );
 const request = (response: Response) =>
   vi.fn<typeof fetch>(() => Promise.resolve(response));
-async function collect(adapter: GeminiTextAdapter, c = context) {
+async function collect(adapter: GeminiTextAdapter, c = context, input = 'I need a room') {
   const chunks = [];
-  for await (const chunk of adapter.stream(c, 'I need a room', options()))
+  for await (const chunk of adapter.stream(c, input, options()))
     chunks.push(chunk);
   return chunks;
 }
@@ -107,7 +108,7 @@ describe('Gemini normalized text/analyzer adapter (network-free)', () => {
       metadata: {
         adapter: 'gemini-free',
         model: 'gemini-3.8-flash-snapshot',
-        promptVersion: 'tutor-v3',
+        promptVersion: 'tutor-v4',
         inputTokens: 100,
         outputTokens: 20,
         finishReason: 'STOP',
@@ -117,6 +118,34 @@ describe('Gemini normalized text/analyzer adapter (network-free)', () => {
     expect(b.settle).toHaveBeenCalledWith('reservation', 100, 20);
     expect(fetch.mock.calls[0]?.[0]).toContain('streamGenerateContent?alt=sse');
     expect(fetch.mock.calls[0]?.[0] as string).not.toContain(config.apiKey);
+    const body = JSON.parse(fetch.mock.calls[0]![1]!.body as string);
+    expect(body.systemInstruction.parts[0].text).toContain('Respond primarily in English');
+    expect(JSON.parse(body.contents[0].parts[0].text)).not.toHaveProperty('helpSourceTurn');
+  });
+  it('preserves latest-tutor grounding for every level/mode and the no-tutor fallback', async () => {
+    for (const level of ['A1', 'A2', 'B1', 'B2'] as const) {
+      for (const mode of ['natural', 'teaching'] as const) {
+        for (const example of [...HELP_EXAMPLES, { tutor: '', response: 'No te preocupes.\nHow can I help you?' }]) {
+          const turns = example.tutor ? helpTurns(example.tutor) : helpTurns('').slice(2);
+          const fetch = request(sse([event(example.response, 'STOP')]));
+          const chunks = await collect(new GeminiTextAdapter(config, budget(), fetch), {
+            ...context, snapshot: { ...context.snapshot, level, mode }, recentTurns: turns, helpLanguage: 'es',
+          }, 'No entiendo.');
+          const body = JSON.parse(fetch.mock.calls[0]![1]!.body as string);
+          const system = body.systemInstruction.parts[0].text as string;
+          const data = JSON.parse(body.contents[0].parts[0].text);
+          expect(data.helpSourceTurn).toEqual(example.tutor ? turns[1] : null);
+          expect(data.input).toBe('No entiendo.');
+          expect(system).toContain('most recent tutor turn');
+          expect(system).toContain('do not explain or translate the help phrase itself');
+          expect(system).toContain('Do not introduce new requests, choices, options, scenario details, or information');
+          expect(system).toContain('helpSourceTurn is null');
+          expect(system).toContain('even in teaching mode');
+          expect(chunks.map(c => c.text).join('')).toBe(example.response);
+          expect(chunks.at(-1)?.metadata?.promptVersion).toBe('tutor-v4');
+        }
+      }
+    }
   });
   it('keeps transcript attacks in user data and sends versioned mode/help instructions', async () => {
     for (const mode of ['natural', 'teaching'] as const) {
@@ -137,7 +166,10 @@ describe('Gemini normalized text/analyzer adapter (network-free)', () => {
         mode === 'natural' ? 'Defer grammar' : 'at most one',
       );
       expect(body.systemInstruction.parts[0].text).toContain(
-        'brief Spanish explanation',
+        'most recent tutor turn',
+      );
+      expect(body.systemInstruction.parts[0].text).toContain(
+        'briefly in Spanish',
       );
       expect(body.systemInstruction.parts[0].text).not.toContain(
         'IGNORE ALL RULES',
@@ -266,6 +298,16 @@ describe('Gemini normalized text/analyzer adapter (network-free)', () => {
     expect(() => validateReport(bad.draft, transcript)).toThrow(
       'invalid-evidence',
     );
+  });
+  it('excludes help from fake analyzer evidence even when it is the first learner turn', async () => {
+    const turns = [
+      { ...context.recentTurns[0]!, text: 'No entiendo.' },
+      { ...context.recentTurns[0]!, sequence: 2, sourceEventKey: 'practice', text: 'I need a room' },
+    ];
+    const mixed = { ...transcript, turns };
+    const result = await new FakeSessionAnalyzer().analyzeTranscript(mixed, options());
+    expect(validateReport(result.draft, mixed).strengths[0]?.evidence[0]?.turnSequence).toBe(2);
+    await expect(new FakeSessionAnalyzer().analyzeTranscript({ ...mixed, turns: turns.slice(0, 1) }, options())).rejects.toThrow('invalid-evidence');
   });
   it.each([
     'valid',

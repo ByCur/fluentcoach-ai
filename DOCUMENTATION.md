@@ -397,3 +397,59 @@ job/voice resilience, conversation/report browser, smoke and 48-case synthetic
 evaluation gates also passed. Updated API/worker/web images and Compose
 migration/service health passed with the same temporary proxy-trust/loopback
 validation overlays. No migration or historical-record rewrite was added.
+
+### PR #22 — Grounded Spanish help (2026-10-05)
+
+`tutor-v4` is retained. Both Ollama and Gemini receive the most recent tutor turn
+as `helpSourceTurn` in untrusted user data, selected from the ordered conversation
+without using later learner/help turns. Normal turns retain their English policy.
+Repeated button help retains that tutor source within the 40-turn context cap,
+even after it would otherwise leave the recent-turn window.
+
+The help policy requires exactly two short parts on separate lines, under 60
+words total: first explain/translate that specific tutor turn in Spanish; then
+give exactly one simpler English paraphrase/question preserving its intent.
+Never explain/translate “No entiendo” itself, ask what it means, introduce a new
+topic, or add requests, choices, scenario details, information, or a separate
+invitation to continue. Without a previous tutor turn, give brief Spanish
+reassurance followed by one simple English question appropriate to the scenario.
+Help takes precedence over level scaffolding and corrections in either mode.
+Explicit help is rejected as both correction and strength evidence, and the fake
+analyzer skips help when selecting learner evidence.
+
+Regression coverage includes A1/A2/B1/B2 × natural/teaching, both explicit help
+phrases and button help, the two supplied examples, older tutor distractors,
+later learner/help turns, untrusted source text, no-tutor fallback, normal
+English policy, and help-evidence exclusion. All 48 eval fixtures still use
+`tutor-v4`; their fixture version is `pilot-text-fixtures-v2`. The evaluator now
+includes its generated tutor reply before requesting help, records that source,
+and checks two-part structure, one final sentence, and the word limit. The fake
+help response is only a structural fixture; semantic grounding and language
+quality require live human review, explicitly included in the eval rubric.
+
+Validation uses pinned Node 20.20.0 / pnpm 10.28.1 and isolated PostgreSQL 17.6 /
+Redis 8.2.1, with fake AI/speech and network-free provider contracts. No live
+Gemini or local Windows/Ollama validation is claimed.
+
+Passed commands: `pnpm lint`, `pnpm typecheck`, `pnpm build`,
+`pnpm test:unit` (99), `pnpm test:contract:ai` (36),
+`pnpm test:boundaries` (2), `pnpm test:contract:voice` (7),
+`pnpm test:integration:sessions` (12), `pnpm test:integration:analysis` (18),
+`pnpm test:e2e:conversation` (2), `pnpm test:e2e:voice` (8),
+`pnpm test:e2e:reports` (5), and
+`pnpm eval:ai -- --suite pilot-text --billing-mode free_only` (48 synthetic cases).
+The database harness was prepared with `pnpm db:migrate:test` (six migrations).
+
+After merge, the Windows host must produce the following behavior with real
+spoken help (repeat in both modes):
+
+Previous tutor: “How can I help you today?” Learner: “No entiendo.”
+
+Expected example:
+
+> Te he preguntado: «¿En qué puedo ayudarte hoy?»
+>
+> How can I help you?
+
+Confirm that Spanish explains that exact preceding sentence, the single English
+question preserves its intent, and the next normal turn returns to English.
