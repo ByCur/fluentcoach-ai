@@ -1,4 +1,4 @@
-import { AiError } from '@fluentcoach/application';
+import { AiError, TerminalSessionError } from '@fluentcoach/application';
 import {
   ArgumentsHost,
   Catch,
@@ -11,6 +11,22 @@ import { ZodError } from 'zod';
 export class ApiExceptionFilter implements ExceptionFilter {
   catch(error: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<Response>();
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error as Error & { code?: string }).code === 'LIMIT_FILE_SIZE'
+    ) {
+      response.status(413).json({
+        error: { code: 'AUDIO_TOO_LARGE', message: 'AUDIO_TOO_LARGE' },
+      });
+      return;
+    }
+    if (error instanceof TerminalSessionError) {
+      response.status(409).json({
+        error: { code: 'SESSION_TERMINAL', message: 'SESSION_TERMINAL' },
+      });
+      return;
+    }
     if (error instanceof AiError) {
       response
         .status(error.code === 'unauthorized' ? 403 : 503)
@@ -29,10 +45,19 @@ export class ApiExceptionFilter implements ExceptionFilter {
         'SESSION_NOT_FOUND',
         'SESSION_TERMINAL',
         'IDEMPOTENCY_CONFLICT',
+        'UNSUPPORTED_AUDIO_TYPE',
+        'AUDIO_TOO_LARGE',
+        'AUDIO_DURATION_EXCEEDED',
       ].includes(error.message)
     ) {
       response
-        .status(error.message === 'SESSION_NOT_FOUND' ? 404 : 409)
+        .status(
+          error.message === 'SESSION_NOT_FOUND'
+            ? 404
+            : error.message.startsWith('AUDIO_') || error.message === 'UNSUPPORTED_AUDIO_TYPE'
+              ? 400
+              : 409,
+        )
         .json({ error: { code: error.message, message: error.message } });
       return;
     }
