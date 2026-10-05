@@ -34,3 +34,11 @@ export const analysisJobInput=z.object({version:z.literal(1),analysisRunId:z.uui
 export const issueKeyInput = z.enum(['verb-tense','subject-verb-agreement','articles','prepositions','word-order','vocabulary-choice','singular-plural','auxiliary-verbs']);
 export const issueQueryInput = z.object({}).strict();
 export const issueActionInput = z.object({}).strict();
+export const vocabularyIdInput = z.uuid();
+export const vocabularyEmptyInput = z.object({}).strict();
+export const dueReviewsQueryInput = z.object({ limit:z.coerce.number().int().min(1).max(50).default(20) }).strict();
+export const vocabularyReviewInput = z.object({
+  rating:z.enum(['again','hard','good','easy']),
+  reviewKey:z.string().uuid(),
+  expectedVersion:z.number().int().positive(),
+}).strict();

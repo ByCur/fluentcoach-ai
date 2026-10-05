@@ -16,3 +16,4 @@ export * from './ai-config.js';
 export * from './speech-config.js';
 export * from './whisper-cpp.js';
 export * from './issue-repository.js';
+export * from './vocabulary-repository.js';

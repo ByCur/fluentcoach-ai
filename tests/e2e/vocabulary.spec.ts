@@ -1,0 +1,36 @@
+import { randomUUID } from 'node:crypto';
+import { expect,test } from '@playwright/test';
+
+test('learner confirms, reviews, reloads, and cannot double advance a card',async({page})=>{
+  await page.goto('/');
+  await page.route('**/api/v1/auth/synthetic-login',route=>route.continue({postData:JSON.stringify({subject:`e2e-vocabulary-${randomUUID()}`})}));
+  await page.getByRole('button',{name:/Entrar/}).click();
+  await page.getByRole('button',{name:'Continuar'}).click();
+  await page.getByRole('button',{name:'Continuar'}).click();
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button',{name:'Aceptar y guardar'}).click();
+  await page.getByRole('button',{name:'Practicar'}).click();
+  await page.getByRole('button',{name:'Iniciar sesión'}).click();
+  await page.getByLabel('Tu respuesta').fill('Yesterday I go to the hotel');
+  await page.getByRole('button',{name:'Enviar',exact:true}).click();
+  await page.getByRole('button',{name:'Terminar'}).click();
+  const report=page.getByRole('region',{name:'Informe de sesión'});
+  await expect(report.getByRole('status')).toContainText('Informe listo',{timeout:15000});
+  await report.getByRole('button',{name:'Cerrar informe'}).click();
+  await page.getByRole('button',{name:'Actualizar vocabulario'}).click();
+  await expect(page.getByRole('heading',{name:'Yesterday I went to the hotel.'})).toBeVisible();
+  await page.getByRole('button',{name:'Añadir al repaso'}).click();
+  const reviewRequest=page.waitForRequest(request=>request.url().includes('/vocabulary/cards/')&&request.url().endsWith('/reviews'));
+  const reviewResponse=page.waitForResponse(response=>response.url().includes('/vocabulary/cards/')&&response.url().endsWith('/reviews'));
+  await page.getByRole('button',{name:'Bien',exact:true}).click();
+  const request=await reviewRequest,response=await reviewResponse,payload=request.postDataJSON() as {rating:string;reviewKey:string;expectedVersion:number};
+  const first=await response.json() as {review:{id:string}};
+  await expect(page.getByRole('status')).toContainText('Próximo repaso');
+  const repeated=await page.evaluate(async({url,payload})=>{const csrf=(await (await fetch('/api/v1/auth/csrf')).json() as {csrfToken:string}).csrfToken;const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-csrf-token':csrf},body:JSON.stringify(payload)});return {status:response.status,body:await response.json() as {review:{id:string}}};},{url:request.url(),payload});
+  expect(repeated.status).toBe(201);expect(repeated.body.review.id).toBe(first.review.id);
+  const cardId=request.url().split('/cards/')[1]!.split('/')[0]!;
+  await page.reload();await page.getByRole('button',{name:'Practicar'}).click();
+  await expect(page.getByTestId('due-card')).toHaveCount(0);
+  const history=await page.evaluate(async id=>await (await fetch(`/api/v1/vocabulary/cards/${id}/history`)).json() as unknown[],cardId);
+  expect(history).toHaveLength(1);
+});
