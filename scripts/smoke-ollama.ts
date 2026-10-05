@@ -19,7 +19,7 @@ async function main() {
           scenarioVersion: 1,
           level: 'A1',
           mode: 'natural',
-          promptVersion: 'tutor-v2',
+          promptVersion: 'tutor-v3',
         },
         recentTurns: [],
       },

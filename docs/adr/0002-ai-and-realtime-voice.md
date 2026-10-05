@@ -1,7 +1,14 @@
 # ADR 0002: AI provider and realtime voice
 
+> **Current provider defaults: ADRs [0010](0010-local-first-ollama-text.md) and
+> [0011](0011-local-composed-turn-voice.md).** Ollama local text, whisper.cpp local
+> transcription and browser speechSynthesis supersede the historical Gemini
+> default below. Gemini text is explicit optional configuration; Live is future
+> only. There is no automatic Gemini fallback. Browser TTS is not guaranteed
+> offline. The zero-cost policy and raw-audio retention restrictions remain.
+
 > **Amended by ADR 0005.** OpenAI is no longer the initial production provider;
-> Gemini Developer API Free and Gemini Live are selected for the zero-cost pilot.
+> ADR 0005 historically selected Gemini; ADRs 0010/0011 supersede that default.
 > The provider ports, validation and fake-provider decisions remain in force.
 
 - **Status:** accepted for implementation; live-service gates remain

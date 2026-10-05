@@ -1,4 +1,5 @@
 import { ReportPanel } from './report-panel.js';
+import { SPEECH_RATES, useTutorSpeechPreferences } from './tutor-speech.js';
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
@@ -11,8 +12,23 @@ type ProfileResponse = {
   interests: string[];
 };
 type GoalResponse = { minutesPerDay: number; daysPerWeek: number };
-type ConsentResponse = unknown[];
+type ConsentResponse = {
+  purpose: string;
+  policyVersion: string;
+  providerDisclosureVersion: string;
+  revokedAt: string | null;
+}[];
+const currentConsent = {
+  purpose: 'local-ai-practice',
+  policyVersion: 'privacy-2026-10-05',
+  providerDisclosureVersion: 'local-first-2026-10-05',
+} as const;
 type CsrfResponse = { csrfToken: string };
+type SessionResponse = {
+  id: string;
+  turns: { speaker: string; text: string }[];
+  events: { sequence: number }[];
+};
 type Data = {
   interfaceLanguage: string;
   nativeLanguage: string;
@@ -66,6 +82,16 @@ function App() {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingStartedRef = useRef(0);
   const spokenTurnCountRef = useRef(0);
+  const speech = useTutorSpeechPreferences();
+  const reconcileSession = (record: SessionResponse) => {
+    cursorRef.current = record.events.reduce(
+      (latest, event) => Math.max(latest, event.sequence),
+      cursorRef.current,
+    );
+    setCursor(cursorRef.current);
+    setSession(record);
+    setStreamed('');
+  };
   const api = async (path: string, options: RequestInit = {}) =>
     fetch(API + path, {
       credentials: 'include',
@@ -96,7 +122,11 @@ function App() {
           ...pv,
           interests: pv.interests.join(', '),
           ...(gv ?? {}),
-          accepted: cv.length > 0,
+          accepted: cv.some((consent) =>
+            consent.purpose === currentConsent.purpose &&
+            consent.policyVersion === currentConsent.policyVersion &&
+            consent.providerDisclosureVersion === currentConsent.providerDisclosureVersion &&
+            consent.revokedAt === null),
         }));
     });
   }, []);
@@ -127,19 +157,20 @@ function App() {
     return () => source.close();
   }, [session?.id, practice]);
   useEffect(() => {
-    if (!session || muted || !('speechSynthesis' in window)) return;
+    if (!session || !('speechSynthesis' in window)) return;
     const tutorTurns = session.turns.filter((turn) => turn.speaker === 'tutor');
     if (tutorTurns.length <= spokenTurnCountRef.current) return;
     spokenTurnCountRef.current = tutorTurns.length;
+    if (muted) return;
     const utterance = new SpeechSynthesisUtterance(tutorTurns.at(-1)!.text);
-    const voices = window.speechSynthesis.getVoices();
-    utterance.voice =
-      voices.find((voice) => /^en([-_]|$)/i.test(voice.lang)) ?? null;
+    utterance.voice = speech.voice;
     utterance.lang = utterance.voice?.lang ?? 'en-US';
+    utterance.rate = speech.rate;
+    utterance.pitch = 1;
     utterance.onstart = () => setVoiceState('speaking');
     utterance.onend = utterance.onerror = () => setVoiceState('idle');
     window.speechSynthesis.speak(utterance);
-  }, [session, muted]);
+  }, [session, muted, speech.voice, speech.rate]);
   const login = async () => {
     const r = await api('/auth/synthetic-login', {
       method: 'POST',
@@ -170,9 +201,7 @@ function App() {
         daysPerWeek: data.daysPerWeek,
       },
       consent: {
-        purpose: 'gemini-free-ai-practice',
-        policyVersion: 'privacy-2026-09-29',
-        providerDisclosureVersion: 'gemini-free-2026-09-29',
+        ...currentConsent,
         accepted: true,
       },
     };
@@ -207,6 +236,7 @@ function App() {
         setCursor(0);
         setStreamed('');
         setTurnKey('');
+        spokenTurnCountRef.current = 0;
         const r = await checked('/sessions', {
           method: 'POST',
           body: JSON.stringify({
@@ -239,18 +269,7 @@ function App() {
           method: 'POST',
           body: JSON.stringify({ sourceEventKey: key, text }),
         });
-        const record = (await r.json()) as {
-          id: string;
-          turns: { speaker: string; text: string }[];
-          events: { sequence: number }[];
-        };
-        cursorRef.current = Math.max(
-          cursorRef.current,
-          record.events.at(-1)?.sequence ?? 0,
-        );
-        setCursor(cursorRef.current);
-        setSession(record);
-        setStreamed('');
+        reconcileSession((await r.json()) as SessionResponse);
         setText('');
         setTurnKey('');
       } catch (e) {
@@ -321,6 +340,7 @@ function App() {
       setBusy(true);
       setProviderError('');
       setVoiceState('transcribing');
+      setStreamed('');
       const form = new FormData();
       form.set('audio', blob, 'spoken-turn.webm');
       form.set('durationMs', String(durationMs));
@@ -342,7 +362,7 @@ function App() {
           };
           throw Error(body.error?.message ?? 'No pudimos procesar el audio.');
         }
-        setSession((await response.json()) as typeof session);
+        reconcileSession((await response.json()) as SessionResponse);
         setVoiceState('idle');
       } catch (error) {
         setProviderError(
@@ -536,6 +556,27 @@ function App() {
               <button className="secondary" type="button" onClick={stopSpeech}>
                 Detener voz del tutor
               </button>
+              <label>
+                Voz del tutor
+                <select
+                  value={speech.voice?.voiceURI ?? ''}
+                  onChange={(event) => speech.selectVoice(event.target.value)}
+                  disabled={!speech.voices.length}
+                >
+                  {!speech.voices.length && <option value="">Predeterminada del navegador</option>}
+                  {speech.voices.map((voice) => (
+                    <option key={voice.voiceURI} value={voice.voiceURI}>
+                      {voice.name} · {voice.lang}{voice.localService ? ' · local' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Velocidad
+                <select value={speech.rate} onChange={(event) => speech.selectRate(Number(event.target.value))}>
+                  {SPEECH_RATES.map((rate) => <option key={rate} value={rate}>{rate.toFixed(2)}x</option>)}
+                </select>
+              </label>
               <small>
                 La reproducción usa la voz del navegador; FluentCoach no paga una API de TTS y no garantiza que funcione sin conexión.
               </small>
@@ -679,17 +720,24 @@ function App() {
         <section>
           <h2>Privacidad y práctica con IA</h2>
           <div className="notice">
-            <strong>Divulgación Gemini Free · versión 2026-09-29</strong>
+            <strong>Privacidad · práctica local con IA · versión 2026-10-05</strong>
             <p>
-              Cuando activemos las funciones de IA en futuros hitos, FluentCoach
-              usará la API Gemini Developer sin pago para este piloto de coste
-              cero. El contenido enviado en el nivel gratuito puede ser
-              utilizado por Google para mejorar sus productos y puede ser
-              revisado por personas, de acuerdo con sus términos vigentes.
+              Por defecto, Ollama genera las respuestas del tutor y whisper.cpp
+              transcribe tu voz en el equipo local. La reproducción usa
+              speechSynthesis del navegador. El uso normal no tiene coste
+              recurrente de API de IA.
             </p>
             <p>
-              FluentCoach no almacenará audio sin procesar. Puedes decidir no
-              continuar con la práctica basada en IA.
+              FluentCoach conserva la transcripción y las respuestas, pero no
+              almacena audio sin procesar. Las voces disponibles dependen del
+              navegador y del sistema; no se garantiza que funcionen sin conexión.
+            </p>
+            <p>
+              Gemini es una opción explícita para el futuro, no el proveedor
+              predeterminado. No se envía contenido a Gemini por defecto ni se
+              cambia a Gemini automáticamente. Su uso requiere configuración
+              explícita y una revisión de sus condiciones de privacidad.
+              Puedes decidir no continuar con la práctica basada en IA.
             </p>
           </div>
           <label className="check">

@@ -7,7 +7,21 @@ export const learnerProfileInput = z.object({
   interests: z.array(z.string().trim().min(1).max(40)).max(10), version: z.number().int().positive().optional()
 }).strict();
 export const practiceGoalInput = z.object({ minutesPerDay: z.number().int().min(5).max(120), daysPerWeek: z.number().int().min(1).max(7) }).strict();
-export const consentInput = z.object({ purpose: z.literal('gemini-free-ai-practice'), policyVersion: z.literal('privacy-2026-09-29'), providerDisclosureVersion: z.literal('gemini-free-2026-09-29'), accepted: z.literal(true) }).strict();
+export const consentInput = z.discriminatedUnion('purpose', [
+  z.object({
+    purpose: z.literal('local-ai-practice'),
+    policyVersion: z.literal('privacy-2026-10-05'),
+    providerDisclosureVersion: z.literal('local-first-2026-10-05'),
+    accepted: z.literal(true),
+  }).strict(),
+  // Preserve historical clients/records without accepting mixed disclosure versions.
+  z.object({
+    purpose: z.literal('gemini-free-ai-practice'),
+    policyVersion: z.literal('privacy-2026-09-29'),
+    providerDisclosureVersion: z.literal('gemini-free-2026-09-29'),
+    accepted: z.literal(true),
+  }).strict(),
+]);
 export const onboardingInput = z.object({ profile: learnerProfileInput, goal: practiceGoalInput, consent: consentInput }).strict();
 export type LearnerProfileInput = z.infer<typeof learnerProfileInput>;
 export type PracticeGoalInput = z.infer<typeof practiceGoalInput>;

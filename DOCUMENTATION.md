@@ -42,10 +42,13 @@ Trace behavior to SPEC.md requirements and update documents when decisions chang
   always-on worker is deployed; QStash invokes secure idempotent API endpoints,
   while PostgreSQL retains pending work and canonical learner state.
 - Voice uses one bounded authenticated audio upload at a time, local whisper.cpp transcription, the existing Ollama tutor path, and optional browser speech synthesis. It is not continuous/full-duplex. Browser TTS has no FluentCoach API charge but is not guaranteed offline. See [Windows host setup](docs/local-whisper-windows.md).
-- Store no raw audio. **Gemini's unpaid Developer API terms currently say submitted
-  content may improve Google products and may be human-reviewed.** This provider
-  policy is separate from FluentCoach's 90-day transcript/report retention and
-  deletion. Real use requires a plain, versioned disclosure and explicit consent.
+- Store no raw audio. Normal tutor/transcription inference uses local Ollama and
+  whisper.cpp; no learner content is sent to Gemini by default. Browser TTS may
+  use browser/system services and is not guaranteed offline. Optional explicit
+  Gemini configuration requires reviewing its unpaid API data-use terms (model
+  improvement and possible human review), a matching disclosure and consent.
+  Provider terms are separate from FluentCoach transcript/report retention and
+  deletion; there is no implicit Gemini fallback.
 - Current free-limit planning snapshots and fail-closed behavior are in ADR 0005:
   Render's 750 hours/cold starts, Neon compute/storage, Upstash Redis/QStash,
   Auth0 feature/MAU and model-specific Gemini limits all require dated re-checks.
@@ -242,7 +245,7 @@ remaining assumptions. Distinguish proposed targets from measured results.
 
 M02 introduces Prisma migrations for account identity, one learner profile per account, one current practice goal per account, and historical versioned consent. PostgreSQL remains canonical; Redis contains expiring opaque sessions and one-time OIDC state only. Compose applies committed Prisma migrations before API startup, and readiness verifies the completed migration plus required M02 columns. The test reset applies the same committed migration SQL to an empty isolated database. API ownership comes solely from the authenticated session, mutations require CSRF plus Origin validation, and disabled accounts invalidate access. See ADR 0006 for the identity/session boundary and Auth0 Free manual-user boundary and remaining live tenant gate, and ADR 0007 for the explicit decision to defer RLS until separate non-owner runtime/migration roles and transaction context can be proven.
 
-The UI is Spanish-first, responsive and keyboard accessible, with profile, self-selected A1–B2 level, IANA timezone, interests, editable 10-minute/three-day goal, and explicit Gemini Free disclosure. No Gemini request or conversation feature exists in M02. `BILLING_MODE=free_only` is runtime validated; no paid fallback exists.
+The UI is Spanish-first, responsive and keyboard accessible, with profile, self-selected A1–B2 level, IANA timezone, interests, editable 10-minute/three-day goal, and an explicit local-first privacy disclosure. New onboarding records the local-first tuple `local-ai-practice` / `privacy-2026-10-05` / `local-first-2026-10-05`. The exact legacy Gemini tuple remains accepted for historical client compatibility; old records remain unchanged and do not count as current local-first acceptance (see README). No Gemini request or conversation feature exists in M02. `BILLING_MODE=free_only` is runtime validated; no paid fallback exists.
 
 
 ## M05 implementation and validation note (2026-09-30)
@@ -327,6 +330,70 @@ The local voice defaults are `SPEECH_PROVIDER=whisper-cpp`, `WHISPER_BASE_URL=ht
 Use `pnpm smoke:whisper -- <local-audio-file>` only on a host where whisper.cpp, ffmpeg, and an explicitly selected model are already installed. Normal CI uses fake audio, transcription, conversation, and TTS and makes no Ollama/Whisper/ffmpeg/microphone calls.
 
 
-### M06A validation note
+### Initial M06A PR validation note (historical)
 
 The PR quality workflow runs `pnpm lint`, `pnpm typecheck`, unit/boundary/build gates, the 32-test text AI contract suite, the separate 7-test voice contract suite, PostgreSQL-backed session/voice integration tests, and `pnpm test:e2e:voice` with fake AI, transcription, microphone, and TTS. Local targeted validation passed lint, the 61-test unit suite, 2 boundary tests, both contract suites, and the API build. PostgreSQL-backed session/voice API tests and Playwright still require the CI service harness because `DATABASE_URL`, Redis, and Docker are unavailable in this workspace. The real `smoke:whisper` command was deliberately not run because no local whisper-server/model/ffmpeg host exists. These checks remain required before milestone completion; no physical-device, latency, live transcription, offline-TTS, or pronunciation claim is made.
+
+
+### M06A polish and owner-reported host gate (2026-10-05)
+
+The owner reports a successful Windows host gate using multilingual whisper.cpp
+`base`, microphone WebM/Opus, Ollama `llama3.2:3b`, browser speechSynthesis and
+spoken “No entiendo”, including the complete microphone-to-tutor-playback path.
+This is owner-reported evidence, not a host run performed by the PR automation.
+
+Text and voice POST responses now share persisted-session/SSE-cursor
+reconciliation. Late deltas already included in that response are ignored;
+streaming remains visible during generation. `tutor-v3` instructs explicit
+Spanish help first, then one simpler English sentence/question, without grammar
+correction of the help request. Normal practice remains English.
+
+Browser English voice/rate controls persist locally, prefer local/enhanced
+voices, handle `voiceschanged`, and fall back to the browser default when no
+English voice is available. Mute/stop remain available. Onboarding now describes
+the default local providers, no recurring AI API cost, no raw-audio persistence,
+and browser TTS offline limits. No provider, upload validation or session-security changes are introduced.
+Consent validation accepts only the exact historical Gemini and current
+local-first disclosure tuples; mixed versions are rejected.
+
+Manual validation of this polish is still needed on the Windows host: confirm
+short Spanish-first help for “No entiendo”, two consecutive voice turns without
+stale `stream:`, and the available voices, selected speed/voice persistence,
+mute and stop. No silent model downloads or cloud TTS/STT are introduced.
+
+
+Polish validation used pinned Node 20.20.0 / pnpm 10.28.1, an isolated PostgreSQL
+17.6 / Redis 8.2.1 harness, and fake browser/AI/speech providers. Passed: lint,
+typecheck, build, 83 unit tests, 2 boundary tests, 32 AI contracts, 7 voice
+contracts, identity (16), sessions/voice (12), jobs (7), analysis (18), job
+resilience (8), voice resilience (5), smoke (3), the 48-case synthetic evaluation,
+and browser voice (8), onboarding (1), conversation (2), reports (5). The updated
+voice fixture completes onboarding instead of relying on suite order. Browser gates used the same prestarted test servers to
+avoid concurrent-build startup contention; all final browser runs passed. API, worker and web images also built using a temporary
+proxy-CA mount outside the repository. Compose migration/service health passed
+with a temporary overlay that routes loopback probes directly instead of through
+the workspace proxy; repository Docker/Compose files remain unchanged.
+
+
+### Local-first consent audit provenance correction (2026-10-05)
+
+New acceptances now store `local-ai-practice`, `privacy-2026-10-05`, and
+`local-first-2026-10-05`, matching the version shown during onboarding. The
+historical Gemini tuple remains compatible in consent/onboarding input and
+history without any record rewrite or database migration. A legacy-only history
+does not pre-check the current disclosure checkbox; the learner must accept the
+local-first disclosure separately. Domain validation and the HTTP discriminated
+union require exact tuples and reject mixed versions before persistence.
+
+These records identify the disclosure actually accepted, not provider routing.
+If Gemini is enabled later, it requires its own explicit disclosure and consent
+against reviewed current terms; neither a local-first acceptance nor historical
+compatibility silently authorizes Gemini processing.
+
+Audit-correction validation passed: `pnpm lint`, `pnpm typecheck`, 88 unit tests,
+19 identity integration tests, 2 onboarding browser tests and 8 voice browser
+tests. Boundary/build, AI/voice contract, session/job/analysis integration,
+job/voice resilience, conversation/report browser, smoke and 48-case synthetic
+evaluation gates also passed. Updated API/worker/web images and Compose
+migration/service health passed with the same temporary proxy-trust/loopback
+validation overlays. No migration or historical-record rewrite was added.

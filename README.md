@@ -207,3 +207,43 @@ PUBLIC_ORIGIN. The two job endpoints verify the exact signed raw body and public
 URL; reconciliation must be scheduled. Missing transport retains PostgreSQL
 work for recovery. No live or paid provider is used by these gates. See ADR 0008
 for late revision semantics, recovery, migration compatibility and rollback.
+
+
+## M06A local voice and privacy
+
+The normal path is microphone -> local whisper.cpp -> transcript -> local Ollama
+(`llama3.2:3b`) -> tutor reply -> browser `speechSynthesis`. It has no recurring
+AI API cost. FluentCoach holds raw audio only in memory and does not persist it;
+transcripts and tutor turns are persisted with the session. Install models and
+host tools explicitly; the app does not download them silently.
+
+The voice controls offer available English browser voices, preferring local
+voices and then enhanced/natural voices when advertised by the browser. A saved
+English voice is used when still available; otherwise playback falls back to a
+preferred local English voice, any English voice, then the browser default.
+Voice and speed (0.85–1.15x, default 0.95x) are saved only in browser localStorage.
+The browser can load voices asynchronously. Mute prevents playback, and stop
+cancels it. Browser/system TTS may use a remote service, so offline operation is
+not guaranteed even though FluentCoach does not configure a cloud TTS provider.
+
+New onboarding acceptances identify the local-first disclosure with
+`local-ai-practice`, `privacy-2026-10-05`, and `local-first-2026-10-05`.
+Historical records with the exact tuple `gemini-free-ai-practice`,
+`privacy-2026-09-29`, `gemini-free-2026-09-29` remain valid historical records;
+they are not rewritten or treated as acceptance of the local-first disclosure.
+Contracts/domain validation accept these two exact tuples for compatibility and
+reject mixed or unrelated versions. Existing string columns need no migration.
+
+Gemini text remains explicit optional configuration behind its approval gates;
+Gemini Live is only a future option. Neither is a silent fallback. Enabling
+Gemini later requires its own explicit provider disclosure/consent and review
+of then-current terms; local-first acceptance does not authorize Gemini use.
+
+Explicit Spanish help starts with short Spanish help, then one simpler English
+sentence/question (under 60 words); normal tutor turns remain in English.
+
+The owner reports the Windows host gate passed with multilingual whisper.cpp
+`base`, WebM/Opus microphone capture, Ollama `llama3.2:3b`, browser playback and
+spoken “No entiendo”. After this polish change, manually recheck that phrase,
+consecutive voice turns, voice availability/quality and stored speed/voice on
+the target browser. Deterministic tests do not establish model response quality.

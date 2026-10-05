@@ -32,7 +32,7 @@ const context: TutorContext = {
     scenarioVersion: 1,
     level: 'A1',
     mode: 'natural',
-    promptVersion: 'tutor-v2',
+    promptVersion: 'tutor-v3',
   },
   recentTurns: [
     {
@@ -107,7 +107,7 @@ describe('Gemini normalized text/analyzer adapter (network-free)', () => {
       metadata: {
         adapter: 'gemini-free',
         model: 'gemini-3.8-flash-snapshot',
-        promptVersion: 'tutor-v2',
+        promptVersion: 'tutor-v3',
         inputTokens: 100,
         outputTokens: 20,
         finishReason: 'STOP',

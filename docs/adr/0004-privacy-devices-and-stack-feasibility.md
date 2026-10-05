@@ -1,8 +1,15 @@
 # ADR 0004: Privacy, devices, and stack feasibility
 
+> **Current provider defaults: ADRs [0010](0010-local-first-ollama-text.md) and
+> [0011](0011-local-composed-turn-voice.md).** Ollama local text, whisper.cpp local
+> transcription and browser speechSynthesis supersede the historical Gemini
+> default below. Gemini text is explicit optional configuration; Live is future
+> only. There is no automatic Gemini fallback. Browser TTS is not guaranteed
+> offline. The zero-cost policy and raw-audio retention restrictions remain.
+
 > **Amended by ADR 0005.** Application retention/device decisions remain. Its
 > OpenAI-specific provider-data analysis is historical for the initial pilot;
-> Gemini Free's model-improvement and human-review tradeoff now governs.
+> Gemini Free's data-use tradeoff applies only to optional explicit Gemini use.
 
 - **Status:** accepted targets; real-data and physical-device gates remain
 - **Date:** 2026-09-29
