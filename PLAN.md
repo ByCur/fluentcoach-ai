@@ -170,6 +170,8 @@ Windows host validation remains pending; see DOCUMENTATION.md's PR #22 notes.
 
 ## M07 — Recurring learner issues
 
+**Status: implemented for technical review. Versioned domain taxonomy, current-report observations, deterministic rebuilds, rolling recurrence, account-scoped dismissal/restoration and Spanish evidence UI included. Synthetic automated validation is recorded in docs/m07-validation.md; real local-model/category quality and browser review remain manual.**
+
 - **Objective:** Evidence-based persistent priorities.
 - **Scope:** Versioned taxonomy, observations/aggregates, recurrence threshold,
   dismissal, current-report-only counting and rebuilds.

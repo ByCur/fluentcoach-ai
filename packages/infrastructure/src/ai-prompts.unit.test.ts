@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TUTOR_PROMPT_VERSION, type TutorContext } from '@fluentcoach/application';
-import { tutorInput, tutorPrompt } from './ai-prompts.js';
+import { analysisPrompt, tutorInput, tutorPrompt } from './ai-prompts.js';
 
 describe('versioned tutor language policy', () => {
   for (const level of ['A1', 'A2', 'B1', 'B2'] as const) {
@@ -63,4 +63,13 @@ describe('versioned tutor language policy', () => {
     const normal = { snapshot: context.snapshot, recentTurns: context.recentTurns };
     expect(tutorInput(normal, 'Thank you')).not.toHaveProperty('helpSourceTurn');
   });
+});
+
+it('analysis-v3 requests domain taxonomy headings without classifying traits or changing evidence requirements', () => {
+  const prompt = analysisPrompt({ accountId: 'synthetic', sessionId: 'synthetic', revision: 1, snapshot: { scenarioSlug: 'hotel', scenarioVersion: 1, level: 'A1', mode: 'natural', promptVersion: 'tutor-v4' }, turns: [], partial: false, synthetic: true });
+  expect(prompt).toContain('[analysis-v3;');
+  expect(prompt).toContain('language-issues-v1');
+  expect(prompt).toContain('verb-tense (Tiempos verbales)');
+  expect(prompt).toContain('Do not force unrelated findings into a category');
+  expect(prompt).toContain('exact quote and zero-based UTF-16');
 });

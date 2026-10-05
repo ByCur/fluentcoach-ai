@@ -23,6 +23,7 @@ model Account {
   status AccountStatus @default(ACTIVE)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  issueDismissals IssueDismissal[]
   profile LearnerProfile?
   goals PracticeGoal[]
   consents ConsentRecord[]
@@ -208,6 +209,7 @@ model ProviderRun {
 }
 
 model TranscriptRevision {
+ observations IssueObservation[]
  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  sessionId String @map("session_id") @db.Uuid
  accountId String @map("account_id") @db.Uuid
@@ -237,6 +239,7 @@ model TranscriptRevisionReceipt {
 }
 
 model SessionReport {
+ observations IssueObservation[]
  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  analysisRunId String @unique @map("analysis_run_id") @db.Uuid
  sessionId String @map("session_id") @db.Uuid
@@ -247,6 +250,7 @@ model SessionReport {
  partial Boolean @default(false)
  generatedAt DateTime @default(now()) @map("generated_at") @db.Timestamptz
  @@unique([sessionId,accountId])
+ @@unique([id,accountId,sessionId,transcriptRevision,analysisRunId],map:"report_observation_source_key")
  @@map("session_reports")
 }
 model AiDailyBudget {
@@ -266,4 +270,38 @@ model AiBudgetReservation {
  inputTokens Int? @map("input_tokens")
  outputTokens Int? @map("output_tokens")
  @@map("ai_budget_reservations")
+}
+
+// M07: reports are authoritative; the SQL recurring_issue_aggregates view is derived.
+model IssueObservation {
+ accountId String @map("account_id") @db.Uuid
+ taxonomyVersion String @map("taxonomy_version") @db.VarChar(40)
+ issueKey String @map("issue_key") @db.VarChar(40)
+ label String @db.VarChar(80)
+ category String @db.VarChar(20)
+ sessionId String @map("session_id") @db.Uuid
+ reportId String @map("report_id") @db.Uuid
+ analysisRunId String @map("analysis_run_id") @db.Uuid
+ transcriptRevision Int @map("transcript_revision")
+ turnSequence Int @map("turn_sequence")
+ evidenceStart Int @map("evidence_start")
+ evidenceEnd Int @map("evidence_end")
+ quote String
+ uncertainty String @db.VarChar(10)
+ occurredAt DateTime @map("occurred_at") @db.Timestamptz
+ report SessionReport @relation(fields:[reportId,accountId,sessionId,transcriptRevision,analysisRunId],references:[id,accountId,sessionId,transcriptRevision,analysisRunId],onDelete:Cascade)
+ transcript TranscriptRevision @relation(fields:[sessionId,transcriptRevision],references:[sessionId,revision],onDelete:Cascade)
+ @@id([accountId,taxonomyVersion,issueKey,sessionId,turnSequence])
+ @@index([accountId,occurredAt],map:"issue_observations_account_time_idx")
+ @@map("issue_observations")
+}
+model IssueDismissal {
+ accountId String @map("account_id") @db.Uuid
+ taxonomyVersion String @map("taxonomy_version") @db.VarChar(40)
+ issueKey String @map("issue_key") @db.VarChar(40)
+ dismissedAt DateTime @default(now()) @map("dismissed_at") @db.Timestamptz
+ restoredAt DateTime? @map("restored_at") @db.Timestamptz
+ account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
+ @@id([accountId,taxonomyVersion,issueKey])
+ @@map("issue_dismissals")
 }

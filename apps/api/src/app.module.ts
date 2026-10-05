@@ -1,3 +1,4 @@
+import { IssueController } from './issue.controller.js';
 import {
   aiAdapters,
   createJobs,
@@ -9,6 +10,7 @@ import { Module } from '@nestjs/common';
 import {
   ConversationService,
   LearnerService,
+  IssueService,
   ReportService,
   VoiceTurnService,
 } from '@fluentcoach/application';
@@ -17,6 +19,7 @@ import {
   PostgresAccountRepository,
   PostgresJobStore,
   PostgresLearnerRepository,
+  PostgresIssueRepository,
   PostgresSessionRepository,
 } from '@fluentcoach/infrastructure';
 import { FakeOidcProvider } from '@fluentcoach/testing';
@@ -50,8 +53,13 @@ import {
     VoiceController,
     JobController,
     ReportController,
+    IssueController,
   ],
   providers: [
+    {
+      provide: IssueService,
+      useFactory: () => new IssueService(new PostgresIssueRepository()),
+    },
     AuthGuard,
     CsrfGuard,
     OriginGuard,

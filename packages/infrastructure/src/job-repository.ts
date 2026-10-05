@@ -8,7 +8,13 @@ import type {
   ReportResult,
 } from '@fluentcoach/application';
 import type { ConversationTurn } from '@fluentcoach/domain';
-import { AiError, validateReport } from '@fluentcoach/application';
+import {
+  AiError,
+  validateReport,
+  reportObservations,
+  ANALYSIS_PROMPT_VERSION,
+} from '@fluentcoach/application';
+import { writeIssueObservations } from './issue-repository.js';
 import { PostgresReportRepository } from './report-repository.js';
 import { pool, sql } from './prisma.js';
 type Row = {
@@ -70,8 +76,8 @@ async function existing(
 ) {
   const row = (
     await c.query<Row>(
-      'SELECT * FROM analysis_runs WHERE account_id=$1 AND session_id=$2 AND transcript_revision=$3 AND analyzer_version=$4',
-      [accountId, sessionId, revision, 'analysis-v2'],
+      "SELECT * FROM analysis_runs WHERE account_id=$1 AND session_id=$2 AND transcript_revision=$3 AND analyzer_version IN ($4,'analysis-v2') ORDER BY created_at DESC LIMIT 1",
+      [accountId, sessionId, revision, ANALYSIS_PROMPT_VERSION],
     )
   ).rows[0];
   const outbox =
@@ -144,7 +150,7 @@ async function createRevision(
         sessionId,
         accountId,
         revision,
-        'analysis-v2',
+        ANALYSIS_PROMPT_VERSION,
         hasTurns ? 'PENDING' : 'SKIPPED',
       ],
     )
@@ -251,6 +257,10 @@ export class PostgresJobStore implements JobStore {
       }
       const revision = session.transcript_revision + 1;
       await c.query(
+        'DELETE FROM issue_observations WHERE account_id=$1 AND session_id=$2',
+        [i.accountId, i.sessionId],
+      );
+      await c.query(
         'UPDATE practice_sessions SET transcript_revision=$3 WHERE account_id=$1 AND id=$2',
         [i.accountId, i.sessionId, revision],
       );
@@ -343,8 +353,9 @@ export class PostgresJobStore implements JobStore {
           state: string;
           status: string;
           transcript_revision: number;
+          occurred_at: Date;
         }>(
-          'SELECT s.state,s.transcript_revision,a.status FROM practice_sessions s JOIN accounts a ON a.id=s.account_id WHERE s.id=$1 AND s.account_id=$2 FOR UPDATE OF s,a',
+          'SELECT s.state,s.transcript_revision,a.status,COALESCE(s.ended_at,s.created_at) AS occurred_at FROM practice_sessions s JOIN accounts a ON a.id=s.account_id WHERE s.id=$1 AND s.account_id=$2 FOR UPDATE OF s,a',
           [run.session_id, run.account_id],
         )
       ).rows[0];
@@ -363,7 +374,11 @@ export class PostgresJobStore implements JobStore {
         });
         const validated = validateReport(result.report, transcript);
         await c.query(
-          `INSERT INTO session_reports(analysis_run_id,session_id,account_id,transcript_revision,schema_version,content,partial)VALUES($1,$2,$3,$4,$5,$6,$7)ON CONFLICT(session_id,account_id)DO UPDATE SET analysis_run_id=EXCLUDED.analysis_run_id,transcript_revision=EXCLUDED.transcript_revision,schema_version=EXCLUDED.schema_version,content=EXCLUDED.content,partial=EXCLUDED.partial,generated_at=now()`,
+          'DELETE FROM issue_observations WHERE account_id=$1 AND session_id=$2',
+          [run.account_id, run.session_id],
+        );
+        const persisted = await c.query<{ id: string }>(
+          `INSERT INTO session_reports(analysis_run_id,session_id,account_id,transcript_revision,schema_version,content,partial)VALUES($1,$2,$3,$4,$5,$6,$7)ON CONFLICT(session_id,account_id)DO UPDATE SET analysis_run_id=EXCLUDED.analysis_run_id,transcript_revision=EXCLUDED.transcript_revision,schema_version=EXCLUDED.schema_version,content=EXCLUDED.content,partial=EXCLUDED.partial,generated_at=now() RETURNING id`,
           [
             id,
             run.session_id,
@@ -373,6 +388,15 @@ export class PostgresJobStore implements JobStore {
             validated,
             transcript.partial,
           ],
+        );
+        await writeIssueObservations(
+          c,
+          run.account_id,
+          reportObservations(validated, transcript, {
+            reportId: persisted.rows[0]!.id,
+            analysisRunId: id,
+            occurredAt: session.occurred_at.toISOString(),
+          }),
         );
       }
       const m = result?.metadata;
@@ -385,7 +409,7 @@ export class PostgresJobStore implements JobStore {
           run.session_id,
           m?.adapter ?? 'fake',
           m?.model ?? 'deterministic',
-          m?.promptVersion ?? 'analysis-v2',
+          m?.promptVersion ?? ANALYSIS_PROMPT_VERSION,
           m?.schemaVersion ?? 'report-v1',
           m?.latencyMs ?? 0,
           m?.requestId ?? null,

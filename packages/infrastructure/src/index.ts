@@ -15,3 +15,4 @@ export * from './report-repository.js';
 export * from './ai-config.js';
 export * from './speech-config.js';
 export * from './whisper-cpp.js';
+export * from './issue-repository.js';
