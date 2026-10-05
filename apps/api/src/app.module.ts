@@ -1,4 +1,5 @@
 import { IssueController } from './issue.controller.js';
+import { VocabularyController } from './vocabulary.controller.js';
 import {
   aiAdapters,
   createJobs,
@@ -13,6 +14,7 @@ import {
   IssueService,
   ReportService,
   VoiceTurnService,
+  VocabularyService,
 } from '@fluentcoach/application';
 import {
   Auth0OidcAdapter,
@@ -21,6 +23,7 @@ import {
   PostgresLearnerRepository,
   PostgresIssueRepository,
   PostgresSessionRepository,
+  PostgresVocabularyRepository,
 } from '@fluentcoach/infrastructure';
 import { FakeOidcProvider } from '@fluentcoach/testing';
 import { HealthController } from './health.controller.js';
@@ -54,12 +57,14 @@ import {
     JobController,
     ReportController,
     IssueController,
+    VocabularyController,
   ],
   providers: [
     {
       provide: IssueService,
       useFactory: () => new IssueService(new PostgresIssueRepository()),
     },
+    { provide: VocabularyService, useFactory: () => new VocabularyService(new PostgresVocabularyRepository()) },
     AuthGuard,
     CsrfGuard,
     OriginGuard,

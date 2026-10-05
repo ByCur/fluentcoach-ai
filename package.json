@@ -8,10 +8,10 @@
     "pnpm": "10.28.1"
   },
   "scripts": {
-    "build": "pnpm -r --if-present build",
+    "build": "pnpm -r --workspace-concurrency=1 --if-present build",
     "dev": "pnpm --parallel --filter @fluentcoach/web --filter @fluentcoach/api --filter @fluentcoach/worker dev",
     "lint": "node --max-old-space-size=6144 node_modules/eslint/bin/eslint.js .",
-    "typecheck": "pnpm -r --if-present typecheck && tsc -p tsconfig.json --noEmit",
+    "typecheck": "pnpm -r --workspace-concurrency=1 --if-present typecheck && tsc -p tsconfig.json --noEmit",
     "test:unit": "vitest run --project unit",
     "test:boundaries": "vitest run --project boundaries",
     "test:smoke": "vitest run --project smoke",
@@ -35,6 +35,8 @@
     "smoke:whisper": "tsx scripts/smoke-whisper.ts",
     "test:integration:issues": "vitest run --project issues",
     "test:e2e:issues": "playwright test tests/e2e/issues.spec.ts"
+    ,"test:integration:reviews": "vitest run --project reviews"
+    ,"test:e2e:vocabulary": "playwright test tests/e2e/vocabulary.spec.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.36.0",

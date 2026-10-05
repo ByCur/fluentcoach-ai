@@ -464,6 +464,24 @@ retry, duplicate delivery and reanalysis do not inflate sessions or observations
 Session completion time anchors the window, so reanalysis cannot refresh old work.
 
 The domain owns eight `language-issues-v1` grammar/vocabulary categories.
+
+## Vocabulary and review scheduling (M08)
+
+The Spanish-first practice screen exposes conservative `vocabulary-suggestion-v1`
+items derived deterministically from validated, current report corrections. A
+learner must choose **Añadir al repaso** before a card is created; **Ignorar**
+never schedules it. The authenticated endpoints under `/api/v1/vocabulary`
+list/action suggestions, list cards, return a bounded due queue, accept
+idempotent version-checked ratings, and expose immutable card history.
+
+PostgreSQL is authoritative for suggestions, cards and review events. Exact
+normalization, phrase/sense uniqueness, `vocab-scheduler-v1` intervals, UTC and
+boundary behavior, concurrency, stale versions, and report/session deletion are
+documented in [ADR 0013](docs/adr/0013-vocabulary-and-spaced-repetition.md) and
+the [M08 data lifecycle](docs/m08-data-lifecycle.md). The scheduler is a simple
+deterministic product rule, not a scientifically validated or optimal memory
+model. This milestone adds no cloud/paid dependency, shared deck, scraping,
+offline sync, streak or learning-plan behavior.
 `analysis-v3` requests stable category headings while retaining `report-v1` JSON,
 existing evidence validation and local Ollama. A deterministic classifier accepts
 explicit keys or a small versioned English/Spanish alias list; strengths and
