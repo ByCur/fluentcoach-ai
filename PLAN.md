@@ -187,6 +187,9 @@ Windows host validation remains pending; see DOCUMENTATION.md's PR #22 notes.
 
 ## M08 — Vocabulary and spaced repetition
 
+**Status: Complete (2026-10-05).** Implemented by the M08 focused change; see
+ADR 0013 and `docs/m08-data-lifecycle.md` for the versioned rules and limits.
+
 - **Objective:** Turn useful language into reviewable learning material.
 - **Scope:** Contextual suggestions/confirmation, phrase/sense deduplication,
   cards, versioned deterministic scheduler, due queue, ratings/history.

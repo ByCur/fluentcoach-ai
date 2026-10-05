@@ -37,3 +37,4 @@ export * from './ai.js';
 export * from './speech.js';
 export * from './voice-turn.js';
 export * from './issues.js';
+export * from './vocabulary.js';

@@ -28,8 +28,76 @@ model Account {
   goals PracticeGoal[]
   consents ConsentRecord[]
   sessions PracticeSession[]
+  vocabularySuggestions VocabularySuggestion[]
+  vocabularyCards VocabularyCard[]
   @@unique([oidcIssuer, oidcSubject])
   @@map("accounts")
+}
+
+model VocabularySuggestion {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ phrase String @db.VarChar(160)
+ normalizedPhrase String @map("normalized_phrase") @db.VarChar(160)
+ meaning String? @db.VarChar(1000)
+ normalizedSense String @default("") @map("normalized_sense") @db.VarChar(1000)
+ sourceSessionId String? @map("source_session_id") @db.Uuid
+ sourceReportId String? @map("source_report_id") @db.Uuid
+ sourceRevision Int? @map("source_revision")
+ evidence Json
+ originVersion String @map("origin_version") @db.VarChar(40)
+ state String @default("pending") @db.VarChar(12)
+ sourceAvailable Boolean @default(true) @map("source_available")
+ cardId String? @map("card_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+ account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
+ card VocabularyCard? @relation(fields:[cardId,accountId],references:[id,accountId])
+ @@unique([accountId,sourceReportId,normalizedPhrase,normalizedSense])
+ @@map("vocabulary_suggestions")
+}
+model VocabularyCard {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ phrase String @db.VarChar(160)
+ normalizedPhrase String @map("normalized_phrase") @db.VarChar(160)
+ meaning String? @db.VarChar(1000)
+ normalizedSense String @default("") @map("normalized_sense") @db.VarChar(1000)
+ sourceSuggestionId String? @map("source_suggestion_id") @db.Uuid
+ sourceSessionId String? @map("source_session_id") @db.Uuid
+ sourceReportId String? @map("source_report_id") @db.Uuid
+ sourceRevision Int? @map("source_revision")
+ sourceAvailable Boolean @default(true) @map("source_available")
+ state String @default("active") @db.VarChar(12)
+ schedulerVersion String @map("scheduler_version") @db.VarChar(40)
+ dueAt DateTime @map("due_at") @db.Timestamptz
+ intervalMinutes Int @default(0) @map("interval_minutes")
+ repetitions Int @default(0)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+ account Account @relation(fields:[accountId],references:[id],onDelete:Cascade)
+ suggestions VocabularySuggestion[]
+ reviews VocabularyReviewEvent[]
+ @@unique([accountId,normalizedPhrase,normalizedSense])
+ @@unique([id,accountId])
+ @@map("vocabulary_cards")
+}
+model VocabularyReviewEvent {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ cardId String @map("card_id") @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ schedulerVersion String @map("scheduler_version") @db.VarChar(40)
+ reviewKey String @map("review_key") @db.VarChar(100)
+ previousState Json @map("previous_state")
+ rating String @db.VarChar(10)
+ reviewedAt DateTime @map("reviewed_at") @db.Timestamptz
+ resultingState Json @map("resulting_state")
+ nextDueAt DateTime @map("next_due_at") @db.Timestamptz
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ card VocabularyCard @relation(fields:[cardId,accountId],references:[id,accountId],onDelete:Cascade)
+ @@unique([accountId,reviewKey])
+ @@map("vocabulary_review_events")
 }
 
 model LearnerProfile {
@@ -250,6 +318,7 @@ model SessionReport {
  partial Boolean @default(false)
  generatedAt DateTime @default(now()) @map("generated_at") @db.Timestamptz
  @@unique([sessionId,accountId])
+ @@unique([id,accountId],map:"session_reports_id_account_key")
  @@unique([id,accountId,sessionId,transcriptRevision,analysisRunId],map:"report_observation_source_key")
  @@map("session_reports")
 }
