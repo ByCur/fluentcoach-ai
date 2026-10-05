@@ -14,10 +14,10 @@ import {
   type AiCallOptions,
   type ProviderMetadata,
 } from './ai.js';
-class TerminalSessionError extends AiError {
+class TerminalSessionError extends Error {
+  override name = 'TerminalSessionError';
   constructor() {
-    super('cancelled');
-    this.message = 'SESSION_TERMINAL';
+    super('SESSION_TERMINAL');
   }
 }
 export interface TutorContext {
@@ -89,6 +89,11 @@ export class ConversationService {
   ) {}
   scenarios() {
     return SCENARIOS;
+  }
+  async assertTurnAllowed(accountId: string, id: string) {
+    const session = await this.required(accountId, id);
+    if (!['created', 'active'].includes(session.state))
+      throw new TerminalSessionError();
   }
   async start(
     accountId: string,

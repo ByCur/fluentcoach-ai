@@ -10,6 +10,7 @@ import {
   ConversationService,
   LearnerService,
   ReportService,
+  VoiceTurnService,
 } from '@fluentcoach/application';
 import {
   Auth0OidcAdapter,
@@ -23,6 +24,8 @@ import { HealthController } from './health.controller.js';
 import { IdentityController, OIDC_PROVIDER } from './identity.controller.js';
 import { JobController } from './job.controller.js';
 import { ConversationController } from './conversation.controller.js';
+import { VoiceController } from './voice.controller.js';
+import { speechTranscriber } from './speech.providers.js';
 import { LearnerController } from './learner.controller.js';
 import { AuthGuard } from './auth.guard.js';
 import { CsrfGuard } from './csrf.guard.js';
@@ -35,6 +38,8 @@ import {
   LEARNER_SERVICE,
   REPORT_SERVICE,
   AI_ADAPTERS,
+  VOICE_TURN_SERVICE,
+  SPEECH_TRANSCRIBER,
 } from './tokens.js';
 @Module({
   controllers: [
@@ -42,6 +47,7 @@ import {
     IdentityController,
     LearnerController,
     ConversationController,
+    VoiceController,
     JobController,
     ReportController,
   ],
@@ -55,6 +61,7 @@ import {
     },
     { provide: ACCOUNT_REPOSITORY, useClass: PostgresAccountRepository },
     { provide: AI_ADAPTERS, useFactory: aiAdapters },
+    { provide: SPEECH_TRANSCRIBER, useFactory: speechTranscriber },
     {
       provide: REPORT_SERVICE,
       inject: [AI_ADAPTERS],
@@ -76,6 +83,14 @@ import {
           adapters.conversation,
           new PostgresJobStore(),
         ),
+    },
+    {
+      provide: VOICE_TURN_SERVICE,
+      inject: [CONVERSATION_SERVICE, SPEECH_TRANSCRIBER],
+      useFactory: (
+        conversations: ConversationService,
+        transcriber: ReturnType<typeof speechTranscriber>,
+      ) => new VoiceTurnService(conversations, transcriber),
     },
     {
       provide: LEARNER_SERVICE,
