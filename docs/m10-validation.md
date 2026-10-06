@@ -62,6 +62,9 @@ expected 401. Identities: node uid 1000 for API/worker; nginx uid 101 for web.
 The separate non-root migration image applied all 10 migrations successfully.
 Environment files/proxy CA are excluded from image layers; API/worker deployment
 contains production dependencies and excludes development tooling.
+An actual nginx upstream outage returned 502 without logging synthetic learner
+text or an OIDC callback code supplied in the request URI. Request-level nginx
+error logs are disabled as well as access logs; startup diagnostics remain.
 
 ## Five-session load and resilience
 

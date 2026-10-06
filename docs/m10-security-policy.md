@@ -34,7 +34,8 @@ Logging uses a closed operation/outcome vocabulary and bounded finite numeric
 status/count/duration values. All keys are copied from this allowlist; arbitrary
 objects, headers, exception messages, request bodies, paths, content and account
 IDs never reach telemetry. Nest default raw error logging and nginx access logs
-are disabled. Redis emits no uncontrolled error events. HTTP error messages use
+and request-level nginx error logs are disabled (upstream errors can echo OIDC
+callback query strings). Redis emits no uncontrolled error events. HTTP error messages use
 fixed application-owned codes and Spanish validation copy, not SQL/provider
 bodies. Synthetic tests inject secrets/content through real HTTP, database,
 Redis/provider/plan/audio failure paths and assert outputs/logs never contain them.
