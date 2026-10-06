@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openLearnerPage } from './learner-navigation.js';
 import { randomUUID } from 'node:crypto';
 
 // Each browser test owns its learner; reloads retain that same authenticated account.
@@ -17,6 +18,12 @@ type SpeechProbe = {
   __speechCancelled: boolean;
   __eventSources: EventSource[];
   __deltas: string[];
+  __recorders: MediaRecorder[];
+  __stoppedTracks: number;
+  __stoppedRecorders: number;
+  __deliverCancelledAudio?: () => void;
+  __releaseMicrophone?: () => void;
+  __finishStop?: () => void;
 };
 const browserVoices = [
   { voiceURI: 'spanish', lang: 'es-ES', name: 'Spanish', localService: true, default: true },
@@ -36,6 +43,9 @@ function installBrowserFakes(
     probe.__speechCancelled = false;
     probe.__eventSources = [];
     probe.__deltas = [];
+    probe.__recorders = [];
+    probe.__stoppedTracks = 0;
+    probe.__stoppedRecorders = 0;
     const NativeEventSource = window.EventSource;
     window.EventSource = class extends NativeEventSource {
       constructor(url: string | URL, options?: EventSourceInit) {
@@ -58,7 +68,7 @@ function installBrowserFakes(
             return Promise.reject(error);
           }
           return Promise.resolve({
-            getTracks: () => [{ stop: () => undefined }],
+            getTracks: () => [{ stop: () => { probe.__stoppedTracks += 1; } }],
           });
         },
       },
@@ -69,12 +79,14 @@ function installBrowserFakes(
       mimeType = 'audio/webm';
       ondataavailable: ((event: BlobEvent) => void) | null = null;
       onstop: (() => void) | null = null;
-      constructor(_stream: MediaStream, options?: MediaRecorderOptions) {
+      constructor(public stream: MediaStream, options?: MediaRecorderOptions) {
         super();
+        probe.__recorders.push(this as unknown as MediaRecorder);
         this.mimeType = options?.mimeType ?? this.mimeType;
       }
       start() { this.state = 'recording'; }
       stop() {
+        probe.__stoppedRecorders += 1;
         this.ondataavailable?.({ data: new Blob(['fake-audio'], { type: this.mimeType }) } as BlobEvent);
         this.state = 'inactive';
         this.onstop?.();
@@ -127,6 +139,103 @@ test('push-to-talk uses fake capture/transcription/TTS while text fallback stays
   await page.getByLabel('Tu respuesta').fill('Text still works');
   await page.getByRole('button', { name: 'Enviar', exact: true }).click();
   await expect(page.getByText(/Tutor:.*Text still works/)).toBeVisible();
+});
+
+for (const destination of ['Inicio', 'Mi perfil']) {
+  test(`leaving recording through ${destination} stops capture and discards cancelled audio`, async ({ page }) => {
+    await installBrowserFakes(page, 'allowed');
+    await enterPractice(page);
+    const sessionId = await page.locator('[data-session]').getAttribute('data-session');
+    let uploads = 0;
+    page.on('request', (request) => { if (request.url().endsWith('/voice-turns')) uploads += 1; });
+    await page.getByRole('button', { name: 'Hablar', exact: true }).click();
+    await expect(page.getByText('Voz: grabando')).toBeVisible();
+    // Model buffered audio plus a queued dataavailable callback after cancellation.
+    await page.evaluate(() => {
+      const probe = window as unknown as SpeechProbe;
+      const callback = probe.__recorders[0]!.ondataavailable!;
+      callback.call(probe.__recorders[0]!, { data: new Blob(['cancelled-audio']) } as BlobEvent);
+      probe.__deliverCancelledAudio = () => { callback.call(probe.__recorders[0]!, { data: new Blob(['late-cancelled-audio']) } as BlobEvent); };
+      probe.__speechCancelled = false;
+    });
+    if (destination === 'Inicio') await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+    else await openLearnerPage(page, destination);
+    expect(await page.evaluate(() => {
+      const probe = window as unknown as SpeechProbe;
+      probe.__deliverCancelledAudio?.();
+      return { state: probe.__recorders[0]!.state, recorders: probe.__stoppedRecorders,
+        tracks: probe.__stoppedTracks, speech: probe.__speechCancelled,
+        handlerDetached: probe.__recorders[0]!.ondataavailable === null };
+    })).toEqual({ state: 'inactive', recorders: 1, tracks: 1, speech: true, handlerDetached: true });
+    if (destination !== 'Inicio') await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+    await page.getByRole('button', { name: 'Continuar práctica', exact: true }).click();
+    await expect(page.locator('[data-session]')).toHaveAttribute('data-session', sessionId!);
+    await expect(page.getByText('Voz: lista')).toBeVisible();
+    expect(uploads).toBe(0);
+    // A subsequent explicit recording uploads only its own audio.
+    const response = page.waitForResponse((value) => value.url().endsWith('/voice-turns'));
+    await page.getByRole('button', { name: 'Hablar', exact: true }).click();
+    await page.evaluate(() => (window as unknown as SpeechProbe).__deliverCancelledAudio?.());
+    await page.getByRole('button', { name: 'Detener y enviar' }).click();
+    const sent = await response;
+    expect(sent.status()).toBe(201);
+    const payload = sent.request().postDataBuffer()!.toString();
+    expect(payload).toContain('fake-audio');
+    expect(payload).not.toContain('cancelled-audio');
+    expect(uploads).toBe(1);
+  });
+}
+
+test('leaving before microphone permission resolves releases the late stream without recording', async ({ page }) => {
+  await installBrowserFakes(page, 'allowed');
+  await enterPractice(page);
+  await page.evaluate(() => {
+    const probe = window as unknown as SpeechProbe;
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: {
+      getUserMedia: () => new Promise<MediaStream>((resolve) => {
+        probe.__releaseMicrophone = () => resolve({ getTracks: () => [{ stop: () => { probe.__stoppedTracks += 1; } }] } as unknown as MediaStream);
+      }),
+    } });
+  });
+  let uploads = 0;
+  page.on('request', (request) => { if (request.url().endsWith('/voice-turns')) uploads += 1; });
+  await page.getByRole('button', { name: 'Hablar', exact: true }).click();
+  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+  await page.evaluate(() => (window as unknown as SpeechProbe).__releaseMicrophone!());
+  await expect.poll(() => page.evaluate(() => (window as unknown as SpeechProbe).__stoppedTracks)).toBe(1);
+  expect(await page.evaluate(() => (window as unknown as SpeechProbe).__recorders.length)).toBe(0);
+  await page.getByRole('button', { name: 'Continuar práctica', exact: true }).click();
+  await expect(page.getByText('Voz: lista')).toBeVisible();
+  expect(uploads).toBe(0);
+});
+
+test('navigation during the recorder stop event discards the pending recording without uploading', async ({ page }) => {
+  await installBrowserFakes(page, 'allowed');
+  await enterPractice(page);
+  let uploads = 0;
+  page.on('request', (request) => { if (request.url().endsWith('/voice-turns')) uploads += 1; });
+  await page.getByRole('button', { name: 'Hablar', exact: true }).click();
+  await page.evaluate(() => {
+    const probe = window as unknown as SpeechProbe;
+    const recorder = probe.__recorders[0]!;
+    recorder.stop = () => {
+      probe.__stoppedRecorders += 1;
+      Object.defineProperty(recorder, 'state', { configurable: true, value: 'inactive' });
+      probe.__finishStop = () => {
+        recorder.ondataavailable?.call(recorder, { data: new Blob(['cancelled-audio']) } as BlobEvent);
+        recorder.onstop?.call(recorder, new Event('stop'));
+        recorder.dispatchEvent(new Event('stop'));
+      };
+    };
+  });
+  await page.getByRole('button', { name: 'Detener y enviar' }).click();
+  await openLearnerPage(page, 'Mi perfil');
+  await page.evaluate(() => (window as unknown as SpeechProbe).__finishStop!());
+  expect(await page.evaluate(() => (window as unknown as SpeechProbe).__stoppedTracks)).toBe(1);
+  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+  await page.getByRole('button', { name: 'Continuar práctica', exact: true }).click();
+  await expect(page.getByText('Voz: lista')).toBeVisible();
+  expect(uploads).toBe(0);
 });
 
 test('microphone denial leaves text input usable', async ({ page }) => {

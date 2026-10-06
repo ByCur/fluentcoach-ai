@@ -46,6 +46,10 @@ test("practice, conversation, fake voice controls, report, issues, vocabulary an
   await page.getByRole("button", { name: "Aceptar y guardar" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Configuración guardada" })).toContainText("Configuración guardada");
   await check(page, "learner-home");
+  await openLearnerPage(page, 'Mi perfil');
+  await expect(page.getByText(/Paso [123] de 3/)).toHaveCount(0);
+  await check(page, 'returning-profile-settings');
+  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
   await page.getByRole('button', { name: 'Abrir menú de perfil' }).click();
   await check(page, "profile-navigation");
   await page.keyboard.press('Escape');
@@ -59,6 +63,7 @@ test("practice, conversation, fake voice controls, report, issues, vocabulary an
       static isTypeSupported(){return true;}
       state:RecordingState='inactive';mimeType='audio/webm';
       ondataavailable:((event:BlobEvent)=>void)|null=null;onstop:(()=>void)|null=null;
+      constructor(public stream: MediaStream){super();}
       start(){this.state='recording';}
       stop(){this.ondataavailable?.({data:new Blob(['synthetic-audio'],{type:this.mimeType})} as BlobEvent);this.state='inactive';this.onstop?.();this.dispatchEvent(new Event('stop'));}
     }

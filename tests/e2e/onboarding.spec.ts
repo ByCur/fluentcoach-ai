@@ -54,16 +54,33 @@ test('synthetic learner accepts local-first onboarding and values survive reload
   await openLearnerPage(page, 'Mi perfil');
   await expect(page.getByLabel('B1')).toBeChecked();
   await expect(page.getByLabel(/Intereses/)).toHaveValue('viajes, cocina');
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.getByText(/Paso [123] de 3/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continuar', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('checkbox')).toHaveCount(0);
+  await expect(page.getByLabel('Minutos por día')).toHaveValue('20');
+  await expect(page.getByLabel('Días por semana')).toHaveValue('4');
+  const consentBefore = await (await page.request.get('/api/v1/consent')).json() as unknown[];
+  await page.getByLabel('A2').check();
+  await page.getByLabel(/Intereses/).fill('viajes, lectura');
   await page.getByLabel('Minutos por día').fill('25');
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  await expect(page.getByRole('checkbox')).toBeChecked();
-  await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
+  await page.getByLabel('Días por semana').fill('5');
+  const profileSaved = page.waitForResponse((response) => response.url().endsWith('/learner-profile') && response.request().method() === 'PUT');
+  const goalSaved = page.waitForResponse((response) => response.url().endsWith('/practice-goal') && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  expect((await profileSaved).status()).toBe(200);
+  expect((await goalSaved).status()).toBe(200);
+  await expect(page.getByRole('status')).toContainText('Cambios guardados');
+  expect(await (await page.request.get('/api/v1/consent')).json()).toEqual(consentBefore);
   await page.reload();
   await openLearnerPage(page, 'Mi perfil');
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.getByLabel('A2')).toBeChecked();
+  await expect(page.getByLabel(/Intereses/)).toHaveValue('viajes, lectura');
   await expect(page.getByLabel('Minutos por día')).toHaveValue('25');
+  await expect(page.getByLabel('Días por semana')).toHaveValue('5');
+  await expect(page.getByText(/Paso [123] de 3/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Privacidad y tus datos' }).click();
+  await expect(page.getByRole('button', { name: 'Exportar mis datos', exact: true })).toBeVisible();
+
 });
 
 test('historical Gemini consent is preserved and requires a separate local-first acceptance', async ({ page }) => {

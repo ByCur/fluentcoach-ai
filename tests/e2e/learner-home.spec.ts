@@ -111,3 +111,22 @@ test('home and profile menu fit a narrow screen without horizontal scrolling', a
   expect(menu!.x + menu!.width).toBeLessThanOrEqual(360);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 });
+
+test('returning settings report a failed goal save and allow retry without changing consent', async ({ page }) => {
+  await readyLearner(page);
+  await openLearnerPage(page, 'Mi perfil');
+  const consent = await (await page.request.get('/api/v1/consent')).json() as unknown[];
+  await page.getByLabel(/Intereses/).fill('lectura');
+  await page.getByLabel('Minutos por día').fill('20');
+  await page.route('**/api/v1/practice-goal', (route) => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 503, json: {} }) : route.continue());
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(page.getByRole('status')).toContainText('Tu perfil se guardó, pero no pudimos guardar tu ritmo');
+  expect(await (await page.request.get('/api/v1/practice-goal')).json()).toMatchObject({ minutesPerDay: 10 });
+  expect(await (await page.request.get('/api/v1/learner-profile')).json()).toMatchObject({ interests: ['lectura'] });
+  await page.unroute('**/api/v1/practice-goal');
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(page.getByRole('status')).toContainText('Cambios guardados');
+  expect(await (await page.request.get('/api/v1/practice-goal')).json()).toMatchObject({ minutesPerDay: 20 });
+  expect(await (await page.request.get('/api/v1/consent')).json()).toEqual(consent);
+});
