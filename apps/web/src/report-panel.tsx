@@ -1,3 +1,4 @@
+import { suggestionUncertainty } from './learner-wording.js';
 import { useEffect, useState } from 'react';
 type Finding = {
   text: string;
@@ -95,9 +96,9 @@ export function ReportPanel({
               : view.status === 'running'
                 ? 'Preparando informe…'
                 : view.status === 'failed'
-                  ? `No pudimos generar el informe (${view.errorCode ?? 'proveedor no disponible'}). Tu sesión se conserva.`
+                  ? 'No pudimos preparar el informe. Tu práctica se conserva; puedes volver a intentarlo.'
                   : view.status === 'skipped'
-                    ? 'Sin respuestas para analizar. No se ha generado feedback.'
+                    ? 'Sin respuestas para analizar. No hay comentarios sobre esta práctica.'
                     : 'Informe listo')}
       </p>
       {error ? (
@@ -117,11 +118,11 @@ export function ReportPanel({
             <div key={key}>
               <h3>
                 {key === 'strengths'
-                  ? 'Fortalezas'
-                  : 'Correcciones prioritarias'}
+                  ? 'Lo que haces bien'
+                  : 'Lo que puedes mejorar'}
               </h3>
               {view.report![key].length === 0 && (
-                <p>No hay correcciones respaldadas por evidencia suficiente.</p>
+                <p>Aún no hay ejemplos suficientes para hacer una sugerencia.</p>
               )}
               {view.report![key].map((finding, i) => (
                 <article key={i}>
@@ -134,7 +135,7 @@ export function ReportPanel({
                     </blockquote>
                   ))}
                   <p>Práctica: {finding.practice}</p>
-                  <small>Incertidumbre: {finding.uncertainty}</small>
+                  <small>{suggestionUncertainty(finding.uncertainty)}</small>
                 </article>
               ))}
             </div>

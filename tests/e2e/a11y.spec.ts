@@ -1,3 +1,4 @@
+import { openLearnerPage } from './learner-navigation.js';
 import { randomUUID } from "node:crypto";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
@@ -43,10 +44,17 @@ test("practice, conversation, fake voice controls, report, issues, vocabulary an
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Aceptar y guardar" }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "Configuración guardada",
-  );
-  await page.getByRole("button", { name: "Practicar" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Configuración guardada" })).toContainText("Configuración guardada");
+  await check(page, "learner-home");
+  await openLearnerPage(page, 'Mi perfil');
+  await expect(page.getByText(/Paso [123] de 3/)).toHaveCount(0);
+  await check(page, 'returning-profile-settings');
+  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+  await page.getByRole('button', { name: 'Abrir menú de perfil' }).click();
+  await check(page, "profile-navigation");
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Abrir menú de perfil' })).toBeFocused();
+  await page.getByRole("button", { name: /Practicar ahora|Continuar práctica/ }).click();
   await check(page, "practice-selection");
   // Transient fake media exercises the recording UI without device access.
   await page.evaluate(() => {
@@ -55,28 +63,29 @@ test("practice, conversation, fake voice controls, report, issues, vocabulary an
       static isTypeSupported(){return true;}
       state:RecordingState='inactive';mimeType='audio/webm';
       ondataavailable:((event:BlobEvent)=>void)|null=null;onstop:(()=>void)|null=null;
+      constructor(public stream: MediaStream){super();}
       start(){this.state='recording';}
       stop(){this.ondataavailable?.({data:new Blob(['synthetic-audio'],{type:this.mimeType})} as BlobEvent);this.state='inactive';this.onstop?.();this.dispatchEvent(new Event('stop'));}
     }
     Object.defineProperty(window,'MediaRecorder',{configurable:true,value:FakeRecorder});
   });
   for (let n = 0; n < 2; n++) {
-    await page.getByRole("button", { name: "Iniciar sesión" }).click();
+    await page.getByRole("button", { name: "Empezar práctica" }).click();
     await check(page, "text-conversation-and-voice-controls");
     if(n===0){
       await page.getByRole('button',{name:'Silenciar voz del tutor'}).click();
-      await page.getByRole('button',{name:'Iniciar turno de voz'}).click();
+      await page.getByRole('button',{name:'Hablar'}).click();
       await expect(page.getByRole('button',{name:'Detener y enviar'})).toBeVisible();
       await check(page,'fake-microphone-recording-state');
       await page.getByRole('button',{name:'Detener y enviar'}).click();
-      await expect(page.getByText(/learner:.*Synthetic spoken turn/)).toBeVisible();
+      await expect(page.getByText(/Tú:.*Synthetic spoken turn/)).toBeVisible();
     }
     for (let turn = 0; turn < 2; turn++) {
       await page
         .getByLabel("Tu respuesta")
         .fill(`Yesterday I go to the hotel ${n}-${turn}`);
       await page.getByRole("button", { name: "Enviar", exact: true }).click();
-      await expect(page.getByLabel("Tu respuesta")).toHaveValue("");
+      await expect(page.getByLabel("Tu respuesta")).toHaveValue("", { timeout: 15000 });
     }
     await page.getByRole("button", { name: "Terminar" }).click();
     const report = page.getByRole("region", { name: "Informe de sesión" });
@@ -86,17 +95,24 @@ test("practice, conversation, fake voice controls, report, issues, vocabulary an
     await check(page, "report");
     await report.getByRole("button", { name: "Cerrar informe" }).click();
   }
-  await page.getByRole("button", { name: "Actualizar prioridades" }).click();
+  await openLearnerPage(page, 'Lo que debo mejorar');
+  await page.getByRole("button", { name: "Actualizar mis ejemplos" }).click();
   await check(page, "recurring-issues");
+  await openLearnerPage(page, 'Mi vocabulario');
   await page.getByRole("button", { name: "Actualizar vocabulario" }).click();
   await page.getByRole("button", { name: "Añadir al repaso" }).first().click();
   await check(page, "vocabulary-review");
-  const plan = page.getByRole("region", { name: "Tu plan de práctica" });
-  await plan.getByRole("button", { name: "Generar/Ver propuesta" }).click();
+  await openLearnerPage(page, 'Mi plan');
+  const plan = page.getByRole("region", { name: "Mi plan" });
+  await plan.getByRole("button", { name: "Preparar mi plan" }).click();
   await expect(
     plan.getByRole("article", { name: "Propuesta de plan" }),
   ).toBeVisible();
-  await check(page, "plan-and-progress");
+  await check(page, "plan");
+  await openLearnerPage(page, 'Mis recomendaciones');
+  await check(page, 'recommendations');
+  await openLearnerPage(page, 'Mi progreso');
+  await check(page, 'progress');
 });
 test("privacy export states, confirmation and deletion completion are accessible and clear learner UI", async ({
   page,

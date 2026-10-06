@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { PrivacyJob } from "@fluentcoach/domain";
 export function PrivacyPanel({
   csrf,
   onDeleted,
   onClose,
+  profileMenu,
+  navigationError,
 }: {
   csrf: string;
   onDeleted: () => void;
   onClose: () => void;
+  profileMenu?: ReactNode;
+  navigationError?: string;
 }) {
   const [job, setJob] = useState<PrivacyJob | null>(null),
     [confirmed, setConfirmed] = useState(false),
@@ -43,10 +47,12 @@ export function PrivacyPanel({
   }, [job?.id, job?.state]);
   return (
     <main>
-      <header>
-        <h1>Privacidad y tus datos</h1>
-        <button onClick={onClose}>Volver</button>
+      <header className="learner-header">
+        <div><h1>Privacidad y tus datos</h1>
+        <button onClick={onClose}>Volver</button></div>
+        {profileMenu}
       </header>
+      {navigationError && <p role="alert">{navigationError}</p>}
       <p>
         Las transcripciones y los informes se conservan durante 90 días. Tu
         vocabulario confirmado y el historial estructurado permanecen hasta que

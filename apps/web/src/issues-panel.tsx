@@ -1,3 +1,4 @@
+import { suggestionUncertainty } from './learner-wording.js';
 import { useEffect, useState } from 'react';
 import type { RecurringIssue } from '@fluentcoach/domain';
 export function IssuesPanel({ csrf }: { csrf: string }) {
@@ -14,7 +15,7 @@ export function IssuesPanel({ csrf }: { csrf: string }) {
           credentials: 'include',
           signal: controller.signal,
         });
-        if (!response.ok) throw Error('No pudimos cargar tus prioridades.');
+        if (!response.ok) throw Error('No pudimos cargar tus ejemplos.');
         const result = (await response.json()) as RecurringIssue[];
         if (active) {
           setIssues(result);
@@ -23,7 +24,7 @@ export function IssuesPanel({ csrf }: { csrf: string }) {
       } catch (e) {
         if (active)
           setError(
-            e instanceof Error ? e.message : 'Prioridades no disponibles.',
+            e instanceof Error ? e.message : 'Ejemplos no disponibles.',
           );
       }
     };
@@ -54,22 +55,22 @@ export function IssuesPanel({ csrf }: { csrf: string }) {
   const active = issues.filter((issue) => !issue.dismissed);
   const dismissed = issues.filter((issue) => issue.dismissed);
   return (
-    <section aria-label="Prioridades recurrentes">
-      <h2>Prioridades recurrentes</h2>
+    <section aria-label="Lo que debo mejorar">
+      <h2>Lo que debo mejorar</h2>
       <p>
-        Detectado en varias sesiones: prioridades de práctica, sin evaluar ni
-        certificar tu nivel.
+        Aspectos que aparecen en varias prácticas y en los que puedes centrarte.
+        Estos ejemplos no son una evaluación ni un certificado de tu nivel.
       </p>
       <button
         className="secondary"
         disabled={busy}
         onClick={() => setReload((value) => value + 1)}
       >
-        Actualizar prioridades
+        Actualizar mis ejemplos
       </button>
       {error && <p role="alert">{error}</p>}
       {!active.length && !error && (
-        <p>Aún no hay prioridades recurrentes activas.</p>
+        <p>Aún no hay aspectos que se repitan en tus prácticas.</p>
       )}
       {active.map((issue) => (
         <article key={issue.issueKey}>
@@ -89,13 +90,11 @@ export function IssuesPanel({ csrf }: { csrf: string }) {
                 key={`${observation.sessionId}:${observation.evidence.turnSequence}`}
               >
                 <cite>
-                  Sesión {observation.sessionId.slice(0, 8)} · revisión{' '}
-                  {observation.revision} · tu turno{' '}
-                  {observation.evidence.turnSequence}
+                  Un ejemplo de tu práctica
                 </cite>
                 <p>{observation.evidence.quote}</p>
                 <small>
-                  Incertidumbre del informe: {observation.uncertainty}
+                  {suggestionUncertainty(observation.uncertainty)}
                 </small>
               </blockquote>
             ))}
@@ -110,10 +109,9 @@ export function IssuesPanel({ csrf }: { csrf: string }) {
       ))}
       {!!dismissed.length && (
         <details>
-          <summary>Prioridades descartadas</summary>
+          <summary>Aspectos que has apartado</summary>
           <p>
-            Siguen descartadas aunque llegue nueva evidencia, hasta que las
-            restaures.
+            Se mantendrán apartados hasta que decidas volver a practicarlos.
           </p>
           {dismissed.map((issue) => (
             <p key={issue.issueKey}>

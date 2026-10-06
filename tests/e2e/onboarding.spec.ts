@@ -1,5 +1,14 @@
-import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { openLearnerPage } from './learner-navigation.js';
+import { test, expect } from '@playwright/test';
+
+// Each test owns a learner so unfinished practices cannot affect another flow.
+test.beforeEach(async ({ page }) => {
+  const subject = `onboarding-e2e-${randomUUID()}`;
+  await page.route('**/api/v1/auth/synthetic-login', (route) => route.continue({
+    postData: JSON.stringify({ subject }),
+  }));
+});
 
 const localConsent = {
   purpose: 'local-ai-practice', policyVersion: 'privacy-2026-10-05',
@@ -37,22 +46,41 @@ test('synthetic learner accepts local-first onboarding and values survive reload
   expect(response.status()).toBe(201);
   const submitted = response.request().postDataJSON() as { consent: unknown };
   expect(submitted.consent).toEqual({ ...localConsent, accepted: true });
-  await expect(page.getByRole('status')).toContainText('Configuración guardada');
+  await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
   const history = await page.request.get('/api/v1/consent');
   expect(history.status()).toBe(200);
   expect(await history.json()).toEqual(expect.arrayContaining([expect.objectContaining(localConsent)]));
   await page.reload();
+  await openLearnerPage(page, 'Mi perfil');
   await expect(page.getByLabel('B1')).toBeChecked();
   await expect(page.getByLabel(/Intereses/)).toHaveValue('viajes, cocina');
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.getByText(/Paso [123] de 3/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continuar', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('checkbox')).toHaveCount(0);
+  await expect(page.getByLabel('Minutos por día')).toHaveValue('20');
+  await expect(page.getByLabel('Días por semana')).toHaveValue('4');
+  const consentBefore = await (await page.request.get('/api/v1/consent')).json() as unknown[];
+  await page.getByLabel('A2').check();
+  await page.getByLabel(/Intereses/).fill('viajes, lectura');
   await page.getByLabel('Minutos por día').fill('25');
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  await expect(page.getByRole('checkbox')).toBeChecked();
-  await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
-  await expect(page.getByRole('status')).toContainText('Configuración guardada');
+  await page.getByLabel('Días por semana').fill('5');
+  const profileSaved = page.waitForResponse((response) => response.url().endsWith('/learner-profile') && response.request().method() === 'PUT');
+  const goalSaved = page.waitForResponse((response) => response.url().endsWith('/practice-goal') && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  expect((await profileSaved).status()).toBe(200);
+  expect((await goalSaved).status()).toBe(200);
+  await expect(page.getByRole('status')).toContainText('Cambios guardados');
+  expect(await (await page.request.get('/api/v1/consent')).json()).toEqual(consentBefore);
   await page.reload();
-  await page.getByRole('button', { name: 'Continuar' }).click();
+  await openLearnerPage(page, 'Mi perfil');
+  await expect(page.getByLabel('A2')).toBeChecked();
+  await expect(page.getByLabel(/Intereses/)).toHaveValue('viajes, lectura');
   await expect(page.getByLabel('Minutos por día')).toHaveValue('25');
+  await expect(page.getByLabel('Días por semana')).toHaveValue('5');
+  await expect(page.getByText(/Paso [123] de 3/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Privacidad y tus datos' }).click();
+  await expect(page.getByRole('button', { name: 'Exportar mis datos', exact: true })).toBeVisible();
+
 });
 
 test('historical Gemini consent is preserved and requires a separate local-first acceptance', async ({ page }) => {
@@ -84,7 +112,7 @@ test('historical Gemini consent is preserved and requires a separate local-first
   expect(await (await page.request.get('/api/v1/consent')).json()).toEqual(historical);
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
-  await expect(page.getByRole('status')).toContainText('Configuración guardada');
+  await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
   const updated = await (await page.request.get('/api/v1/consent')).json() as unknown[];
   expect(updated).toHaveLength(2);
   expect(updated).toEqual(expect.arrayContaining([...historical, expect.objectContaining(localConsent)]));

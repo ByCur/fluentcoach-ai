@@ -12,6 +12,17 @@ release tooling, but secure zero-cost cloud text/voice hosting remains blocked;
 staging/production and the private learner pilot are not complete. See
 [release runbook](docs/m11-release-runbook.md) and [provider verification](docs/m11-provider-verification.md).
 
+After completing onboarding, learners land on Inicio: practice or continue a
+conversation, recommendations from their existing plan and due vocabulary,
+recurring practice examples, and a weekly progress summary. The top-right profile
+menu opens Mi perfil, Mis recomendaciones, Lo que debo mejorar, Mi vocabulario,
+Mi plan, Mi progreso, and Cerrar sesión. Privacy/export/deletion controls remain
+available from Mi perfil. These views reuse M07–M09 account-scoped endpoints;
+opening Inicio does not generate or accept a plan. Returning learners edit their
+profile and practice goal together in Mi perfil without repeating onboarding or
+recording new consent. Leaving practice stops microphone capture and tutor speech
+and discards unsubmitted audio; the conversation remains available to continue.
+
 ## Prerequisites
 
 - Node.js **20.20.x** (see `.nvmrc`)
