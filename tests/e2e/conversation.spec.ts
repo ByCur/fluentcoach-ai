@@ -20,6 +20,9 @@ async function onboarding(page: Page) {
   await page.getByRole('button', {name: 'Aceptar y guardar'}).click();
   await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
   await page.getByRole('button', {name: 'Práctica libre'}).click();
+  // Opening practice awaits canonical sessions; evaluateAll does not wait for the UI to mount.
+  await expect(page.getByRole('combobox', {name: 'Situación', exact: true})).toBeVisible();
+  await expect(page.getByRole('combobox', {name: 'Situación', exact: true})).toBeEnabled();
 }
 test('delayed chunks reach the browser progressively; disconnect and cursor resume preserve each chunk once', async ({page}) => {
   await onboarding(page);
@@ -64,6 +67,8 @@ test('delayed chunks reach the browser progressively; disconnect and cursor resu
   await page.getByRole('button', {name: 'Terminar'}).click();
   await page.reload();
   await page.getByRole('button', {name: 'Práctica libre'}).click();
+  await expect(page.getByRole('combobox', {name: 'Situación', exact: true})).toBeVisible();
+  await expect(page.getByRole('combobox', {name: 'Situación', exact: true})).toBeEnabled();
   await page.getByRole('button', {name: 'Ver historial'}).click();
   await expect(page.locator(`[data-session-history="${started.id}"]`)).toHaveText('En un hotel · Terminada');
 });
@@ -72,11 +77,18 @@ test('all roadmap scenarios and A1/A2/B1/B2 are selectable with persisted snapsh
   const scenarios = ['introductions','past-experiences','travel','hotel','restaurant','shopping','family-friends','work','hobbies','doctor-visit','future-plans','opinions','problem-solving','free-conversation'];
   expect(await page.getByLabel('Situación').locator('option').evaluateAll(options => options.map(o => (o as HTMLOptionElement).value))).toEqual(scenarios);
   for (const level of ['A1','A2','B1','B2']) {
+    const scenarioSlug = scenarios[['A1','A2','B1','B2'].indexOf(level)]!;
     await page.getByLabel('Nivel de práctica').selectOption(level);
-    await page.getByLabel('Situación').selectOption(scenarios[['A1','A2','B1','B2'].indexOf(level)]!);
+    await page.getByLabel('Situación').selectOption(scenarioSlug);
     const response = page.waitForResponse(r => r.url().endsWith('/sessions') && r.request().method() === 'POST');
+    const streamRequest = page.waitForRequest(r => new URL(r.url()).pathname.endsWith('/events') && new URL(r.url()).searchParams.get('cursor') === '0');
     await page.getByRole('button', {name: 'Empezar práctica'}).click();
-    const body=await (await response).json() as {snapshot:{level:string}};expect(body.snapshot.level).toBe(level);
+    const body = await (await response).json() as {id: string; snapshot: {scenarioSlug: string; level: string; mode: string}};
+    expect(body.snapshot).toMatchObject({scenarioSlug, level, mode: 'natural'});
+    expect(new URL((await streamRequest).url()).pathname).toBe(`/api/v1/sessions/${body.id}/events`);
+    const persisted = await page.request.get(`/api/v1/sessions/${body.id}`);
+    expect(persisted.status()).toBe(200);
+    expect((await persisted.json() as {snapshot: unknown}).snapshot).toMatchObject({scenarioSlug, level, mode: 'natural'});
     await expect(page.locator('[data-cursor]')).toHaveAttribute('data-cursor','0');
     await page.getByLabel('Tu respuesta').fill('Synthetic greeting');
     await page.getByRole('button', {name: 'Enviar', exact: true}).click();

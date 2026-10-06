@@ -49,3 +49,16 @@ manual screen-reader checks remain manual validation. Automated accessibility
 is not WCAG certification. Existing cloud hosting/private-pilot gates remain as
 documented in the release runbook. No thresholds, privacy fences or CI gates
 were disabled.
+
+## PR #31 CI synchronization follow-up
+
+CI's scenario read raced the asynchronous canonical-session lookup when opening
+Práctica libre. The conversation helper now waits for the Situación combobox to
+be visible and enabled before reading its exact fourteen values, with no sleeps
+or application changes. The tests also read each A1/A2/B1/B2 session snapshot back
+from the owned session API and verify its new EventSource request uses cursor 0.
+Free practice after onboarding and reload remains covered.
+
+Revalidated: `pnpm test:e2e:conversation` (2 passed), `pnpm test:e2e:progress`
+(14 passed, including roadmap/provider/navigation), affected ESLint and root
+TypeScript checks (passed). The product's asynchronous session lookup is preserved.
