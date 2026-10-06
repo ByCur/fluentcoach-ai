@@ -25,6 +25,9 @@ beforeAll(async () => {
   app.use(cookieParser());
   app.useGlobalFilters(new ApiExceptionFilter());
   await app.init();
+  // Own one listening server for the entire concurrent run. Otherwise Supertest
+  // starts/closes a temporary listener per request and can reset overlapping calls.
+  await app.listen(0, '127.0.0.1');
 });
 afterAll(async () => {
   await app.close();

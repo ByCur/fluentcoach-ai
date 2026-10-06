@@ -70,13 +70,17 @@ error logs are disabled as well as access logs; startup diagnostics remain.
 
 | Synthetic scenario | Requests/operations | Total ms | p50 ms | p95 ms | Errors |
 | --- | --- | --- | --- | --- | --- |
-| Authenticated HTTP, text/voice, durable reports/progress | 62 | 14,116.81 | 7.75 | 3,738.85 | 0 |
-| Application ports, transcript/events/reports/progress | 46 | 984.02 | 57.15 | 259.66 | 0 |
+| Authenticated HTTP, text/voice, durable reports/progress | 59 | 6,211.06 | 6.35 | 1,892.78 | 0 |
+| Application ports, transcript/events/reports/progress | 46 | 896.83 | 48.20 | 223.15 | 0 |
 
 Measurements include reconciliation/streaming waits and concurrent local checks.
 No lost/duplicate turns, cross-session/account leakage, deadlocks, pool exhaustion
 or unhandled 5xx occurred. Correctness is the gate; no arbitrary latency SLA.
 This is local pilot sanity, not production scalability or real provider latency.
+The concurrent HTTP harness owns one listening server until application cleanup;
+this fixes a CI connection reset caused by Supertest closing overlapping temporary
+listeners. Both load tests passed twice after the correction. Poll request counts
+vary with reconciliation timing; correctness assertions remain unchanged.
 
 Resilience covers Ollama/whisper/Redis outages, timeout/invalid provider output,
 bounded analysis exhaustion, signed/durable duplicates, restart/reconciliation,
