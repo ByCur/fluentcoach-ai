@@ -23,7 +23,8 @@ has been provisioned, billing enabled, payment method supplied, or secret added.
 - `PLAN.md`: milestone scope, acceptance and validation gates.
 - `AGENTS.md`: contributor/agent rules.
 - `README.md`: tested M01 quick start and quality gates.
-- `docs/adr/`: accepted implementation decisions and review triggers.
+- `docs/adr/`: implementation decisions, proposed future decisions and review triggers.
+- [M12 discovery](docs/m12-discovery.md): future exam/sharing specs, gates and review record.
 
 ## Development workflow
 
@@ -591,3 +592,28 @@ blocked deployment; it is not production approval. Explicit-base-URL smoke
 commands cannot claim a pass without a real network response. Runtime and
 release check refuse the current cloud architecture; no deployment or worker
 provisioning is supplied. Ollama/whisper.cpp and EUR 0/free-only remain unchanged.
+
+## M12 future-mode discovery (2026-10-06)
+
+Discovery specs and matrices are prepared and reviewed for document consistency;
+PR approval and specialist sign-offs remain pending. Neither mode is implemented.
+See the [review/decision record and proposed milestones](docs/m12-discovery.md),
+[exam practice specification](docs/m12-exam-practice-spec.md),
+[teacher/family sharing specification](docs/m12-learner-sharing-spec.md),
+[pre-implementation test matrices](docs/m12-test-matrices.md),
+[ADR 0018](docs/adr/0018-practice-only-exam-evaluation.md) and
+[ADR 0019](docs/adr/0019-explicit-revocable-learner-sharing.md).
+
+The proposed first slices use original tasks and qualitative practice-only exam
+feedback, plus separate affirmative adult learner consent for individually named,
+read-only summary recipients with selected scope, bounded expiry and revocation.
+No exam family/official scale is approved. Rights, rubric/model validity, consent,
+age/guardian rules, authorization/restore, audit retention and export handling
+remain explicit future gates. Current learner access/privacy and M10/M11 release
+blockers remain unchanged. No dashboard role or sharing feature is installed.
+
+Matrices specify 48 core + 20 adverse synthetic exam cases, role/access,
+consent/revocation, two-account isolation and deletion/export effects. These are
+future contracts, not runnable or passing tests. M12 requires manual document
+review; future commands/fixtures belong to a separately accepted implementation
+plan. No M13 implementation, deployment or pilot is included.

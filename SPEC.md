@@ -33,7 +33,9 @@ Initial non-goals: official CEFR certification; native mobile apps; offline AI;
 group/video tutoring; custom model training; microservices/Kubernetes; payments
 or public signup; pronunciation scoring from transcripts; teacher/family access
 or exam implementation. Doctor visits are language role-play, not medical advice.
-Future sharing and exam modes need separately reviewed specifications.
+Future sharing and exam modes need separately reviewed specifications. M12
+[discovery documents](docs/m12-discovery.md) define proposed contracts and test
+matrices only; neither mode is implemented or authorized by this specification.
 
 ## 3. Decisions and unresolved assumptions
 
@@ -58,8 +60,11 @@ choices in future `docs/adr/` decision records.
 | Data retention | No application audio storage; transcripts/reports 90 days; structured learner state until deletion | Confirm before pilot, including independent provider retention |
 | Pedagogical review | Reviewed Spanish-learner examples and tutor rubric | Identify reviewer before pilot; no unsubstantiated validation claim |
 
-No need to select future dashboard roles or exam rubrics now. Do not silently
-resolve privacy/budget/provider gates by enabling services or collecting data.
+M12 proposes future dashboard permissions and exam rubrics in separate discovery
+documents; no role, rubric or sharing entitlement is active in the current product.
+A separately accepted implementation plan must resolve the relevant review gates.
+Do not silently resolve privacy/budget/provider gates by enabling services or
+collecting data.
 
 ## 4. Functional requirements
 
@@ -79,7 +84,7 @@ resolve privacy/budget/provider gates by enabling services or collecting data.
 | F12 | Spaced repetition uses a deterministic, versioned algorithm and ratings; duplicate review submission cannot advance twice. |
 | F13 | Show minutes, sessions, goals, speaking streaks, review activity and evidence-based issue trends; display insufficient-data states instead of invented fluency scores. |
 | F14 | Account-scoped history, export and deletion cover API, streams, derived state and background jobs. |
-| F15 | Future exam practice and teacher/family dashboards require assessment, consent and authorization specifications before implementation. |
+| F15 | Future exam practice and teacher/family dashboards require separately reviewed assessment/content-rights, explicit revocable learner consent, scoped authorization, audit/lifecycle and age/guardian specifications plus test matrices before implementation. M12 discovery defines proposed contracts only; no official exam scoring or implicit third-party learner access. Current owner-only access remains unchanged. |
 
 Proposed streak rule: consecutive local dates with at least two minutes of
 validated active voice practice; exclude idle connection time and track text
