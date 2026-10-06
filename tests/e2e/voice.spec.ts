@@ -101,7 +101,8 @@ function installBrowserFakes(
 async function enterPractice(page: Page) {
   await page.goto('/');
   const login = page.getByRole('button', { name: /Entrar/ });
-  if (await login.isVisible()) await login.click();
+  await expect(login).toBeVisible();
+  await login.click();
   await expect(page.getByRole('heading', { name: 'Prepara tu aprendizaje' })).toBeVisible();
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('button', { name: 'Continuar' }).click();

@@ -246,6 +246,8 @@ depends on the required PostgreSQL/Redis/Chromium CI gates. See ADR 0013 and
 
 ## M11 — Deployment and private learner pilot
 
+**Status: Release tooling under technical review; cloud release and learner pilot blocked. M11 is not complete.** See ADR 0017 and M11 validation/manual gates.
+
 - **Objective:** Operate the tested product with recovery paths.
 - **Scope:** ADR 0005 free services, production isolation, secrets, immutable builds,
   controlled migration, gated release, available free backup/alerts,

@@ -25,6 +25,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
       });
       return;
     }
+    if (error instanceof Error && error.message === 'RELEASE_DRAINING') {
+      response.status(503).setHeader('retry-after','60');
+      response.json({error:{code:'RELEASE_DRAINING',message:'Estamos actualizando el servicio. Tu sesión actual se conserva.'}}); return;
+    }
     if (error instanceof TerminalSessionError) {
       response.status(409).json({
         error: { code: 'SESSION_TERMINAL', message: 'SESSION_TERMINAL' },

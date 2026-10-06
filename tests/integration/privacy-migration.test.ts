@@ -6,7 +6,7 @@ it('upgrades populated M09 sources, preserves active history, resumes legacy rev
  const db=new pg.Pool({connectionString:process.env['DATABASE_URL']}),c=await db.connect(),schema='m10_upgrade_'+randomUUID().replaceAll('-',''),root='packages/infrastructure/prisma/migrations';
  try{
   await c.query(`CREATE SCHEMA ${schema}`);await c.query(`SET search_path TO ${schema},public`);
-  for(const name of (await readdir(root)).filter(n=>n.startsWith('2026')&&!n.includes('m10')).sort())await c.query(await readFile(`${root}/${name}/migration.sql`,'utf8'));
+  for(const name of (await readdir(root)).filter(n=>n.startsWith('2026')&&n<'202610060001_m10_privacy').sort())await c.query(await readFile(`${root}/${name}/migration.sql`,'utf8'));
   const a=(await c.query<{id:string}>("INSERT INTO accounts(oidc_issuer,oidc_subject) VALUES('synthetic','upgrade') RETURNING id")).rows[0]!.id;
   const profile=(await c.query<{id:string}>("INSERT INTO learner_profiles(account_id,interface_language,native_language,timezone,cefr_level,interests) VALUES($1,'es','es','UTC','A2',ARRAY['UPGRADE_PRIVATE_MARKER']) RETURNING id",[a])).rows[0]!.id;
   const s=(await c.query<{id:string}>("INSERT INTO practice_sessions(account_id,profile_id,scenario_slug,scenario_version,level,mode,prompt_version,state,transcript_revision) VALUES($1,$2,'hotel',1,'A2','NATURAL','tutor-v4','ENDED',1) RETURNING id",[a,profile])).rows[0]!.id;

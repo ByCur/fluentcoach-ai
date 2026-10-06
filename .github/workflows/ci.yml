@@ -28,6 +28,17 @@ jobs:
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
       - run: pnpm db:migrate:test
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
+      - run: pnpm release:preflight
+      - run: pnpm test:deployment
+      - run: pnpm test:migrations
+        env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
+      - run: pnpm test:release
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          REDIS_URL: "redis://localhost:6379"
+          BILLING_MODE: free_only
+          AI_PROVIDER: fake
+          SPEECH_PROVIDER: fake
       - run: pnpm test:integration:identity
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
       - run: pnpm test:integration:sessions
@@ -92,56 +103,66 @@ jobs:
       - run: pnpm eval:ai -- --suite pilot-text --billing-mode free_only
       - run: pnpm test:resilience:jobs
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
+      - run: docker compose exec -T postgres psql -U fluentcoach -d postgres -c 'CREATE DATABASE fluentcoach_browser_test'
+      - run: pnpm db:migrate:deploy
+        env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_browser_test" }
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:onboarding
         env:
-          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_browser_test"
           REDIS_URL: "redis://localhost:6379"
           BILLING_MODE: free_only
           AI_PROVIDER: fake
       - run: pnpm test:e2e:conversation
         env:
-          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_browser_test"
           REDIS_URL: "redis://localhost:6379"
           BILLING_MODE: free_only
           AI_PROVIDER: fake
       - run: pnpm test:e2e:reports
         env:
-          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_browser_test"
           REDIS_URL: "redis://localhost:6379"
           BILLING_MODE: free_only
           AI_PROVIDER: fake
       - run: pnpm test:e2e:issues
         env:
-          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_browser_test"
           REDIS_URL: "redis://localhost:6379"
           BILLING_MODE: free_only
           AI_PROVIDER: fake
           SPEECH_PROVIDER: fake
       - run: pnpm test:e2e:vocabulary
         env:
-          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_browser_test"
           REDIS_URL: "redis://localhost:6379"
           BILLING_MODE: free_only
           AI_PROVIDER: fake
           SPEECH_PROVIDER: fake
       - run: pnpm test:e2e:voice
         env:
-          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_browser_test"
           REDIS_URL: "redis://localhost:6379"
           BILLING_MODE: free_only
           AI_PROVIDER: fake
           SPEECH_PROVIDER: fake
       - run: pnpm test:e2e:progress
         env:
-          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_browser_test"
           REDIS_URL: "redis://localhost:6379"
           BILLING_MODE: free_only
           AI_PROVIDER: fake
           SPEECH_PROVIDER: fake
       - run: pnpm test:a11y
         env:
-          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_browser_test"
+          REDIS_URL: "redis://localhost:6379"
+          BILLING_MODE: free_only
+          AI_PROVIDER: fake
+          SPEECH_PROVIDER: fake
+      - run: pnpm test:e2e:cold-start
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_browser_test"
           REDIS_URL: "redis://localhost:6379"
           BILLING_MODE: free_only
           AI_PROVIDER: fake
@@ -166,7 +187,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: sh scripts/install-security-scanners.sh "$RUNNER_TEMP/m10-scanners"
       - run: echo "$RUNNER_TEMP/m10-scanners" >> "$GITHUB_PATH"
-      - run: docker build --target api -t fluentcoach-api:security .
-      - run: docker build --target worker -t fluentcoach-worker:security .
-      - run: docker build --target web -t fluentcoach-web:security .
+      - run: docker build --build-arg RELEASE_COMMIT_SHA=${{ github.sha }} --target api -t fluentcoach-api:security .
+      - run: docker build --build-arg RELEASE_COMMIT_SHA=${{ github.sha }} --target worker -t fluentcoach-worker:security .
+      - run: docker build --build-arg RELEASE_COMMIT_SHA=${{ github.sha }} --target web -t fluentcoach-web:security .
       - run: pnpm test:security
+      - uses: docker/setup-buildx-action@v3
+      - run: docker buildx build --target api --build-arg RELEASE_COMMIT_SHA=${{ github.sha }} --output type=oci,dest=${{ runner.temp }}/fluentcoach-api.oci.tar --metadata-file ${{ runner.temp }}/image-metadata.json .
+      - run: pnpm release:identity -- --metadata "${{ runner.temp }}/image-metadata.json" --archive "${{ runner.temp }}/fluentcoach-api.oci.tar" --output "${{ runner.temp }}/release-identity.json"
+        env: { RELEASE_COMMIT_SHA: "${{ github.sha }}" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m11-immutable-api-${{ github.sha }}
+          retention-days: 1
+          path: |
+            ${{ runner.temp }}/fluentcoach-api.oci.tar
+            ${{ runner.temp }}/release-identity.json

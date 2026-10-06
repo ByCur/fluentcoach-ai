@@ -89,7 +89,11 @@ Review these defaults with the learner before M09 acceptance.
 
 ## 5. High-level architecture
 
-Use a modular monolith from one repository. The zero-cost pilot deploys a static
+M11 verification (ADR 0017) blocks cloud promotion: secure zero-cost hosting for
+local Ollama/whisper.cpp and Redis encryption at rest is unproved/unavailable.
+No developer-PC public tunnel or remote-provider fallback is permitted.
+
+Use a modular monolith from one repository. The candidate zero-cost pilot deploys a static
 web app and API, not an always-on worker. QStash invokes secure idempotent API job
 endpoints; transport-neutral job ports preserve a future dedicated worker path.
 PostgreSQL is canonical; Redis holds non-canonical session/cache state.
@@ -310,8 +314,8 @@ matrix and PLAN.md for milestone exit gates.
 
 Docker Compose supports local development. Staging/production use isolated
 managed containers and data services. CI builds immutable images; deploy staging
-automatically and promote the same digest through an explicit production release
-gate. Run migrations once per release; use expand/contract compatibility and
+only when a verified topology clears release blockers, and promote the same digest through an explicit operator-authorized production release
+gate. Current M11 staging/production startup and promotion fail closed. Run migrations once per release; use expand/contract compatibility and
 tested rollback/restore. No deployment occurs in this planning phase.
 
 ## 12. Technical references

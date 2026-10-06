@@ -576,3 +576,18 @@ Exact commands, counts and measurements are in [M10 validation](docs/m10-validat
 or cloud/paid resource provisioning is included. External provider
 retention/deletion must be independently verified before enabling any optional
 remote provider for real learner data.
+
+## M11 release readiness (blocked, incomplete)
+
+See [ADR 0017](docs/adr/0017-m11-blocked-zero-cost-release.md),
+[dated provider verification](docs/m11-provider-verification.md),
+[release/recovery runbook](docs/m11-release-runbook.md),
+[secret inventory](docs/m11-secret-inventory.md),
+[pilot/device checklist](docs/m11-pilot-checklist.md) and
+[validation](docs/m11-validation.md). CI retains all M10 and earlier gates and
+adds `pnpm test:migrations`, `pnpm release:preflight`, `pnpm test:deployment`,
+`pnpm test:release` and `pnpm test:e2e:cold-start`. Repository preflight reports
+blocked deployment; it is not production approval. Explicit-base-URL smoke
+commands cannot claim a pass without a real network response. Runtime and
+release check refuse the current cloud architecture; no deployment or worker
+provisioning is supplied. Ollama/whisper.cpp and EUR 0/free-only remain unchanged.

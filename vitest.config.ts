@@ -23,6 +23,9 @@ export default defineConfig({
   test: {
     fileParallelism: false,
     projects: [
+      {resolve:{alias:sourceAliases},test:{name:'migrations',include:['tests/integration/*migration.test.ts','tests/release/migrations.test.ts'],testTimeout:30000}},
+      {resolve:{alias:sourceAliases},test:{name:'deployment',include:['tests/deployment/**/*.test.ts'],testTimeout:30000}},
+      {resolve:{alias:sourceAliases},test:{name:'release',include:['tests/release/**/*.test.ts'],testTimeout:30000}},
       {resolve:{alias:sourceAliases},test:{name:'privacy',include:['tests/integration/privacy*.test.ts'],testTimeout:30000}},
       {resolve:{alias:sourceAliases},test:{name:'load',include:['tests/load/**/*.test.ts'],testTimeout:60000}},
       { resolve: { alias: sourceAliases }, test: { name: 'plans', include: ['tests/integration/plans*.test.ts'], testTimeout: 15000 } },

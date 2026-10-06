@@ -7,3 +7,7 @@ describe('dependency readiness', () => {
     await expect(dependenciesReady([() => Promise.resolve(true), () => Promise.resolve(false)])).resolves.toBe(false);
   });
 });
+
+it('treats rejected dependency probes as not-ready without exposing errors', async () => {
+  expect(await dependenciesReady([() => Promise.reject(new Error('synthetic secret'))])).toBe(false);
+});

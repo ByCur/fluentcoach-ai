@@ -36,7 +36,7 @@ export class JobController {
         currentSigningKey: current,
         nextSigningKey: next,
         body: request.rawBody,
-        url: `${process.env['PUBLIC_ORIGIN']}${path}`,
+        url: `${process.env['PUBLIC_API_ORIGIN'] ?? process.env['PUBLIC_ORIGIN']}${path}`,
       });
     } catch {
       throw new UnauthorizedException('INVALID_QSTASH_SIGNATURE');
