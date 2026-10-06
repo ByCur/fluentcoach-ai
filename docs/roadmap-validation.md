@@ -82,7 +82,7 @@ fake output and prompt contract checks do not establish local model quality.
 Workspace verification for this change: all Vitest projects passed (458 tests),
 and the subsequently added cleanup/lease race passed in the complete 16-test
 roadmap file. The complete browser collection and final affected-file rerun
-verified all 50 current scenarios, including a11y, normal reports/progress and
+verified all 51 current scenarios, including a11y, learner/tutor-start report evidence and normal progress and
 voice preferences. Lint, typecheck, workspace build, forward migration deployment,
 release preflight and all three fake evaluation suites passed. The local Ollama
 adapter was checked with normalized response fixtures and an actual HTTP outage;

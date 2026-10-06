@@ -1,3 +1,4 @@
+import {practiceStarts} from './session-initiator.js';
 import { randomUUID } from 'node:crypto';
 import { test, expect, type Page } from '@playwright/test';
 
@@ -25,10 +26,13 @@ async function start(page: Page) {
   await page.getByLabel('Situación').selectOption('hotel');
   await page.getByRole('button', { name: 'Empezar práctica' }).click();
 }
-test('automatic report cites actual learner text and survives history reload', async ({
+for (const initiator of ['learner', 'tutor'] as const) {
+test(`automatic report cites actual learner text and survives history reload (${initiator} starts)`, async ({
   page,
 }) => {
+  await practiceStarts(page, initiator);
   await start(page);
+  if (initiator === 'tutor') await expect(page.getByText('Tutor: Hello! Do you have a reservation?', {exact: true})).toBeVisible();
   await page.getByLabel('Tu respuesta').fill('I need a room for two nights');
   await page.getByRole('button', { name: 'Enviar', exact: true }).click();
   await expect(page.getByText(/Tú:.*I need a room/)).toBeVisible();
@@ -37,11 +41,12 @@ test('automatic report cites actual learner text and survives history reload', a
   await expect(panel.getByRole('status')).toContainText('Informe listo', {
     timeout: 15000,
   });
-  await expect(panel.getByText('Tu turno 1')).toBeVisible();
+  await expect(panel.getByText(`Tu turno ${initiator === 'tutor' ? 2 : 1}`)).toBeVisible();
   await expect(
     panel.getByText('I need a room for two nights', { exact: true }),
   ).toBeVisible();
   await expect(panel.getByText(/no certifica tu nivel/)).toBeVisible();
+  await expect(panel.getByText('Hello! Do you have a reservation?', {exact: true})).toHaveCount(0);
   await page.reload();
   await page.getByRole('button', { name: 'Práctica libre' }).click();
   await page
@@ -55,6 +60,7 @@ test('automatic report cites actual learner text and survives history reload', a
     page.getByRole('region', { name: 'Informe de sesión' }).getByRole('status'),
   ).toContainText('Informe listo');
 });
+}
 test('provider failure is visible and report retry recovers without duplicating the session', async ({
   page,
 }) => {
