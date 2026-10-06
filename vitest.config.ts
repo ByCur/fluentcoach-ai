@@ -66,6 +66,7 @@ export default defineConfig({
           include: [
             'tests/integration/sessions.test.ts',
             'tests/integration/conversation-http.test.ts',
+            'tests/integration/conversation-opening.test.ts',
             'tests/integration/voice-http.test.ts',
           ],
           testTimeout: 15000,

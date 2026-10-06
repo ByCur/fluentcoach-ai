@@ -62,3 +62,28 @@ Free practice after onboarding and reload remains covered.
 Revalidated: `pnpm test:e2e:conversation` (2 passed), `pnpm test:e2e:progress`
 (14 passed, including roadmap/provider/navigation), affected ESLint and root
 TypeScript checks (passed). The product's asynchronous session lookup is preserved.
+
+## Persistent-account startup and tutor opening regression
+
+See ADR 0021. Reproduce with five owned unfinished sessions: the exact rejection
+is `409 / OPEN_SESSION_LIMIT`, not a stale plan version. New regressions cover five
+empty CREATED practices, account isolation, retained meaningful CREATED/ACTIVE
+practices and live leases, concurrent starts, receipt replay, opener persistence,
+concurrent workers, failure fallback and absence of learner evidence. Browser tests
+cover the current CTA error location, bounded conflict retries, empty learner-start,
+opening status, speech playback and reload without another opener request.
+
+`pnpm eval:ai -- --suite tutor-openings --billing-mode free_only` runs the versioned
+56-case structural scenario/level matrix with fake AI. Optional `--live --max-calls
+6 --output /tmp/tutor-openings.json` allows at most six local Ollama calls and zero
+paid calls. Review English, scenario relevance and difficulty in the live artifact;
+fake output and prompt contract checks do not establish local model quality.
+
+Workspace verification for this change: all Vitest projects passed (458 tests),
+and the subsequently added cleanup/lease race passed in the complete 16-test
+roadmap file. The complete browser collection and final affected-file rerun
+verified all 50 current scenarios, including a11y, normal reports/progress and
+voice preferences. Lint, typecheck, workspace build, forward migration deployment,
+release preflight and all three fake evaluation suites passed. The local Ollama
+adapter was checked with normalized response fixtures and an actual HTTP outage;
+a running local model was unavailable, so live wording quality is unverified.

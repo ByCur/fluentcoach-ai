@@ -129,3 +129,63 @@ it('dismissing an issue during its practice redacts evidence and adapts upcoming
   expect(adapted.activities[0]).toMatchObject({id: issue.id, sessionId: started.sessionId, state: 'started', evidence: []});
   expect(adapted.activities.filter(a => a.state === 'pending').every(a => a.type === 'conversation')).toBe(true);
 });
+
+it('a persistent account with five stale empty practices starts exactly one roadmap session across double clicks and lost acknowledgements', async () => {
+  const owner = await account('persistent-empty'), other = await account('other-empty');
+  const sessions = new PostgresSessionRepository();
+  const snapshot = {scenarioSlug: 'hotel', scenarioVersion: 1, level: 'A2' as const, mode: 'natural' as const, promptVersion: 'tutor-v4'};
+  const stale = await Promise.all(Array.from({length: 5}, () => sessions.create(owner.id, snapshot)));
+  const foreign = await sessions.create(other.id, snapshot);
+  const route = await repo.roadmap(owner.id), activity = route.activities[0]!;
+  const results = await Promise.all([repo.start(owner.id, route.id, activity.id, route.version), repo.start(owner.id, route.id, activity.id, route.version)]);
+  const id = results[0].sessionId;
+  expect(results[1].sessionId).toBe(id);
+  expect((await repo.start(owner.id, route.id, activity.id, route.version)).sessionId).toBe(id);
+  const history = await sessions.history(owner.id);
+  expect(history).toHaveLength(6);
+  expect(history.filter(s => s.state === 'created').map(s => s.id)).toEqual([id]);
+  for (const old of stale) expect(await sessions.get(owner.id, old.id)).toMatchObject({state: 'abandoned', turns: []});
+  expect(await sessions.get(other.id, foreign.id)).toMatchObject({state: 'created'});
+  expect((await repo.roadmap(owner.id)).activities[0]).toMatchObject({state: 'started', sessionId: id});
+  expect((await sql<{started_from_version: number}>('SELECT started_from_version FROM learning_plan_activities WHERE id=$1', [activity.id]))[0]!.started_from_version).toBe(route.version);
+});
+
+it('never abandons meaningful CREATED practices, active sessions, live leases or the current started activity', async () => {
+  const owner = await account('preserve-meaningful'), sessions = new PostgresSessionRepository();
+  const snapshot = {scenarioSlug: 'hotel', scenarioVersion: 1, level: 'A2' as const, mode: 'natural' as const, promptVersion: 'tutor-v4'};
+  const records = [];
+  for (let i = 0; i < 5; i++) {
+    const record = await sessions.create(owner.id, snapshot);
+    if (i < 2) record.turns.push({sequence: 1, sourceEventKey: `meaningful-${i}`, speaker: i === 0 ? 'learner' : 'tutor', text: 'Hello!', language: 'en'});
+    else if (i < 4) record.state = 'active';
+    await sessions.save(record);
+    records.push(record);
+  }
+  await sessions.acquireTurn(owner.id, records[4]!.id, randomUUID());
+  const route = await repo.roadmap(owner.id);
+  await expect(repo.start(owner.id, route.id, route.activities[0]!.id, route.version)).rejects.toThrow('OPEN_SESSION_LIMIT');
+  for (const record of records) expect(await sessions.get(owner.id, record.id)).toMatchObject({state: record.state, turns: record.turns});
+  expect(await sessions.history(owner.id)).toHaveLength(5);
+  // Free a live lease, then only its empty CREATED practice can be abandoned.
+  await sql('UPDATE practice_sessions SET turn_lease_until=now()-interval \'1 second\' WHERE id=$1', [records[4]!.id]);
+  const started = await repo.start(owner.id, route.id, route.activities[0]!.id, route.version);
+  expect(await sessions.get(owner.id, records[4]!.id)).toMatchObject({state: 'abandoned'});
+  const resumed = await repo.start(owner.id, route.id, route.activities[0]!.id, started.plan.version);
+  expect(resumed.sessionId).toBe(started.sessionId);
+  expect(await sessions.get(owner.id, started.sessionId!)).toMatchObject({state: 'created'});
+});
+
+it('turn lease acquisition racing orphan cleanup uses account-first locks and preserves whichever operation wins', async () => {
+  const sessions = new PostgresSessionRepository();
+  for (let n = 0; n < 3; n++) {
+    const owner = await account(`cleanup-race-${n}`), route = await repo.roadmap(owner.id);
+    const empty = await sessions.create(owner.id, {scenarioSlug: 'hotel', scenarioVersion: 1, level: 'A2', mode: 'natural', promptVersion: 'tutor-v4'});
+    const [leased, started] = await Promise.all([
+      sessions.acquireTurn(owner.id, empty.id, randomUUID()),
+      repo.start(owner.id, route.id, route.activities[0]!.id, route.version),
+    ]);
+    expect(await sessions.get(owner.id, empty.id)).toMatchObject({state: leased ? 'created' : 'abandoned', turns: []});
+    expect(await sessions.get(owner.id, started.sessionId!)).toMatchObject({state: 'created'});
+    expect((await repo.start(owner.id, route.id, route.activities[0]!.id, route.version)).sessionId).toBe(started.sessionId);
+  }
+});

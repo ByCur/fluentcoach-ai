@@ -56,6 +56,11 @@ export class ConversationController {
   ) {
     return this.service.help(r.accountId!, id);
   }
+  @Post('sessions/:id/opening') @UseGuards(CsrfGuard) opening(
+    @Req() r: AuthRequest, @Param('id') id: string,
+  ) {
+    return this.service.opening(r.accountId!, resourceId.parse(id));
+  }
   @Post('sessions/:id/end') @UseGuards(CsrfGuard) end(
     @Req() r: AuthRequest,
     @Param('id') id: string,

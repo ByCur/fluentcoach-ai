@@ -36,8 +36,9 @@ const currentConsent = {
 type CsrfResponse = { csrfToken: string };
 type SessionResponse = {
   id: string;
+  initiator?: 'learner' | 'tutor';
   turns: { speaker: string; text: string }[];
-  events: { sequence: number }[];
+  events: { sequence: number; kind?: string }[];
 };
 type Data = {
   interfaceLanguage: string;
@@ -73,6 +74,8 @@ function App() {
   const [navigationAttempt, setNavigationAttempt] = useState(0);
   const pageHeading = useRef<HTMLHeadingElement>(null);
   const [resumeSession, setResumeSession] = useState<(SessionResponse & { snapshot: { level: string; mode: string } }) | null>(null);
+  const [openingLoading, setOpeningLoading] = useState(false);
+  const [openingMessage, setOpeningMessage] = useState('');
   const [deleted,setDeleted]=useState(false);
   const [auth, setAuth] = useState(false),
     [csrf, setCsrf] = useState(''),
@@ -83,10 +86,7 @@ function App() {
     [sessionLoading, setSessionLoading] = useState(false),
     [scenario, setScenario] = useState('restaurant'),
     [mode, setMode] = useState('natural'),
-    [session, setSession] = useState<{
-      id: string;
-      turns: { speaker: string; text: string }[];
-    } | null>(null),
+    [session, setSession] = useState<SessionResponse | null>(null),
     [text, setText] = useState(''),
     [history, setHistory] = useState<
       { id: string; snapshot: { scenarioSlug: string }; state: string }[]
@@ -276,6 +276,35 @@ function App() {
     pageHeading.current?.focus();
   }, [page, practice, configured]);
   useEffect(() => {
+    setOpeningMessage('');
+    if (!practice || !session || sessionLoading || session.initiator !== 'tutor' || session.turns.length) return;
+    const fallback = 'El tutor no pudo empezar. Puedes iniciar tú la conversación.';
+    const controller = new AbortController();
+    setOpeningLoading(true);
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]);
+    const alreadyRequested = session.events.some(e => e.kind === 'opening.requested');
+    void api(`/sessions/${session.id}${alreadyRequested ? '' : '/opening'}`, {method: alreadyRequested ? 'GET' : 'POST', signal})
+      .then(async response => {
+        if (!response.ok) throw Error('OPENING_FAILED');
+        let record = await response.json() as SessionResponse;
+        // Reload/another API process can observe the receipt while inference is
+        // still running. Read canonical state briefly; never regenerate an opener.
+        while (!record.turns.length && record.events.some(e => e.kind === 'opening.requested')
+          && !record.events.some(e => ['opening.completed', 'opening.failed'].includes(e.kind ?? ''))) {
+          signal.throwIfAborted();
+          await new Promise(resolve => setTimeout(resolve, 300));
+          const persisted = await api(`/sessions/${session.id}`, {signal});
+          if (!persisted.ok) throw Error('OPENING_FAILED');
+          record = await persisted.json() as SessionResponse;
+        }
+        if (controller.signal.aborted) return;
+        reconcileSession(record);
+        if (!record.turns.some(t => t.speaker === 'tutor')) setOpeningMessage(fallback);
+      }).catch(() => {if (!controller.signal.aborted) setOpeningMessage(fallback);})
+      .finally(() => {if (!controller.signal.aborted) setOpeningLoading(false);});
+    return () => {controller.abort(); setOpeningLoading(false);};
+  }, [practice, session?.id, session?.initiator, sessionLoading]);
+  useEffect(() => {
     if (!auth || !configured || practice || page !== 'home') return;
     const controller = new AbortController();
     void api('/sessions', { signal: controller.signal }).then(async (response) => {
@@ -344,7 +373,7 @@ function App() {
     setText('');
     cursorRef.current = 0;
     setCursor(0);
-    setSession({ id, turns: [] });
+    setSession({ id, turns: [], events: [] });
     setSessionLoading(true);
     setPractice(true);
     void api(`/sessions/${id}`, {signal: AbortSignal.timeout(10000)}).then(async response => {
@@ -482,12 +511,7 @@ function App() {
             mode,
           }),
         });
-        setSession(
-          (await r.json()) as {
-            id: string;
-            turns: { speaker: string; text: string }[];
-          },
-        );
+        setSession((await r.json()) as SessionResponse);
       } catch (e) {
         setProviderError(
           e instanceof Error ? e.message : 'Sesión no disponible.',
@@ -495,7 +519,7 @@ function App() {
       }
     };
     const send = async () => {
-      if (!session || busy || sessionLoading || !text.trim()) return;
+      if (!session || busy || sessionLoading || openingLoading || !text.trim()) return;
       setBusy(true);
       setProviderError('');
       setStreamed('');
@@ -642,12 +666,7 @@ function App() {
         const r = await checked(`/sessions/${session.id}/help`, {
           method: 'POST',
         });
-        setSession(
-          (await r.json()) as {
-            id: string;
-            turns: { speaker: string; text: string }[];
-          },
-        );
+        reconcileSession((await r.json()) as SessionResponse);
       } catch (e) {
         setProviderError(
           e instanceof Error ? e.message : 'Ayuda no disponible.',
@@ -685,6 +704,8 @@ function App() {
         {header('Práctica en inglés')}
         {connection!=='ready'&&<p role="status">{connection==='unavailable'?'No hay conexión. Tu sesión se conserva. Vuelve a abrir Practicar para reconectar.':'Reconectando… Tu sesión se conserva.'}</p>}
         {sessionLoading && <p role="status">Cargando tu conversación…</p>}
+        {openingLoading && <p role="status">El tutor empieza la conversación…</p>}
+        {openingMessage && <p role="status">{openingMessage}</p>}
         {providerError && <p role="alert">{providerError}</p>}
         {reportId && (
           <ReportPanel
@@ -784,7 +805,7 @@ function App() {
               Tu respuesta
               <input
                 value={text}
-                readOnly={busy || !!turnKey}
+                readOnly={busy || openingLoading || !!turnKey}
                 onChange={(e) => {
                   if (!document.hidden && document.hasFocus())
                     typing.current.input(performance.now());
@@ -805,7 +826,7 @@ function App() {
                   Detener y enviar
                 </button>
               ) : (
-                <button type="button" disabled={busy || sessionLoading || voiceState !== 'idle'} onClick={() => void startRecording()}>
+                <button type="button" disabled={busy || sessionLoading || openingLoading || voiceState !== 'idle'} onClick={() => void startRecording()}>
                   Hablar
                 </button>
               )}
@@ -841,17 +862,17 @@ function App() {
               </small>
             </div>
             <nav>
-              <button disabled={busy || sessionLoading} onClick={() => void send()}>
+              <button disabled={busy || sessionLoading || openingLoading} onClick={() => void send()}>
                 {busy
                   ? 'Esperando respuesta…'
                   : turnKey
                     ? 'Reintentar respuesta'
                     : 'Enviar'}
               </button>
-              <button className="secondary" disabled={sessionLoading} onClick={() => void help()}>
+              <button className="secondary" disabled={sessionLoading || openingLoading} onClick={() => void help()}>
                 Ayuda en español
               </button>
-              <button className="secondary" disabled={sessionLoading} onClick={() => void end()}>
+              <button className="secondary" disabled={sessionLoading || openingLoading} onClick={() => void end()}>
                 Terminar
               </button>
             </nav>

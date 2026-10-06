@@ -1,3 +1,4 @@
+import {evaluateOpenings} from './eval-openings.js';
 import { evaluateRoadmap } from './eval-roadmap.js';
 import { parseArgs } from 'node:util';
 import { writeFile } from 'node:fs/promises';
@@ -42,6 +43,10 @@ async function main() {
       },
     },
   });
+  if (values.suite === 'tutor-openings' && values['billing-mode'] === 'free_only') {
+    await evaluateOpenings({live: values.live, maxCalls: Number(values['max-calls']), output: values.output});
+    return;
+  }
   if (values.suite === 'plans' && values['billing-mode'] === 'free_only') {
     await evaluateRoadmap({live: values.live, maxCalls: Number(values['max-calls']), output: values.output});
     return;

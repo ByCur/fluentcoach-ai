@@ -7,6 +7,7 @@ import {
   REPORT_JSON_SCHEMA,
   REPORT_SCHEMA_VERSION,
   TUTOR_PROMPT_VERSION,
+  TUTOR_OPENING_PROMPT_VERSION,
   type PlanCandidate,
   type PlanInputs,
   type PlanGenerator,
@@ -17,7 +18,7 @@ import {
   type SessionAnalyzer,
   type TutorContext,
 } from '@fluentcoach/application';
-import { analysisPrompt, tutorInput, tutorPrompt } from './ai-prompts.js';
+import { analysisPrompt, tutorInput, tutorPrompt, tutorOpeningPrompt } from './ai-prompts.js';
 
 const responseSchema = z.object({
   model: z.string().min(1).max(200),
@@ -125,6 +126,7 @@ export class OllamaTextAdapter
     user: unknown,
     structured: boolean,
     options: AiCallOptions,
+    maxTokens?: number,
   ) {
     const started = Date.now();
     const response = await this.call(
@@ -139,7 +141,7 @@ export class OllamaTextAdapter
             { role: 'system', content: system },
             { role: 'user', content: JSON.stringify(user) },
           ],
-          options: { temperature: 0.2 },
+          options: { temperature: 0.2, ...(maxTokens ? {num_predict: maxTokens} : {}) },
           ...(structured ? { format: REPORT_JSON_SCHEMA } : {}),
         }),
       },
@@ -179,6 +181,13 @@ export class OllamaTextAdapter
     );
     yield { text: result.text, done: false };
     yield { text: '', done: true, metadata: result.metadata };
+  }
+
+  async opening(context: TutorContext, options: AiCallOptions) {
+    const result = await this.generate(tutorOpeningPrompt(context), {
+      snapshot: context.snapshot, activity: context.activity,
+    }, false, options, 160);
+    return {...result, metadata: {...result.metadata, promptVersion: TUTOR_OPENING_PROMPT_VERSION}};
   }
 
   async analyzeTranscript(

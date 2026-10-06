@@ -19,3 +19,15 @@ describe('M03 authenticated SSE HTTP transport',()=>{
  it('rejects a second account before SSE headers and rejects guessed ownership fields and invalid cursors',async()=>{const a=await identity('a'),b=await identity('b'),s=await start(a),id=String(s.body.id);await request(app.getHttpServer()).get(`/api/v1/sessions/${id}/events`).expect(401);await request(app.getHttpServer()).get(`/api/v1/sessions/${id}/events`).set(b).expect(404).expect('content-type',/json/);for(const cursor of['-1','NaN','1.2','9007199254740992'])await request(app.getHttpServer()).get(`/api/v1/sessions/${id}/events?cursor=${cursor}`).set(a).expect(400);await request(app.getHttpServer()).post('/api/v1/sessions').set(b).send({scenarioSlug:'hotel',level:'B1',mode:'teaching',accountId:s.body.accountId}).expect(400)});
  it('streams delayed deltas while the POST is pending and honors Last-Event-ID over the original URL cursor',async()=>{const a=await identity('a'),s=await start(a),id=String(s.body.id);const abort=new AbortController();const response=await fetch(`${base}/api/v1/sessions/${id}/events?cursor=0`,{headers:{Cookie:a.Cookie},signal:abort.signal});expect(response.status).toBe(200);expect(response.headers.get('x-accel-buffering')).toBe('no');const reader=response.body!.getReader();let completed=false;const turn=request(app.getHttpServer()).post(`/api/v1/sessions/${id}/turns`).set(a).send({sourceEventKey:'streamed-turn',text:'Synthetic room request'}).then(r=>{completed=true;return r});let prefix='';while(!prefix.includes('id: 1\n')){const chunk=await reader.read();prefix+=new TextDecoder().decode(chunk.value)}expect(completed).toBe(false);expect(prefix).not.toContain('turn.completed');abort.abort();const resumeAbort=new AbortController();const resumed=await fetch(`${base}/api/v1/sessions/${id}/events?cursor=0`,{headers:{Cookie:a.Cookie,'Last-Event-ID':'1'},signal:resumeAbort.signal});const resumedReader=resumed.body!.getReader();let tail='';try{while(!tail.includes('turn.completed')){const chunk=await resumedReader.read();tail+=new TextDecoder().decode(chunk.value)}}finally{resumeAbort.abort()}expect(tail.match(/^id: \d+/gm)).toEqual(['id: 2','id: 3','id: 4']);expect((await turn).status).toBe(201)});
 });
+
+it('protects the idempotent opening endpoint with account ownership, UUID validation and CSRF', async () => {
+  const a = await identity('opening-owner'), b = await identity('opening-other');
+  const s = await start(a), id = String(s.body.id);
+  await request(app.getHttpServer()).post(`/api/v1/sessions/${id}/opening`).expect(401);
+  await request(app.getHttpServer()).post(`/api/v1/sessions/${id}/opening`).set(b).expect(404);
+  await request(app.getHttpServer()).post('/api/v1/sessions/not-a-uuid/opening').set(a).expect(400);
+  await request(app.getHttpServer()).post(`/api/v1/sessions/${id}/opening`).set({Cookie: a.Cookie, Origin: origin}).expect(400);
+  const first = await request(app.getHttpServer()).post(`/api/v1/sessions/${id}/opening`).set(a).expect(201);
+  const second = await request(app.getHttpServer()).post(`/api/v1/sessions/${id}/opening`).set(a).expect(201);
+  expect(second.body.turns).toEqual(first.body.turns);
+});

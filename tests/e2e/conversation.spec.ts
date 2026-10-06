@@ -1,8 +1,10 @@
+import {learnerStarts} from './session-initiator.js';
 import { randomUUID } from 'node:crypto';
 import { test, expect, type Page } from '@playwright/test';
 
 // Each test owns a learner so unfinished practices cannot affect another flow.
 test.beforeEach(async ({ page }) => {
+  await learnerStarts(page);
   const subject = `conversation-e2e-${randomUUID()}`;
   await page.route('**/api/v1/auth/synthetic-login', (route) => route.continue({
     postData: JSON.stringify({ subject }),

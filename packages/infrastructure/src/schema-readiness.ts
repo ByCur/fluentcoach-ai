@@ -7,6 +7,7 @@ export const M09_MIGRATION = '202610050003_m09_plans_progress';
 export const M10_MIGRATION = '202610060001_m10_privacy';
 export const ROADMAP_MIGRATION = '202610060003_roadmap';
 const requiredMigrations = [
+ ROADMAP_MIGRATION,
  '202610060002_m11_release_control',
  RELEASE_MIGRATION,
  M10_MIGRATION,

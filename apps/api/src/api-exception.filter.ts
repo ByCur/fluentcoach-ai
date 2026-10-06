@@ -47,6 +47,14 @@ export class ApiExceptionFilter implements ExceptionFilter {
         });
       return;
     }
+    if (error instanceof Error && error.message === 'OPEN_SESSION_LIMIT') {
+      response.status(409).json({ error: {
+        code: 'OPEN_SESSION_LIMIT',
+        message: 'Tienes cinco prácticas sin terminar. Abre una desde Práctica libre y termínala antes de continuar tu ruta. Tus conversaciones se conservan.',
+        retryable: false,
+      } });
+      return;
+    }
     if (
       error instanceof Error &&
       [

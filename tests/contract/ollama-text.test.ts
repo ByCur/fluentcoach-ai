@@ -232,3 +232,19 @@ it('roadmap-selection-v1 only sends safe candidates and bounded personalization 
   expect(body.options).toEqual({temperature: 0, num_predict: 256});
   expect(body.format.additionalProperties).toBe(false);
 });
+
+it.each(['A1','A2','B1','B2'] as const)('generates a versioned, short %s opener from scenario and roadmap context without a learner pseudo-message', async level => {
+  const request = vi.fn<typeof fetch>().mockResolvedValue(response(completion('Hello! What would you like to order?')));
+  const adapter = new OllamaTextAdapter({}, request);
+  const result = await adapter.opening({...context, snapshot: {...context.snapshot, level}, activity: {title: 'Conversación: En un restaurante', type: 'conversation'}}, options());
+  expect(result.metadata.promptVersion).toBe('tutor-opening-v1');
+  const body = JSON.parse(request.mock.calls[0]![1]!.body as string) as {options: {num_predict: number}; messages: {role: string; content: string}[]};
+  expect(body.options.num_predict).toBe(160);
+  expect(body.messages[0]!.content).toContain(`scenario restaurant at ${level}`);
+  expect(body.messages[0]!.content).toContain('1–2 sentences');
+  expect(body.messages[0]!.content).toContain('official assessment');
+  const input = JSON.parse(body.messages[1]!.content) as Record<string, unknown>;
+  expect(input).toEqual({snapshot: {...context.snapshot, level}, activity: {title: 'Conversación: En un restaurante', type: 'conversation'}});
+  expect(input).not.toHaveProperty('input');
+  expect(input).not.toHaveProperty('turns');
+});

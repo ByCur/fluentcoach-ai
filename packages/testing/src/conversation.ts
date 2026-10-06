@@ -8,6 +8,15 @@ import type {
 } from '@fluentcoach/application';
 export class FakeConversationProvider implements ConversationProvider {
   constructor(private readonly delayMs = 0) {}
+  async opening(context: TutorContext, options: AiCallOptions) {
+    if (this.delayMs) await new Promise(resolve => setTimeout(resolve, this.delayMs));
+    if (options.signal?.aborted) throw new AiError('cancelled');
+    return {text: context.snapshot.scenarioSlug === 'hotel'
+      ? 'Hello! Do you have a reservation?'
+      : context.snapshot.scenarioSlug === 'travel'
+        ? 'Hi! Where would you like to travel?'
+        : 'Hi! What would you like to talk about today?'};
+  }
   async *stream(context: TutorContext, input: string, options?: AiCallOptions) {
     if (options?.signal?.aborted) throw new AiError('cancelled');
     if (options && options.deadline.getTime() <= Date.now())

@@ -17,7 +17,7 @@ CMD ["packages/infrastructure/node_modules/.bin/prisma", "migrate", "deploy", "-
 FROM node:20.20.2-alpine3.22 AS api
 ARG RELEASE_COMMIT_SHA=unreleased
 LABEL org.opencontainers.image.revision=$RELEASE_COMMIT_SHA
-ENV RELEASE_COMMIT_SHA=$RELEASE_COMMIT_SHA RELEASE_MIGRATION_VERSION=202610060003_roadmap
+ENV RELEASE_COMMIT_SHA=$RELEASE_COMMIT_SHA RELEASE_MIGRATION_VERSION=202610070001_tutor_opening_progress
 ENV NODE_ENV=production
 RUN --mount=type=secret,id=proxy_ca if [ -f /run/secrets/proxy_ca ]; then cat /etc/ssl/certs/ca-certificates.crt /run/secrets/proxy_ca > /tmp/m10-ca.pem; export SSL_CERT_FILE=/tmp/m10-ca.pem; fi; apk upgrade --no-cache; rm -f /tmp/m10-ca.pem
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/pnpm /usr/local/bin/pnpx
