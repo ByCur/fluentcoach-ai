@@ -8,7 +8,7 @@ export function VocabularyPanel({csrf}:{csrf:string}){
  const post=async(path:string,body:unknown={})=>{setBusy(true);try{const r=await fetch('/api/v1/vocabulary'+path,{method:'POST',credentials:'include',headers:{'content-type':'application/json','x-csrf-token':csrf},body:JSON.stringify(body)});if(r.ok)await load();return r;}finally{setBusy(false);}};
  const review=async(card:Card,rating:'again'|'hard'|'good'|'easy')=>{const key=crypto.randomUUID();const r=await post(`/cards/${card.id}/reviews`,{rating,reviewKey:key,expectedVersion:card.version});if(r.ok){const result=await r.json() as {card:Card};setNext(new Intl.DateTimeFormat('es',{dateStyle:'medium',timeStyle:'short'}).format(new Date(result.card.dueAt)));}};
  return <section aria-labelledby="vocabulary-title" className="vocabulary">
-  <h2 id="vocabulary-title">Vocabulario para repasar</h2>
+  <h2 id="vocabulary-title">Mi vocabulario</h2>
   <button className="secondary" disabled={busy} onClick={()=>void load()}>Actualizar vocabulario</button>
   {!suggestions.length&&<p>No hay sugerencias pendientes.</p>}
   {suggestions.map(s=><article key={s.id}><h3>{s.phrase}</h3>{s.meaning&&<p>{s.meaning}</p>}<div><button disabled={busy} onClick={()=>void post(`/suggestions/${s.id}/confirm`)}>Añadir al repaso</button> <button className="secondary" disabled={busy} onClick={()=>void post(`/suggestions/${s.id}/ignore`)}>Ignorar</button></div></article>)}

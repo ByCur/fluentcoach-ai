@@ -4,3 +4,32 @@
 .vocabulary article{border:1px solid #cbd9d2;border-radius:14px;padding:1rem;background:#f7fbf8}.vocabulary article h3{margin-top:0}.ratings{display:flex;gap:.5rem;flex-wrap:wrap}.ratings button{flex:1 1 7rem}
 
 :focus-visible{outline:3px solid #176a54;outline-offset:3px}button:disabled{opacity:.65;cursor:not-allowed}a{color:#125b48;text-decoration:underline}
+
+/* Learner navigation and a calm, single-column home. */
+.learner-shell{width:min(880px,calc(100% - 2rem))}
+.learner-header{display:flex;align-items:flex-start;gap:1rem}
+.learner-header h1{font-size:clamp(1.8rem,5vw,2.7rem);line-height:1.15;margin-bottom:1rem}
+.profile-menu{position:relative;flex-shrink:0;margin-left:auto}
+.profile-trigger{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;min-height:48px}
+.profile-trigger span{background:none;padding:0;font-weight:700}
+.avatar{width:32px;height:32px;background:#d6ebe0;border-radius:50%;padding:3px}
+.profile-dropdown{position:absolute;right:0;top:calc(100% + .5rem);z-index:10;width:min(260px,calc(100vw - 3rem));display:flex;flex-direction:column;gap:.2rem;padding:.5rem;background:white;border:1px solid #cbd9d2;border-radius:14px;box-shadow:0 12px 30px #19463825}
+.profile-dropdown button{text-align:left;min-height:44px;background:white;font-weight:600}
+.profile-dropdown button:hover{background:#e7efeb}
+.profile-dropdown .logout{border-top:1px solid #cbd9d2;border-radius:0 0 8px 8px}
+.main-navigation{justify-content:flex-start;flex-wrap:wrap;margin-bottom:1.5rem}
+.welcome{color:#53655f;line-height:1.6}
+.home-card{padding:1.4rem;border:1px solid #d8e4de;border-radius:18px;gap:.75rem;margin:1rem 0}
+.home-card h2,.home-card h3,.home-card p{margin:0;line-height:1.5}
+.home-card h2{font-size:1.45rem}
+.home-card h3{font-size:1.1rem}
+.home-card>button{justify-self:start}
+.practice-card{background:#eef8f2;border-color:#b8d6c4}
+.summary-list{padding-left:1.2rem;margin:.25rem 0;display:grid;gap:1rem}
+.home-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;margin:0}
+.home-metrics dt{font-size:.9rem;line-height:1.5;color:#53655f}
+.home-metrics dd{margin:.3rem 0;font-size:1.4rem;font-weight:700}
+.text-button{background:none;color:#125b48;text-decoration:underline;padding:.25rem;font-weight:600}
+main p,main li{line-height:1.6;overflow-wrap:anywhere}
+nav{flex-wrap:wrap}
+@media(max-width:520px){.learner-shell{width:100%}.learner-header{display:flex}.profile-trigger>span{display:none}.profile-dropdown{width:min(260px,calc(100vw - 3rem))}.home-metrics{grid-template-columns:1fr}.home-card{padding:1rem}.home-card>button{width:100%}}

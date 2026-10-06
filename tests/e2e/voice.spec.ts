@@ -108,31 +108,31 @@ async function enterPractice(page: Page) {
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
-  await expect(page.getByRole('status')).toContainText('Configuración guardada');
-  await page.getByRole('button', { name: 'Practicar' }).click();
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
+  await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/ }).click();
+  await page.getByRole('button', { name: 'Empezar práctica' }).click();
 }
 
 test('push-to-talk uses fake capture/transcription/TTS while text fallback stays usable', async ({ page }) => {
   await installBrowserFakes(page, 'allowed');
   await enterPractice(page);
-  await page.getByRole('button', { name: 'Iniciar turno de voz' }).click();
-  await expect(page.getByRole('status', { name: '' }).filter({ hasText: 'recording' })).toBeVisible();
+  await page.getByRole('button', { name: 'Hablar' }).click();
+  await expect(page.getByRole('status', { name: '' }).filter({ hasText: 'grabando' })).toBeVisible();
   await page.getByRole('button', { name: 'Detener y enviar' }).click();
-  await expect(page.getByText(/learner:.*Synthetic spoken turn/)).toBeVisible();
-  await expect(page.getByText(/tutor:.*Synthetic spoken turn/)).toBeVisible();
-  await expect(page.getByText('Voz: speaking')).toBeVisible();
+  await expect(page.getByText(/Tú:.*Synthetic spoken turn/)).toBeVisible();
+  await expect(page.getByText(/Tutor:.*Synthetic spoken turn/)).toBeVisible();
+  await expect(page.getByText('Voz: hablando el tutor')).toBeVisible();
   await page.getByRole('button', { name: 'Detener voz del tutor' }).click();
   expect(await page.evaluate(() => (window as unknown as { __speechCancelled: boolean }).__speechCancelled)).toBe(true);
   await page.getByLabel('Tu respuesta').fill('Text still works');
   await page.getByRole('button', { name: 'Enviar', exact: true }).click();
-  await expect(page.getByText(/tutor:.*Text still works/)).toBeVisible();
+  await expect(page.getByText(/Tutor:.*Text still works/)).toBeVisible();
 });
 
 test('microphone denial leaves text input usable', async ({ page }) => {
   await installBrowserFakes(page, 'denied');
   await enterPractice(page);
-  await page.getByRole('button', { name: 'Iniciar turno de voz' }).click();
+  await page.getByRole('button', { name: 'Hablar' }).click();
   await expect(page.getByRole('alert')).toContainText('permiso');
   expect(
     await page.evaluate(
@@ -145,7 +145,7 @@ test('microphone denial leaves text input usable', async ({ page }) => {
 });
 
 async function voiceTurn(page: Page) {
-  await page.getByRole('button', { name: 'Iniciar turno de voz' }).click();
+  await page.getByRole('button', { name: 'Hablar' }).click();
   await page.getByRole('button', { name: 'Detener y enviar' }).click();
 }
 
@@ -157,10 +157,10 @@ test('voice streams live, reconciles persisted events, and ignores late duplicat
     const response = page.waitForResponse(r => r.url().endsWith('/voice-turns'))
       .then(r => { completed = true; return r; });
     await voiceTurn(page);
-    await expect(page.getByTestId('tutor-stream')).toHaveText("stream: Let's continue: ");
+    await expect(page.getByTestId('tutor-stream')).toHaveText("Tutor: Let's continue: ");
     expect(completed).toBe(false);
     const record = await (await response).json() as { events: { sequence: number }[] };
-    await expect(page.getByText(/tutor:.*Synthetic spoken turn/)).toHaveCount(turn);
+    await expect(page.getByText(/Tutor:.*Synthetic spoken turn/)).toHaveCount(turn);
     await expect(page.getByTestId('tutor-stream')).toHaveCount(0);
     await expect(page.locator('[data-cursor]')).toHaveAttribute('data-cursor', String(Math.max(...record.events.map(e => e.sequence))));
     // Replay actual received deltas after the POST: the persisted session already includes them.
@@ -184,26 +184,25 @@ test('English local quality preference and selected voice/rate affect the next u
     .toEqual(['natural', 'basic', 'remote']);
   await expect(page.getByLabel('Velocidad')).toHaveValue('0.95');
   await voiceTurn(page);
-  await expect(page.getByText('Voz: speaking')).toBeVisible();
+  await expect(page.getByText('Voz: hablando el tutor')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken.at(-1)))
     .toMatchObject({ voiceURI: 'natural', rate: 0.95, pitch: 1 });
   await page.getByRole('button', { name: 'Detener voz del tutor' }).click();
   await selector.selectOption('basic');
   await page.getByLabel('Velocidad').selectOption('1.1');
   await voiceTurn(page);
-  await expect(page.getByText('Voz: speaking')).toBeVisible();
+  await expect(page.getByText('Voz: hablando el tutor')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken.at(-1)))
     .toMatchObject({ voiceURI: 'basic', rate: 1.1, pitch: 1 });
   expect(await page.evaluate(() => [localStorage.getItem('fluentcoach.tutorVoice'), localStorage.getItem('fluentcoach.tutorRate')]))
     .toEqual(['basic', '1.1']);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Prepara tu aprendizaje' })).toBeVisible();
-  await page.getByRole('button', { name: 'Practicar' }).click();
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+  await expect(page.getByRole('heading', { name: 'Tu espacio de inglés' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continuar práctica', exact: true }).click();
   await expect(selector).toHaveValue('basic');
   await expect(page.getByLabel('Velocidad')).toHaveValue('1.1');
   await voiceTurn(page);
-  await expect(page.getByText('Voz: speaking')).toBeVisible();
+  await expect(page.getByText('Voz: hablando el tutor')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken.at(-1)))
     .toMatchObject({ voiceURI: 'basic', rate: 1.1 });
 });
@@ -224,7 +223,7 @@ test('voiceschanged handles asynchronous arrival, unavailable saved voice, and d
   }, browserVoices);
   await expect(selector).toHaveValue('natural');
   await voiceTurn(page);
-  await expect(page.getByText('Voz: speaking')).toBeVisible();
+  await expect(page.getByText('Voz: hablando el tutor')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken.at(-1)?.voiceURI)).toBe('natural');
   await page.getByRole('button', { name: 'Detener voz del tutor' }).click();
   await page.evaluate(() => {
@@ -234,7 +233,7 @@ test('voiceschanged handles asynchronous arrival, unavailable saved voice, and d
   });
   await expect(selector).toHaveValue('remote');
   await voiceTurn(page);
-  await expect(page.getByText('Voz: speaking')).toBeVisible();
+  await expect(page.getByText('Voz: hablando el tutor')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken.at(-1)?.voiceURI)).toBe('remote');
   await page.getByRole('button', { name: 'Detener voz del tutor' }).click();
   await page.evaluate(() => {
@@ -243,7 +242,7 @@ test('voiceschanged handles asynchronous arrival, unavailable saved voice, and d
   });
   await expect(selector).toBeDisabled();
   await voiceTurn(page);
-  await expect(page.getByText('Voz: speaking')).toBeVisible();
+  await expect(page.getByText('Voz: hablando el tutor')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken.at(-1)?.voiceURI)).toBeNull();
 });
 
@@ -269,7 +268,7 @@ test('blocked browser storage keeps voice/rate controls and playback usable', as
   await page.getByRole('combobox', { name: 'Voz del tutor', exact: true }).selectOption('basic');
   await page.getByLabel('Velocidad').selectOption('1.15');
   await voiceTurn(page);
-  await expect(page.getByText('Voz: speaking')).toBeVisible();
+  await expect(page.getByText('Voz: hablando el tutor')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken.at(-1)))
     .toMatchObject({ voiceURI: 'basic', rate: 1.15 });
 });
@@ -279,13 +278,13 @@ test('mute prevents playback and unmute only speaks the next tutor turn; stop ca
   await enterPractice(page);
   await page.getByRole('button', { name: 'Silenciar voz del tutor' }).click();
   await voiceTurn(page);
-  await expect(page.getByText(/tutor:.*Synthetic spoken turn/)).toBeVisible();
+  await expect(page.getByText(/Tutor:.*Synthetic spoken turn/)).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken)).toHaveLength(0);
   await page.getByRole('button', { name: 'Activar voz del tutor' }).click();
   await page.getByLabel('Velocidad').selectOption('0.85');
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken)).toHaveLength(0);
   await voiceTurn(page);
-  await expect(page.getByText('Voz: speaking')).toBeVisible();
+  await expect(page.getByText('Voz: hablando el tutor')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken)).toHaveLength(1);
   await page.evaluate(() => { (window as unknown as SpeechProbe).__speechCancelled = false; });
   await page.getByRole('button', { name: 'Detener voz del tutor' }).click();

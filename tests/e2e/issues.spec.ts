@@ -1,3 +1,4 @@
+import { openLearnerPage } from './learner-navigation.js';
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 test('synthetic sessions cross threshold, expose exact evidence, dismiss across reload and restore', async ({
@@ -17,12 +18,11 @@ test('synthetic sessions cross threshold, expose exact evidence, dismiss across 
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
-  await expect(page.getByRole('status')).toContainText(
-    'Configuración guardada',
-  );
-  await page.getByRole('button', { name: 'Practicar' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
+  await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/ }).click();
+  await openLearnerPage(page, 'Lo que debo mejorar');
   const priorities = page.getByRole('region', {
-    name: 'Prioridades recurrentes',
+    name: 'Lo que debo mejorar',
   });
   await expect(
     priorities.getByRole('heading', { name: 'Tiempos verbales' }),
@@ -31,13 +31,15 @@ test('synthetic sessions cross threshold, expose exact evidence, dismiss across 
     [1, 2],
     [2, 1],
   ] as const) {
-    await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+    await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+    await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/ }).click();
+    await page.getByRole('button', { name: 'Empezar práctica' }).click();
     for (let turn = 0; turn < count; turn++) {
       const text = `Yesterday I go to hotel session ${sessionIndex} turn ${turn}`;
       await page.getByLabel('Tu respuesta').fill(text);
       await page.getByRole('button', { name: 'Enviar', exact: true }).click();
       await expect(
-        page.getByText(`learner: ${text}`, { exact: true }),
+        page.getByText(`Tú: ${text}`, { exact: true }),
       ).toBeVisible();
     }
     await page.getByRole('button', { name: 'Terminar' }).click();
@@ -46,8 +48,9 @@ test('synthetic sessions cross threshold, expose exact evidence, dismiss across 
       timeout: 15000,
     });
     await report.getByRole('button', { name: 'Cerrar informe' }).click();
+    await openLearnerPage(page, 'Lo que debo mejorar');
     await priorities
-      .getByRole('button', { name: 'Actualizar prioridades' })
+      .getByRole('button', { name: 'Actualizar mis ejemplos' })
       .click();
     if (sessionIndex === 1)
       await expect(
@@ -75,12 +78,12 @@ test('synthetic sessions cross threshold, expose exact evidence, dismiss across 
     priorities.getByRole('heading', { name: 'Tiempos verbales' }),
   ).toHaveCount(0);
   await page.reload();
-  await page.getByRole('button', { name: 'Practicar' }).click();
+  await openLearnerPage(page, 'Lo que debo mejorar');
   await expect(
     priorities.getByRole('heading', { name: 'Tiempos verbales' }),
   ).toHaveCount(0);
   await priorities
-    .getByText('Prioridades descartadas', { exact: true })
+    .getByText('Aspectos que has apartado', { exact: true })
     .click();
   await priorities
     .getByRole('button', { name: 'Restaurar · Tiempos verbales' })

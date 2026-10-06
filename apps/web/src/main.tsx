@@ -1,4 +1,8 @@
 import { waitForApi, type ConnectionState } from './reconnect.js';
+import { LearnerHome } from './learner-home.js';
+import { ProfileMenu, learnerPages, type LearnerPage } from './learner-navigation.js';
+import { scenarioLabels, sessionLabels, voiceLabels } from './learner-wording.js';
+import type { PlanActivity } from '@fluentcoach/application';
 import { PrivacyPanel } from './privacy-panel.js';
 import { PlanProgressPanel } from './plan-progress-panel.js';
 import { ActiveTypingTimer } from './active-typing.js';
@@ -60,6 +64,13 @@ function App() {
   const [authMode,setAuthMode]=useState<'synthetic'|'oidc'|null>(null);
   const [connectionAttempt,setConnectionAttempt]=useState(0);
   const [privacy,setPrivacy]=useState(false);
+  const [page, setPage] = useState<LearnerPage>('profile');
+  const [configured, setConfigured] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [navigationError, setNavigationError] = useState('');
+  const [navigationAttempt, setNavigationAttempt] = useState(0);
+  const pageHeading = useRef<HTMLHeadingElement>(null);
+  const [resumeSession, setResumeSession] = useState<(SessionResponse & { snapshot: { level: string; mode: string } }) | null>(null);
   const [deleted,setDeleted]=useState(false);
   const [auth, setAuth] = useState(false),
     [csrf, setCsrf] = useState(''),
@@ -150,6 +161,10 @@ function App() {
         csrfBody = (await csrfResponse.json()) as CsrfResponse;
       setCsrf(csrfBody.csrfToken);
       setAuth(true);
+      if (pv && gv && cv.some((consent) => consent.purpose === currentConsent.purpose && consent.policyVersion === currentConsent.policyVersion && consent.providerDisclosureVersion === currentConsent.providerDisclosureVersion && consent.revokedAt === null)) {
+        setConfigured(true);
+        setPage('home');
+      }
       if (pv)
         setData((x) => ({
           ...x,
@@ -200,7 +215,7 @@ function App() {
       setCursor(value.sequence);
       if (value.kind === 'provider.failed') {
         setProviderError(
-          'El proveedor no está disponible. Tu respuesta se conserva; puedes volver a intentarlo.',
+          'El tutor no está disponible. Tu respuesta se conserva; puedes volver a intentarlo.',
         );
         setStreamed('');
       }
@@ -226,6 +241,89 @@ function App() {
     utterance.onend = utterance.onerror = () => setVoiceState('idle');
     window.speechSynthesis.speak(utterance);
   }, [session, muted, speech.voice, speech.rate]);
+  useEffect(() => {
+    pageHeading.current?.focus();
+  }, [page, practice, configured]);
+  useEffect(() => {
+    if (!auth || !configured || practice || page !== 'home') return;
+    const controller = new AbortController();
+    void api('/sessions', { signal: controller.signal }).then(async (response) => {
+      if (!response.ok) throw Error('LOAD_FAILED');
+      const records = await response.json() as (SessionResponse & { state: string; snapshot: { level: string; mode: string } })[];
+      if (!controller.signal.aborted) setResumeSession(records.find((record) => ['created', 'active'].includes(record.state)) ?? null);
+    }).catch(() => {
+      if (!controller.signal.aborted) setNavigationError('No pudimos cargar tus prácticas anteriores. Puedes volver a abrir Inicio para reintentar.');
+    });
+    return () => controller.abort();
+  }, [auth, configured, practice, page, navigationAttempt]);
+  const navigate = (next: LearnerPage) => {
+    setPractice(false);
+    setPrivacy(false);
+    setPage(next);
+    if (next === 'profile') setStep(1);
+    if (next === 'home') setNavigationAttempt((value) => value + 1);
+    setNavigationError('');
+    setMessage('');
+    pageHeading.current?.focus();
+  };
+  const openPractice = () => {
+    if (!session && resumeSession) {
+      cursorRef.current = 0;
+      reconcileSession(resumeSession);
+      setLevel(resumeSession.snapshot.level);
+      setMode(resumeSession.snapshot.mode);
+      spokenTurnCountRef.current = resumeSession.turns.filter((turn) => turn.speaker === 'tutor').length;
+    } else if (!session) setLevel(data.cefrLevel);
+    setPractice(true);
+  };
+  const startPlannedSession = (id: string, activity: PlanActivity) => {
+    setPracticeObjective(activity.title + ' · ' + activity.rationale);
+    spokenTurnCountRef.current = 0;
+    typing.current.reset();
+    pendingDuration.current = null;
+    setTurnKey('');
+    setText('');
+    cursorRef.current = 0;
+    setCursor(0);
+    setSession({ id, turns: [] });
+    setPractice(true);
+    void api('/sessions').then(async (response) => {
+      if (!response.ok) throw Error('LOAD_FAILED');
+      const records = await response.json() as (SessionResponse & { snapshot: { level: string; mode: string } })[];
+      const record = records.find((value) => value.id === id);
+      if (record) {
+        reconcileSession(record);
+        setLevel(record.snapshot.level);
+        setMode(record.snapshot.mode);
+      }
+    }).catch(() => setProviderError('No pudimos cargar la práctica.'));
+  };
+  const logout = async () => {
+    setLogoutBusy(true);
+    setNavigationError('');
+    try {
+      const response = await api('/auth/logout', { method: 'POST' });
+      if (!response.ok) throw Error('LOGOUT_FAILED');
+      window.speechSynthesis?.cancel();
+      recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
+      // Reload clears account-owned UI state after the server invalidates the session.
+      window.location.reload();
+    } catch {
+      setNavigationError('No pudimos cerrar la sesión. Vuelve a intentarlo.');
+      setLogoutBusy(false);
+    }
+  };
+  const profileMenu = <ProfileMenu onNavigate={navigate} onLogout={() => void logout()} busy={logoutBusy} />;
+  const header = (title: string) => <>
+    <header className="learner-header">
+      <div><p className="eyebrow">FluentCoach</p><h1 ref={pageHeading} tabIndex={-1}>{title}</h1></div>
+      {profileMenu}
+    </header>
+    <nav className="main-navigation" aria-label="Navegación principal">
+      <button className="secondary" aria-current={!practice && page === 'home' ? 'page' : undefined} onClick={() => navigate('home')}>Inicio</button>
+    </nav>
+    {navigationError && <p role="alert">{navigationError}</p>}
+  </>;
   const login = async () => {
     if(!authMode)return;
     if(authMode==='oidc'){window.location.assign(`${API}/auth/login`);return;}
@@ -267,6 +365,7 @@ function App() {
       method: 'POST',
       body: JSON.stringify(body),
     });
+    if (r.ok) { setConfigured(true); setPage('home'); }
     setMessage(
       r.ok
         ? 'Configuración guardada. Tu perfil está listo.'
@@ -274,7 +373,7 @@ function App() {
     );
   };
   if(deleted)return <main><h1>Eliminación iniciada</h1><p role="status">Se ha cerrado tu sesión. Tus datos se están eliminando.</p></main>;
-  if(auth&&privacy)return <PrivacyPanel csrf={csrf} onClose={()=>setPrivacy(false)} onDeleted={()=>{window.speechSynthesis?.cancel();recorderRef.current?.stream.getTracks().forEach(track=>track.stop());audioChunksRef.current=[];recorderRef.current=null;setSession(null);setHistory([]);setReportId(null);setPractice(false);setData(initial);setCsrf('');setAuth(false);setPrivacy(false);setDeleted(true);}}/>;
+  if(auth&&privacy)return <PrivacyPanel profileMenu={profileMenu} navigationError={navigationError} csrf={csrf} onClose={()=>setPrivacy(false)} onDeleted={()=>{window.speechSynthesis?.cancel();recorderRef.current?.stream.getTracks().forEach(track=>track.stop());audioChunksRef.current=[];recorderRef.current=null;setSession(null);setHistory([]);setReportId(null);setPractice(false);setData(initial);setCsrf('');setAuth(false);setPrivacy(false);setDeleted(true);}}/>;
   if (practice) {
     const checked = async (path: string, options: RequestInit = {}) => {
       const response = await api(path, options);
@@ -284,7 +383,7 @@ function App() {
         };
         throw Error(
           body.error?.message ??
-            'El proveedor no está disponible. Puedes volver a intentarlo.',
+            'El tutor no está disponible. Puedes volver a intentarlo.',
         );
       }
       return response;
@@ -347,7 +446,7 @@ function App() {
         setProviderError(
           e instanceof Error
             ? e.message
-            : 'El proveedor no está disponible. Puedes volver a intentarlo.',
+            : 'El tutor no está disponible. Puedes volver a intentarlo.',
         );
       } finally {
         setBusy(false);
@@ -471,6 +570,8 @@ function App() {
         await checked(`/sessions/${session.id}/end`, { method: 'POST' });
         setReportId(session.id);
         setSession(null);
+        setResumeSession(null);
+        setPracticeObjective('');
         setProviderError('');
         const r = await checked('/sessions');
         setHistory(
@@ -490,16 +591,7 @@ function App() {
     };
     return (
       <main>
-        <header>
-          <div>
-            <p className="eyebrow">FluentCoach AI</p>
-            <h1>Práctica en inglés</h1>
-          </div>
-          <button className="secondary" onClick={() => setPractice(false)}>
-            Perfil
-          </button>
-        </header>
-        <button className="secondary" onClick={()=>setPrivacy(true)}>Privacidad y tus datos</button>
+        {header('Práctica en inglés')}
         {connection!=='ready'&&<p role="status">{connection==='unavailable'?'No hay conexión. Tu sesión se conserva. Vuelve a abrir Practicar para reconectar.':'Reconectando… Tu sesión se conserva.'}</p>}
         {providerError && <p role="alert">{providerError}</p>}
         {reportId && (
@@ -509,48 +601,11 @@ function App() {
             onClose={() => setReportId(null)}
           />
         )}{' '}
-        {!session && (
-          <>
-            <PlanProgressPanel
-              csrf={csrf}
-              onEvidence={setReportId}
-              onStart={(id, activity) => {
-                setPracticeObjective(
-                  activity.title + ' · ' + activity.rationale,
-                );
-                spokenTurnCountRef.current = 0;
-                typing.current.reset();
-                pendingDuration.current = null;
-                setTurnKey('');
-                setText('');
-                cursorRef.current = 0;
-                setCursor(0);
-                setSession({ id, turns: [] });
-                void checked('/sessions')
-                  .then(async (r) => {
-                    const records = (await r.json()) as (SessionResponse & {
-                      snapshot: { level: string; mode: string };
-                    })[];
-                    const record = records.find((s) => s.id === id);
-                    if (record) {
-                      reconcileSession(record);
-                      setLevel(record.snapshot.level);
-                      setMode(record.snapshot.mode);
-                    }
-                  })
-                  .catch(() =>
-                    setProviderError('No pudimos cargar la sesión.'),
-                  );
-              }}
-            />
-            <IssuesPanel csrf={csrf} />
-            <VocabularyPanel csrf={csrf} />
-          </>
-        )}
         {!session ? (
           <section>
+            <h2>¿Qué quieres practicar?</h2>
             <label>
-              Escenario
+              Situación
               <select
                 value={scenario}
                 onChange={(e) => setScenario(e.target.value)}
@@ -564,7 +619,7 @@ function App() {
                   'free-conversation',
                 ].map((x) => (
                   <option key={x} value={x}>
-                    {x}
+                    {scenarioLabels[x] ?? x}
                   </option>
                 ))}
               </select>
@@ -580,13 +635,13 @@ function App() {
               </select>
             </label>
             <label>
-              Modo
+              Cómo quieres practicar
               <select value={mode} onChange={(e) => setMode(e.target.value)}>
                 <option value="natural">Conversación natural</option>
-                <option value="teaching">Modo enseñanza</option>
+                <option value="teaching">Con ayuda durante la conversación</option>
               </select>
             </label>
-            <button onClick={() => void start()}>Iniciar sesión</button>
+            <button onClick={() => void start()}>Empezar práctica</button>
             <button
               className="secondary"
               onClick={() =>
@@ -606,14 +661,14 @@ function App() {
             {history.map((h) => (
               <div key={h.id}>
                 <p data-session-history={h.id}>
-                  {h.snapshot.scenarioSlug} · {h.state}
+                  {scenarioLabels[h.snapshot.scenarioSlug] ?? h.snapshot.scenarioSlug} · {sessionLabels[h.state] ?? h.state}
                 </p>
                 {['ended', 'abandoned'].includes(h.state) && (
                   <button
                     className="secondary"
                     onClick={() => setReportId(h.id)}
                   >
-                    Ver informe · {h.snapshot.scenarioSlug}
+                    Ver informe · {scenarioLabels[h.snapshot.scenarioSlug] ?? h.snapshot.scenarioSlug}
                   </button>
                 )}
               </div>
@@ -631,12 +686,12 @@ function App() {
             >
               {session.turns.map((t, i) => (
                 <p key={i}>
-                  <strong>{t.speaker}:</strong> {t.text}
+                  <strong>{t.speaker === 'learner' ? 'Tú' : t.speaker === 'tutor' ? 'Tutor' : 'Ayuda'}:</strong> {t.text}
                 </p>
               ))}
               {streamed && (
                 <p data-testid="tutor-stream">
-                  <strong>stream:</strong> {streamed}
+                  <strong>Tutor:</strong> {streamed}
                 </p>
               )}
             </div>
@@ -658,7 +713,7 @@ function App() {
             </label>
             <div className="voice-controls">
               <p role="status" aria-live="polite">
-                Voz: {voiceState === 'idle' ? 'lista' : voiceState}
+                Voz: {voiceLabels[voiceState]}
               </p>
               {voiceState === 'recording' ? (
                 <button type="button" onClick={() => void stopAndSend()}>
@@ -666,7 +721,7 @@ function App() {
                 </button>
               ) : (
                 <button type="button" disabled={busy || voiceState !== 'idle'} onClick={() => void startRecording()}>
-                  Iniciar turno de voz
+                  Hablar
                 </button>
               )}
               <button className="secondary" type="button" onClick={() => { setMuted((value) => !value); stopSpeech(); }}>
@@ -697,7 +752,7 @@ function App() {
                 </select>
               </label>
               <small>
-                La reproducción usa la voz del navegador; FluentCoach no paga una API de TTS y no garantiza que funcione sin conexión.
+                La voz del tutor depende de tu navegador. Puede necesitar conexión a internet.
               </small>
             </div>
             <nav>
@@ -728,25 +783,29 @@ function App() {
         <h1>Practica inglés con confianza.</h1>
         <p>Tu espacio privado para avanzar paso a paso.</p>
         <button onClick={() => void login()}>
-          {authMode==='synthetic'?'Entrar con identidad de desarrollo':'Entrar con tu invitación'}
+          {authMode==='synthetic'?'Entrar en la demo':'Entrar con tu invitación'}
         </button>
         <small>
-          En producción, el acceso será mediante el proveedor OIDC invitado.
+          El acceso a FluentCoach es por invitación.
         </small>
       </main>
     );
+  if (configured && page !== 'profile') return <main className="learner-shell">
+    {header(page === 'home' ? 'Tu espacio de inglés' : learnerPages[page])}
+    {message && <p role="status">{message}</p>}
+    {reportId && <ReportPanel sessionId={reportId} csrf={csrf} onClose={() => setReportId(null)} />}
+    {page === 'home' && <LearnerHome onNavigate={navigate} onPractice={openPractice} continuing={!!session || !!resumeSession} />}
+    {page === 'issues' && <IssuesPanel csrf={csrf} />}
+    {page === 'vocabulary' && <VocabularyPanel csrf={csrf} />}
+    {['plan', 'progress', 'recommendations'].includes(page) && <PlanProgressPanel
+      key={page} view={page as 'plan' | 'progress' | 'recommendations'} csrf={csrf}
+      onEvidence={setReportId} onStart={startPlannedSession} onVocabulary={() => navigate('vocabulary')} />}
+  </main>;
   return (
     <main>
-      <header>
-        <div>
-          <p className="eyebrow">FluentCoach AI</p>
-          <h1>Prepara tu aprendizaje</h1>
-        </div>
-        <span aria-label={`Paso ${step} de 3`}>Paso {step} de 3</span>
-        <button className="secondary" onClick={() => setPractice(true)}>
-          Practicar
-        </button>
-      </header>
+      {header(configured ? 'Mi perfil' : 'Prepara tu aprendizaje')}
+      <p aria-label={`Paso ${step} de 3`}>Paso {step} de 3</p>
+      <button className="secondary" onClick={openPractice}>Practicar</button>
       <button className="secondary" onClick={()=>setPrivacy(true)}>Privacidad y tus datos</button>
       <div className="progress">
         <i style={{ width: `${(step / 3) * 100}%` }} />
@@ -755,7 +814,7 @@ function App() {
         <section>
           <h2>Cuéntanos sobre ti</h2>
           <label>
-            Idioma de la interfaz
+            Idioma de la aplicación
             <select
               value={data.interfaceLanguage}
               onChange={(e) =>
@@ -767,7 +826,7 @@ function App() {
             </select>
           </label>
           <label>
-            Idioma nativo
+            Tu idioma habitual
             <input
               value={data.nativeLanguage}
               onChange={(e) =>

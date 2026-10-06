@@ -1,3 +1,4 @@
+import { openLearnerPage } from './learner-navigation.js';
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 async function onboard(page: import('@playwright/test').Page) {
@@ -12,17 +13,15 @@ async function onboard(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
-  await expect(page.getByRole('status')).toContainText(
-    'Configuración guardada',
-  );
-  await page.getByRole('button', { name: 'Practicar' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
+  await openLearnerPage(page, 'Mi plan');
 }
 test('starter proposal, skip, accept and refresh preserve explicit lifecycle across reload', async ({
   page,
 }) => {
   await onboard(page);
-  const plan = page.getByRole('region', { name: 'Tu plan de práctica' });
-  await plan.getByRole('button', { name: 'Generar/Ver propuesta' }).click();
+  const plan = page.getByRole('region', { name: 'Mi plan' });
+  await plan.getByRole('button', { name: 'Preparar mi plan' }).click();
   await expect(plan).toContainText('Aún no hay suficientes datos');
   const proposal = plan.getByRole('article', { name: 'Propuesta de plan' });
   await proposal
@@ -42,7 +41,7 @@ test('starter proposal, skip, accept and refresh preserve explicit lifecycle acr
     plan.getByRole('article', { name: 'Plan activo' }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole('button', { name: 'Practicar' }).click();
+  await openLearnerPage(page, 'Mi plan');
   await expect(
     plan.getByRole('article', { name: 'Plan activo' }),
   ).toBeVisible();
@@ -58,8 +57,8 @@ test('linked conversation completes only after successful end; text stays separa
   page,
 }) => {
   await onboard(page);
-  const plan = page.getByRole('region', { name: 'Tu plan de práctica' });
-  await plan.getByRole('button', { name: 'Generar/Ver propuesta' }).click();
+  const plan = page.getByRole('region', { name: 'Mi plan' });
+  await plan.getByRole('button', { name: 'Preparar mi plan' }).click();
   await plan.getByRole('button', { name: 'Aceptar plan' }).click();
   await plan
     .getByRole('button', { name: /Practicar Conversación/ })
@@ -71,9 +70,11 @@ test('linked conversation completes only after successful end; text stays separa
   await page.getByRole('button', { name: 'Enviar', exact: true }).click();
   await expect(page.getByLabel('Tu respuesta')).toHaveValue('');
   await page.getByRole('button', { name: 'Terminar' }).click();
+  await openLearnerPage(page, 'Mi plan');
   await expect(
     plan.getByRole('article', { name: 'Plan activo' }),
   ).toContainText('Completada');
+  await openLearnerPage(page, 'Mi progreso');
   await expect(page.getByTestId('completed-sessions')).toContainText('1');
   await expect(page.getByTestId('speaking-minutes')).toHaveText('0.0');
   const metrics = await page.evaluate(

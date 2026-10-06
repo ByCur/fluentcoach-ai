@@ -10,8 +10,12 @@ export function PlanProgressPanel({
   csrf,
   onStart,
   onEvidence,
+  onVocabulary,
+  view,
 }: {
   csrf: string;
+  view: 'plan' | 'progress' | 'recommendations';
+  onVocabulary: () => void;
   onStart: (sessionId: string, activity: PlanActivity) => void;
   onEvidence: (sessionId: string) => void;
 }) {
@@ -42,21 +46,22 @@ export function PlanProgressPanel({
     if (!response.ok)
       throw Error(
         response.status === 409
-          ? 'El plan o sus fuentes han cambiado. Actualiza la vista.'
+          ? 'Tu plan ha cambiado. Actualiza la vista.'
           : 'No pudimos cargar o generar el plan. Puedes reintentarlo; tu progreso se conserva.',
       );
     return response;
   }
   async function load() {
-    const [p, m, i] = await Promise.all([
-      call('/plans/current'),
-      call('/progress'),
-      call('/progress/issues'),
-    ]);
-    setPlans((await p.json()) as typeof plans);
-    setMetrics((await m.json()) as Metrics);
-    setIssues((await i.json()) as IssueTrend[]);
+    if (view === 'progress') {
+      const [m, i] = await Promise.all([call('/progress'), call('/progress/issues')]);
+      setMetrics(await m.json() as Metrics);
+      setIssues(await i.json() as IssueTrend[]);
+    } else {
+      const response = await call('/plans/current');
+      setPlans(await response.json() as typeof plans);
+    }
   }
+
   useEffect(() => {
     void load().catch(() =>
       setMessage(
@@ -73,10 +78,7 @@ export function PlanProgressPanel({
       if (activity) {
         const result = (await response.json()) as { sessionId: string | null };
         if (result.sessionId) onStart(result.sessionId, activity);
-        else
-          setMessage(
-            'Repaso iniciado. Usa la sección Vocabulario para repasar las expresiones pendientes.',
-          );
+        else onVocabulary();
       } else setMessage('Plan guardado.');
       setRequestKey('');
       await load();
@@ -119,7 +121,7 @@ export function PlanProgressPanel({
                   : a.state === 'skipped'
                     ? 'Omitida'
                     : a.state === 'unavailable'
-                      ? 'Fuente no disponible'
+                      ? 'Ejemplo ya no disponible'
                       : a.state === 'started'
                         ? 'Iniciada'
                         : 'Pendiente'}
@@ -131,7 +133,7 @@ export function PlanProgressPanel({
                     className="secondary"
                     onClick={() => onEvidence(e.sessionId)}
                   >
-                    Ver evidencia de sesión
+                    Ver ejemplo de mi práctica
                   </button>
                 </p>
               ))}
@@ -193,11 +195,11 @@ export function PlanProgressPanel({
   }
   return (
     <>
-      <section aria-labelledby="practice-plan">
-        <h2 id="practice-plan">Tu plan de práctica</h2>
+      {view !== 'progress' && <section aria-labelledby="practice-plan">
+        <h2 id="practice-plan">{view === 'recommendations' ? 'Mis recomendaciones' : 'Mi plan'}</h2>
         {!plans.active && !plans.proposal && (
           <p>
-            Genera una propuesta basada en tu nivel seleccionado y tu objetivo.
+            Prepara un plan con actividades para tu nivel y tu ritmo de práctica.
           </p>
         )}
         {plans.active && renderPlan(plans.active)}
@@ -207,15 +209,15 @@ export function PlanProgressPanel({
             disabled={busy}
             onClick={() => generate(plans.active ?? undefined)}
           >
-            Generar/Ver propuesta
+            Preparar mi plan
           </button>
         )}
         <p role="status" aria-live="polite">
           {message}
         </p>
-      </section>
-      <section aria-labelledby="learner-progress">
-        <h2 id="learner-progress">Tu progreso</h2>
+      </section>}
+      {view === 'progress' && <section aria-labelledby="learner-progress">
+        <h2 id="learner-progress">Mi progreso</h2>
         <button
           className="secondary"
           onClick={() =>
@@ -228,7 +230,7 @@ export function PlanProgressPanel({
         </button>
         {metrics && (
           <dl>
-            <dt>Minutos activos esta semana</dt>
+            <dt>Minutos de práctica esta semana</dt>
             <dd data-testid="active-minutes">
               {metrics.activeMinutes.toFixed(1)}
             </dd>
@@ -238,7 +240,7 @@ export function PlanProgressPanel({
             </dd>
             <dt>Minutos de práctica escrita</dt>
             <dd data-testid="text-minutes">{metrics.textMinutes.toFixed(1)}</dd>
-            <dt>Sesiones completadas</dt>
+            <dt>Prácticas terminadas</dt>
             <dd data-testid="completed-sessions">
               {metrics.completedSessions} ({metrics.completedSessionsThisWeek}{' '}
               esta semana)
@@ -260,16 +262,16 @@ export function PlanProgressPanel({
             <dt>Repasos de vocabulario</dt>
             <dd>
               {metrics.reviewsThisWeek} esta semana · {metrics.reviewsToday} hoy
-              · {metrics.dueCards} tarjetas pendientes
+              · {metrics.dueCards} expresiones pendientes
             </dd>
           </dl>
         )}
         <p>
-          Solo actividad aceptada. La espera y el tiempo inactivo no cuentan. La
-          semana empieza el lunes; cada actividad conserva su fecha local
-          original.
+          Cuenta el tiempo de hablar y escribir durante la práctica. La espera no
+          cuenta. La semana empieza el lunes y cada práctica conserva la fecha
+          del lugar donde la hiciste.
         </p>
-        <h3>Observaciones por prioridad</h3>
+        <h3>Aspectos que aparecen en tus prácticas</h3>
         {!issues.length && (
           <p>Datos insuficientes para mostrar una tendencia.</p>
         )}
@@ -288,7 +290,8 @@ export function PlanProgressPanel({
             <p>{i.message}</p>
           </article>
         ))}
-      </section>
+      </section>}
+      {view === 'progress' && <p role="status" aria-live="polite">{message}</p>}
     </>
   );
 }

@@ -1,4 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import { test, expect, type Page } from '@playwright/test';
+
+// Each test owns a learner so unfinished practices cannot affect another flow.
+test.beforeEach(async ({ page }) => {
+  const subject = `reports-e2e-${randomUUID()}`;
+  await page.route('**/api/v1/auth/synthetic-login', (route) => route.continue({
+    postData: JSON.stringify({ subject }),
+  }));
+});
 async function start(page: Page) {
   await page.goto('/');
   const login = page.getByRole('button', { name: /Entrar/ });
@@ -11,12 +20,10 @@ async function start(page: Page) {
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
-  await expect(page.getByRole('status')).toContainText(
-    'Configuración guardada',
-  );
-  await page.getByRole('button', { name: 'Practicar' }).click();
-  await page.getByLabel('Escenario').selectOption('hotel');
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
+  await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/ }).click();
+  await page.getByLabel('Situación').selectOption('hotel');
+  await page.getByRole('button', { name: 'Empezar práctica' }).click();
 }
 test('automatic report cites actual learner text and survives history reload', async ({
   page,
@@ -24,7 +31,7 @@ test('automatic report cites actual learner text and survives history reload', a
   await start(page);
   await page.getByLabel('Tu respuesta').fill('I need a room for two nights');
   await page.getByRole('button', { name: 'Enviar', exact: true }).click();
-  await expect(page.getByText(/learner:.*I need a room/)).toBeVisible();
+  await expect(page.getByText(/Tú:.*I need a room/)).toBeVisible();
   await page.getByRole('button', { name: 'Terminar' }).click();
   const panel = page.getByRole('region', { name: 'Informe de sesión' });
   await expect(panel.getByRole('status')).toContainText('Informe listo', {
@@ -36,12 +43,12 @@ test('automatic report cites actual learner text and survives history reload', a
   ).toBeVisible();
   await expect(panel.getByText(/no certifica tu nivel/)).toBeVisible();
   await page.reload();
-  await page.getByRole('button', { name: 'Practicar' }).click();
+  await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/ }).click();
   await page
     .getByRole('button', { name: 'Ver historial', exact: true })
     .click();
   await page
-    .getByRole('button', { name: 'Ver informe · hotel' })
+    .getByRole('button', { name: 'Ver informe · En un hotel' })
     .first()
     .click();
   await expect(
@@ -55,12 +62,12 @@ test('provider failure is visible and report retry recovers without duplicating 
   await page.getByLabel('Tu respuesta').fill('SYNTHETIC_REPORT_FAILURE');
   await page.getByRole('button', { name: 'Enviar', exact: true }).click();
   await expect(
-    page.getByText(/learner:.*SYNTHETIC_REPORT_FAILURE/),
+    page.getByText(/Tú:.*SYNTHETIC_REPORT_FAILURE/),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Terminar' }).click();
   const panel = page.getByRole('region', { name: 'Informe de sesión' });
   await expect(panel.getByRole('status')).toContainText(
-    'Tu sesión se conserva',
+    'Tu práctica se conserva',
     { timeout: 15000 },
   );
   await panel.getByRole('button', { name: 'Reintentar informe' }).click();
@@ -80,7 +87,7 @@ test('empty session explicitly has no fabricated feedback', async ({
   await expect(panel.getByRole('status')).toContainText(
     'Sin respuestas para analizar',
   );
-  await expect(panel.getByRole('heading', { name: 'Fortalezas' })).toHaveCount(
+  await expect(panel.getByRole('heading', { name: 'Lo que haces bien' })).toHaveCount(
     0,
   );
 });
@@ -88,7 +95,7 @@ test('failed report fetch offers visible reload recovery', async ({ page }) => {
   await start(page);
   await page.getByLabel('Tu respuesta').fill('Hello');
   await page.getByRole('button', { name: 'Enviar', exact: true }).click();
-  await expect(page.getByText(/learner:.*Hello/)).toBeVisible();
+  await expect(page.getByText(/Tú:.*Hello/)).toBeVisible();
   await page.route('**/api/v1/sessions/*/report', (route) =>
     route.fulfill({ status: 503, body: 'unavailable' }),
   );
@@ -134,6 +141,6 @@ test('conversation provider failure preserves input and retries with the same re
   await page.getByRole('button', { name: 'Reintentar respuesta' }).click();
   const payload = (await request).postDataJSON() as { sourceEventKey: string };
   expect(payload.sourceEventKey).toBe(firstKey);
-  await expect(page.getByText(/learner:.*Can I book a room/)).toBeVisible();
+  await expect(page.getByText(/Tú:.*Can I book a room/)).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
