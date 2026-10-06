@@ -1,8 +1,10 @@
+import type { Telemetry } from './telemetry.js';
 import { AiError, type ReportResult } from './ai.js';
 import type { ConversationTurn } from '@fluentcoach/domain';
 export const JOB_ENVELOPE_VERSION = 1 as const;
 export interface AnalysisJob {
   version: 1;
+  deletionEpoch?: number | undefined;
   analysisRunId: string;
   accountId: string;
   sessionId: string;
@@ -15,6 +17,7 @@ export interface AnalysisRun {
   revision: number;
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
   attempts: number;
+  deletionEpoch?: number | undefined;
   leaseUntil?: Date;
   leaseToken?: string;
   errorCode?: string;
@@ -61,6 +64,7 @@ export class JobService {
     private transport: JobTransport,
     private provider: AnalysisProvider,
     private maxAttempts = 3,
+    private readonly telemetry:Telemetry={record:()=>undefined},
   ) {}
   finalize(accountId: string, sessionId: string, hasTurns: boolean) {
     return this.store.finalize({ accountId, sessionId, hasTurns });
@@ -89,10 +93,12 @@ export class JobService {
       new Date(now.getTime() + 30_000),
       this.maxAttempts,
     );
-    if (!run) return 'duplicate';
+    if (!run) {this.telemetry.record({operation:'analysis',outcome:'cancelled',count:1});return 'duplicate';}
+    const started=Date.now();
     try {
       const result = await this.provider.analyze(job);
       await this.store.succeed(run, result.providerRunId, result);
+      this.telemetry.record({operation:'analysis',outcome:'success',durationMs:Date.now()-started,count:1});
       return 'succeeded';
     } catch (error) {
       // Fixed codes only: provider exception names/messages can contain learner data.
@@ -101,6 +107,7 @@ export class JobService {
         error instanceof AiError ? error.code : 'ANALYSIS_ATTEMPT_FAILED',
         run.attempts < this.maxAttempts,
       );
+      this.telemetry.record({operation:'analysis',outcome:'failure',durationMs:Date.now()-started,count:run.attempts});
       return 'failed';
     }
   }

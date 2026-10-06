@@ -1,6 +1,7 @@
+import { OPERATIONAL_LIMITS } from '@fluentcoach/domain';
 import type { AiCallOptions } from './ai.js';
 
-export const SPEECH_TRANSCRIPT_MAX_LENGTH = 8_000;
+export const SPEECH_TRANSCRIPT_MAX_LENGTH = OPERATIONAL_LIMITS.speechTranscriptChars;
 
 export interface SpeechTranscriptionInput {
   audio: Uint8Array;

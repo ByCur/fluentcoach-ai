@@ -1,3 +1,4 @@
+import { OPERATIONAL_LIMITS } from '@fluentcoach/domain';
 import { z } from 'zod';
 import {
   AiError,
@@ -19,7 +20,7 @@ const responseSchema = z.object({
   model: z.string().min(1).max(200),
   message: z.object({
     role: z.literal('assistant'),
-    content: z.string().max(128_000),
+    content: z.string().max(OPERATIONAL_LIMITS.providerJsonChars),
   }),
   done: z.literal(true),
   done_reason: z.string().max(100).optional(),

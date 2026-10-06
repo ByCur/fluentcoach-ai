@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks';
-import { OllamaTextAdapter } from '@fluentcoach/infrastructure';
+import { OllamaTextAdapter, StructuredTelemetry } from '@fluentcoach/infrastructure';
 
 async function main() {
   const provider = 'ollama';
@@ -29,15 +29,13 @@ async function main() {
     console.log(`provider: ${provider}`);
     console.log(`model: ${model}`);
     console.log('status/success: success');
-    console.log(`response: ${response}`);
+    new StructuredTelemetry().record({operation:'conversation',outcome:'success',count:response.length,durationMs:performance.now()-started});
     console.log(`elapsed time: ${Math.round(performance.now() - started)} ms`);
-  } catch (error) {
+  } catch {
     console.log(`provider: ${provider}`);
     console.log(`model: ${model}`);
     console.log('status/success: failed');
-    console.log(
-      `response: ${error instanceof Error ? error.message : 'unknown error'}`,
-    );
+    new StructuredTelemetry().record({operation:'conversation',outcome:'failure',durationMs:performance.now()-started});
     console.log(`elapsed time: ${Math.round(performance.now() - started)} ms`);
     process.exitCode = 1;
   }

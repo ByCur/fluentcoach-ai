@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+# Exact public synthetic development password used by the disposable compose stack.
+[[allowlists]]
+description = "Public synthetic local development credential"
+regexTarget = "match"
+regexes = ['''local-development-only''']

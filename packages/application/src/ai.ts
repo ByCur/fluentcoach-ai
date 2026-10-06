@@ -74,7 +74,7 @@ export interface ReportResult {
   metadata?: ProviderMetadata;
 }
 export interface ReportView {
-  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
+  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped' | 'unavailable';
   errorCode?: string;
   report?: ReportDraft;
   partial: boolean;

@@ -1,3 +1,4 @@
+import { StructuredTelemetry } from '@fluentcoach/infrastructure';
 import {
   Inject,
   Injectable,
@@ -90,7 +91,7 @@ export function createJobs(reports: ReportService) {
             destination: `${process.env['PUBLIC_ORIGIN']}/api/v1/jobs/analysis`,
           })
         : { enqueue: () => Promise.reject(new Error('QSTASH_UNAVAILABLE')) };
-  const jobs = new JobService(new PostgresJobStore(), transport, reports);
+  const jobs = new JobService(new PostgresJobStore(), transport, reports,3,new StructuredTelemetry());
   return jobs;
 }
 @Injectable()

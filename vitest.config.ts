@@ -23,6 +23,8 @@ export default defineConfig({
   test: {
     fileParallelism: false,
     projects: [
+      {resolve:{alias:sourceAliases},test:{name:'privacy',include:['tests/integration/privacy*.test.ts'],testTimeout:30000}},
+      {resolve:{alias:sourceAliases},test:{name:'load',include:['tests/load/**/*.test.ts'],testTimeout:60000}},
       { resolve: { alias: sourceAliases }, test: { name: 'plans', include: ['tests/integration/plans*.test.ts'], testTimeout: 15000 } },
       { resolve: { alias: sourceAliases }, test: { name: 'progress', include: ['tests/integration/progress*.test.ts'], testTimeout: 15000 } },
       {

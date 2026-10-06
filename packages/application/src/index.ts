@@ -40,3 +40,6 @@ export * from './issues.js';
 export * from './vocabulary.js';
 export * from './plans.js';
 export * from './progress.js';
+
+export * from './privacy.js';
+export * from './telemetry.js';

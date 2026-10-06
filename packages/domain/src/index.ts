@@ -39,3 +39,7 @@ export * from './conversation.js';
 export * from './issues.js';
 export * from './vocabulary.js';
 export * from './progress.js';
+
+export * from './privacy.js';
+
+export * from './operational-limits.js';

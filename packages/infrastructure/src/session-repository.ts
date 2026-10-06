@@ -1,3 +1,4 @@
+import { StructuredTelemetry } from './telemetry.js';
 import {
   type SessionRecord,
   AiError,
@@ -75,7 +76,7 @@ export class PostgresSessionRepository implements SessionRepository {
   async get(accountId: string, id: string) {
     const row = (
       await sql<SessionRow>(
-        'SELECT * FROM practice_sessions WHERE account_id=$1 AND id=$2',
+        "SELECT s.* FROM practice_sessions s JOIN accounts a ON a.id=s.account_id WHERE s.account_id=$1 AND s.id=$2 AND a.status='ACTIVE'",
         [accountId, id],
       )
     )[0];
@@ -94,6 +95,7 @@ export class PostgresSessionRepository implements SessionRepository {
     const c = await pool.connect();
     try {
       await c.query('BEGIN');
+      await c.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[r.accountId]);
       const current = (
         await c.query<{
           state: string;
@@ -199,6 +201,7 @@ export class PostgresSessionRepository implements SessionRepository {
     sessionId: string,
     m: ProviderMetadata,
   ) {
+    new StructuredTelemetry().record({operation:'conversation',outcome:'success',durationMs:m.latencyMs,count:1});
     await sql(
       `INSERT INTO provider_runs(account_id,session_id,operation,adapter,model,prompt_version,schema_version,outcome,latency_ms,request_id,input_tokens,output_tokens,finish_reason)SELECT s.account_id,s.id,'conversation',$3,$4,$5,$6,'succeeded',$7,$8,$9,$10,$11 FROM practice_sessions s JOIN accounts a ON a.id=s.account_id WHERE s.id=$2 AND s.account_id=$1 AND a.status='ACTIVE'`,
       [
@@ -218,7 +221,7 @@ export class PostgresSessionRepository implements SessionRepository {
   }
   async history(accountId: string) {
     const rows = await sql<SessionRow>(
-      'SELECT * FROM practice_sessions WHERE account_id=$1 ORDER BY created_at DESC',
+      "SELECT s.* FROM practice_sessions s JOIN accounts a ON a.id=s.account_id WHERE s.account_id=$1 AND a.status='ACTIVE' ORDER BY s.created_at DESC",
       [accountId],
     );
     return Promise.all(rows.map(hydrate));

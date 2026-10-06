@@ -563,3 +563,16 @@ validation remain manual; fake CI does not prove live educational/device quality
 
 The exact local command results and remaining manual gates are recorded in
 [M09 validation](docs/m09-validation.md).
+
+## M10 privacy lifecycle and operational hardening
+
+Implementation ready for technical review; not marked Complete before the M10
+GitHub CI gates execute. See [privacy lifecycle](docs/m10-privacy-lifecycle.md),
+[Prisma/data lifecycle](docs/m10-data-lifecycle.md), [deletion ADR](docs/adr/0015-deletion-epochs-and-tombstone-replay.md),
+[retention ADR](docs/adr/0016-ninety-day-source-retention.md), [restore runbook](docs/m10-restore-runbook.md),
+[security/logging policy](docs/m10-security-policy.md), [accessibility scope](docs/m10-accessibility.md),
+and [load/resilience playbook](docs/m10-load-and-resilience.md).
+Exact commands, counts and measurements are in [M10 validation](docs/m10-validation.md). No M11 deployment
+or cloud/paid resource provisioning is included. External provider
+retention/deletion must be independently verified before enabling any optional
+remote provider for real learner data.

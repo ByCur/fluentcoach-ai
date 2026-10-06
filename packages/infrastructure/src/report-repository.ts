@@ -57,7 +57,10 @@ export class PostgresReportRepository implements ReportRepository {
         [accountId, sessionId],
       )
     )[0];
-    if (!row) return { status: 'pending', partial: false, revision: 0 };
+    if (!row) {
+      const retained=(await sql<{transcript_revision:number}>('SELECT transcript_revision FROM practice_sessions WHERE account_id=$1 AND id=$2',[accountId,sessionId]))[0];
+      return {status:retained?.transcript_revision?'unavailable':'pending',partial:false,revision:retained?.transcript_revision??0};
+    }
     const result: ReportView = {
       status:
         row.status === 'SUCCEEDED' && !row.content

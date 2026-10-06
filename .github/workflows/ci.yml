@@ -68,6 +68,27 @@ jobs:
           BILLING_MODE: free_only
           AI_PROVIDER: fake
           SPEECH_PROVIDER: fake
+      - run: pnpm test:integration:privacy
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          REDIS_URL: "redis://localhost:6379"
+          BILLING_MODE: free_only
+          AI_PROVIDER: fake
+          SPEECH_PROVIDER: fake
+      - run: pnpm test:load
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          REDIS_URL: "redis://localhost:6379"
+          BILLING_MODE: free_only
+          AI_PROVIDER: fake
+          SPEECH_PROVIDER: fake
+      - run: pnpm test:resilience
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          REDIS_URL: "redis://localhost:6379"
+          BILLING_MODE: free_only
+          AI_PROVIDER: fake
+          SPEECH_PROVIDER: fake
       - run: pnpm eval:ai -- --suite pilot-text --billing-mode free_only
       - run: pnpm test:resilience:jobs
         env: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach" }
@@ -118,6 +139,18 @@ jobs:
           BILLING_MODE: free_only
           AI_PROVIDER: fake
           SPEECH_PROVIDER: fake
+      - run: pnpm test:a11y
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach"
+          REDIS_URL: "redis://localhost:6379"
+          BILLING_MODE: free_only
+          AI_PROVIDER: fake
+          SPEECH_PROVIDER: fake
+      - run: docker compose exec -T postgres psql -U fluentcoach -d postgres -c 'CREATE DATABASE fluentcoach_restore_test'
+      - run: pnpm drill:restore
+        env:
+          DATABASE_URL: "postgresql://fluentcoach:local-development-only@localhost:5432/fluentcoach_restore_test"
+          PRIVACY_DRILL_DISPOSABLE: "1"
       - run: pnpm test:smoke
       - if: always()
         run: docker compose logs --no-color && docker compose down --volumes
@@ -125,6 +158,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - run: docker build --target api -t fluentcoach-api:${{ github.sha }} .
-      - run: docker build --target worker -t fluentcoach-worker:${{ github.sha }} .
-      - run: docker build --target web -t fluentcoach-web:${{ github.sha }} .
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.1, run_install: false }
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: sh scripts/install-security-scanners.sh "$RUNNER_TEMP/m10-scanners"
+      - run: echo "$RUNNER_TEMP/m10-scanners" >> "$GITHUB_PATH"
+      - run: docker build --target api -t fluentcoach-api:security .
+      - run: docker build --target worker -t fluentcoach-worker:security .
+      - run: docker build --target web -t fluentcoach-web:security .
+      - run: pnpm test:security

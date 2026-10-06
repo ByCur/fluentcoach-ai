@@ -4,6 +4,7 @@ import { performance } from 'node:perf_hooks';
 import {
   WhisperCppTranscriber,
   loadSpeechConfig,
+  StructuredTelemetry,
 } from '@fluentcoach/infrastructure';
 
 async function main() {
@@ -37,14 +38,12 @@ async function main() {
     );
     console.log(`provider: ${provider}`);
     console.log('status/success: success');
-    console.log(`transcript: ${result.transcript}`);
+    new StructuredTelemetry().record({operation:'speech',outcome:'success',count:result.transcript.length,durationMs:performance.now()-started});
     console.log(`elapsed time: ${Math.round(performance.now() - started)} ms`);
-  } catch (error) {
+  } catch {
     console.log(`provider: ${provider}`);
     console.log('status/success: failed');
-    console.log(
-      `transcript: ${error instanceof Error ? error.message : 'unknown error'}`,
-    );
+    new StructuredTelemetry().record({operation:'speech',outcome:'failure',durationMs:performance.now()-started});
     console.log(`elapsed time: ${Math.round(performance.now() - started)} ms`);
     process.exitCode = 1;
   }

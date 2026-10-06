@@ -17,6 +17,7 @@ enum CefrLevel {
 }
 
 model Account {
+ deletionEpoch Int @default(0) @map("deletion_epoch")
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   oidcIssuer String @map("oidc_issuer")
   oidcSubject String @map("oidc_subject")
@@ -162,6 +163,7 @@ enum ConversationMode {
   TEACHING
 }
 model PracticeSession {
+ deletionEpoch Int @default(0) @map("deletion_epoch")
  practiceEvents PracticeEvent[]
  planActivities LearningPlanActivity[]
  turnLeaseToken String? @map("turn_lease_token") @db.Uuid
@@ -229,6 +231,7 @@ enum AnalysisStatus {
   SKIPPED
 }
 model AnalysisRun {
+ deletionEpoch Int @default(0) @map("deletion_epoch")
  leaseToken String? @map("lease_token") @db.Uuid
  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  sessionId String @map("session_id") @db.Uuid
@@ -386,6 +389,7 @@ model IssueDismissal {
 
 // Partial current-plan indexes, checks, date/immutability triggers are owned by M09 SQL.
 model LearningPlan {
+ deletionEpoch Int @default(0) @map("deletion_epoch")
  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  accountId String @map("account_id") @db.Uuid
  schemaVersion String @map("schema_version") @db.VarChar(40)
@@ -451,4 +455,39 @@ model PracticeEvent {
  @@unique([accountId,sessionId,sourceKey])
  @@index([accountId,localDate],map:"practice_events_account_date_idx")
  @@map("practice_events")
+}
+
+model PrivacyJob {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ kind String @db.VarChar(12)
+ version String @default("privacy-job-v1") @db.VarChar(40)
+ state String @default("pending") @db.VarChar(12)
+ requestKey String @map("request_key") @db.Uuid
+ deletionEpoch Int @map("deletion_epoch")
+ attempts Int @default(0)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ startedAt DateTime? @map("started_at") @db.Timestamptz
+ completedAt DateTime? @map("completed_at") @db.Timestamptz
+ errorCode String? @map("error_code") @db.VarChar(40)
+ @@unique([accountId,kind,requestKey])
+ @@unique([id,accountId])
+ @@map("privacy_jobs")
+}
+model PrivacyExportArtifact {
+ jobId String @id @map("job_id") @db.Uuid
+ accountId String @map("account_id") @db.Uuid
+ content Json
+ sizeBytes Int @map("size_bytes")
+ expiresAt DateTime @map("expires_at") @db.Timestamptz
+ @@map("privacy_export_artifacts")
+}
+model DeletionTombstone {
+ accountId String @id @map("account_id") @db.Uuid
+ deletionEpoch Int @map("deletion_epoch")
+ requestedAt DateTime @map("requested_at") @db.Timestamptz
+ completedAt DateTime? @map("completed_at") @db.Timestamptz
+ protocolVersion String @map("protocol_version") @db.VarChar(40)
+ schemaVersion String @map("schema_version") @db.VarChar(40)
+ @@map("deletion_tombstones")
 }

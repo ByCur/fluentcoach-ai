@@ -3,7 +3,9 @@ export const M05_MIGRATION = '202609300004_m05_reports';
 export const M02_MIGRATION = '202609290001_m02_identity';
 export const M08_MIGRATION = '202610050002_m08_vocabulary_reviews';
 export const M09_MIGRATION = '202610050003_m09_plans_progress';
+export const M10_MIGRATION = '202610060001_m10_privacy';
 const requiredMigrations = [
+ M10_MIGRATION,
   M09_MIGRATION,
   M08_MIGRATION,
   '202610050001_m07_recurring_issues',
@@ -13,6 +15,10 @@ const requiredMigrations = [
   '202609300005_m05_hardening_compatibility',
 ];
 const requiredColumns = [
+ ['accounts','deletion_epoch'], ['practice_sessions','deletion_epoch'], ['analysis_runs','deletion_epoch'], ['learning_plans','deletion_epoch'],
+ ...['id','account_id','kind','version','state','request_key','deletion_epoch','attempts','created_at','started_at','completed_at','error_code'].map(c=>['privacy_jobs',c]),
+ ...['job_id','account_id','content','size_bytes','expires_at'].map(c=>['privacy_export_artifacts',c]),
+ ...['account_id','deletion_epoch','requested_at','completed_at','protocol_version','schema_version'].map(c=>['deletion_tombstones',c]),
   ['learning_plans', 'id'],
   ['learning_plans', 'account_id'],
   ['learning_plans', 'schema_version'],
