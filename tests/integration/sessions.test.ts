@@ -10,6 +10,7 @@ describe('M03 PostgreSQL sessions', () => {
     for (const scenario of service.scenarios()) for (const level of ['A1','A2','B1','B2'] as const) {
       const s = await service.start(a.id, {scenarioSlug: scenario.slug, level, mode: 'natural'});
       expect((await new PostgresSessionRepository().get(a.id, s.id))?.snapshot).toEqual({...s.snapshot, level, scenarioVersion: 1});
+      await service.end(a.id,s.id); // Release one of the five M10 open-session slots.
     }
     await sql("UPDATE learner_profiles SET cefr_level='B2' WHERE account_id=$1", [a.id]);
     expect((await service.history(a.id)).filter(s => s.snapshot.level === 'A1')).toHaveLength(6);

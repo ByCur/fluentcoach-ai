@@ -88,6 +88,8 @@ export function ReportPanel({
         {error ||
           (!view
             ? 'Cargando informe…'
+            : view.status === 'unavailable'
+              ? 'Este informe ya no está disponible por la política de conservación de 90 días.'
             : view.status === 'pending'
               ? 'Informe pendiente'
               : view.status === 'running'

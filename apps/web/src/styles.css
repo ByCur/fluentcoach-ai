@@ -2,3 +2,5 @@
 .voice-controls{padding:1rem;border:1px solid #cbd9d2;border-radius:14px;background:#f7fbf8;display:flex;gap:.65rem;align-items:center;flex-wrap:wrap}.voice-controls p{flex-basis:100%;margin:0;font-weight:700}.voice-controls small{flex-basis:100%;margin:0}
 .voice-controls label{flex:1 1 12rem;min-width:0}.voice-controls select{max-width:100%}
 .vocabulary article{border:1px solid #cbd9d2;border-radius:14px;padding:1rem;background:#f7fbf8}.vocabulary article h3{margin-top:0}.ratings{display:flex;gap:.5rem;flex-wrap:wrap}.ratings button{flex:1 1 7rem}
+
+:focus-visible{outline:3px solid #176a54;outline-offset:3px}button:disabled{opacity:.65;cursor:not-allowed}a{color:#125b48;text-decoration:underline}

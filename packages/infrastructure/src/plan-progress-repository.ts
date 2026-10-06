@@ -362,14 +362,21 @@ export class PostgresPlanRepository implements PlanRepository {
       return result;
     });
   }
-  generate(
+  async generate(
     accountId: string,
     input: { requestKey: string; planId?: string; expectedVersion?: number },
   ) {
+    // Provider execution holds no account lock: deletion can revoke immediately.
+    const prepared=await m09Transaction(accountId,async c=>({snapshot:await inputs(c,accountId),epoch:(await c.query<{deletion_epoch:number}>('SELECT deletion_epoch FROM accounts WHERE id=$1',[accountId])).rows[0]!.deletion_epoch}));
+    let selection:unknown;
+    try {selection=await this.generator.select(structuredClone(planCandidates(prepared.snapshot)));}catch{throw Error('PLAN_GENERATION_RETRYABLE');}
     return m09Transaction(accountId, async (c) => {
+      const epoch=(await c.query<{deletion_epoch:number}>('SELECT deletion_epoch FROM accounts WHERE id=$1',[accountId])).rows[0]!.deletion_epoch;
+      if(epoch!==prepared.epoch)throw Error('PLAN_GENERATION_RETRYABLE');
       if (input.planId) await required(c, accountId, input.planId);
-      const snapshot = await inputs(c, accountId),
-        signature = JSON.stringify([
+      const snapshot = await inputs(c, accountId);
+      if(snapshot.profileVersion!==prepared.snapshot.profileVersion || snapshot.goal.version!==prepared.snapshot.goal.version)throw Error('PLAN_GENERATION_RETRYABLE');
+      const signature = JSON.stringify([
           input.planId ?? null,
           input.expectedVersion ?? null,
         ]);
@@ -412,7 +419,7 @@ export class PostgresPlanRepository implements PlanRepository {
         let selected: PlanCandidate[];
         try {
           selected = validatePlanSelection(
-            await this.generator.select(structuredClone(candidates)),
+            selection,
             candidates,
           );
         } catch {

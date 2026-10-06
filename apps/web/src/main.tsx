@@ -1,3 +1,4 @@
+import { PrivacyPanel } from './privacy-panel.js';
 import { PlanProgressPanel } from './plan-progress-panel.js';
 import { ActiveTypingTimer } from './active-typing.js';
 import { IssuesPanel } from './issues-panel.js';
@@ -54,6 +55,8 @@ const initial: Data = {
   accepted: false,
 };
 function App() {
+  const [privacy,setPrivacy]=useState(false);
+  const [deleted,setDeleted]=useState(false);
   const [auth, setAuth] = useState(false),
     [csrf, setCsrf] = useState(''),
     [data, setData] = useState(initial),
@@ -231,6 +234,8 @@ function App() {
         : 'No pudimos guardar. Revisa los campos.',
     );
   };
+  if(deleted)return <main><h1>Eliminación iniciada</h1><p role="status">Se ha cerrado tu sesión. Tus datos se están eliminando.</p></main>;
+  if(auth&&privacy)return <PrivacyPanel csrf={csrf} onClose={()=>setPrivacy(false)} onDeleted={()=>{window.speechSynthesis?.cancel();recorderRef.current?.stream.getTracks().forEach(track=>track.stop());audioChunksRef.current=[];recorderRef.current=null;setSession(null);setHistory([]);setReportId(null);setPractice(false);setData(initial);setCsrf('');setAuth(false);setPrivacy(false);setDeleted(true);}}/>;
   if (practice) {
     const checked = async (path: string, options: RequestInit = {}) => {
       const response = await api(path, options);
@@ -455,6 +460,7 @@ function App() {
             Perfil
           </button>
         </header>
+        <button className="secondary" onClick={()=>setPrivacy(true)}>Privacidad y tus datos</button>
         {providerError && <p role="alert">{providerError}</p>}
         {reportId && (
           <ReportPanel
@@ -700,6 +706,7 @@ function App() {
           Practicar
         </button>
       </header>
+      <button className="secondary" onClick={()=>setPrivacy(true)}>Privacidad y tus datos</button>
       <div className="progress">
         <i style={{ width: `${(step / 3) * 100}%` }} />
       </div>

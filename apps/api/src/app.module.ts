@@ -1,3 +1,7 @@
+import { PrivacyController } from './privacy.controller.js';
+import { PrivacyReconciler } from './privacy-reconciler.js';
+import { PrivacyService } from '@fluentcoach/application';
+import { PostgresPrivacyRepository, StructuredTelemetry } from '@fluentcoach/infrastructure';
 import { PlanProgressController } from './plan-progress.controller.js';
 import { IssueController } from './issue.controller.js';
 import { VocabularyController } from './vocabulary.controller.js';
@@ -54,6 +58,7 @@ import {
 } from './tokens.js';
 @Module({
   controllers: [
+    PrivacyController,
     HealthController,
     IdentityController,
     LearnerController,
@@ -66,6 +71,8 @@ import {
     PlanProgressController,
   ],
   providers: [
+    {provide:PrivacyService,useFactory:()=>new PrivacyService(new PostgresPrivacyRepository(Number(process.env['PRIVACY_EXPORT_MAX_BYTES']??8388608)))},
+    PrivacyReconciler,
     { provide: PlanService, useFactory: () => new PlanService(new PostgresPlanRepository(process.env['AI_PROVIDER'] === 'fake' ? new FakePlanGenerator() : undefined)) },
     { provide: ProgressService, useFactory: () => new ProgressService(new PostgresProgressRepository()) },
     {
@@ -111,7 +118,7 @@ import {
       useFactory: (
         conversations: ConversationService,
         transcriber: ReturnType<typeof speechTranscriber>,
-      ) => new VoiceTurnService(conversations, transcriber),
+      ) => new VoiceTurnService(conversations, transcriber,new StructuredTelemetry()),
     },
     {
       provide: LEARNER_SERVICE,

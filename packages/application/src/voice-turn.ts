@@ -1,22 +1,18 @@
+import { OPERATIONAL_LIMITS } from '@fluentcoach/domain';
+import type { Telemetry } from './telemetry.js';
 import { AiError } from './ai.js';
 import type { ConversationService, SessionRecord } from './conversation.js';
 import type { SpeechTranscriber } from './speech.js';
 
-export const VOICE_MAX_BYTES = 8 * 1024 * 1024;
-export const VOICE_MAX_DURATION_MS = 30_000;
-export const VOICE_MIME_TYPES = [
-  'audio/webm',
-  'audio/ogg',
-  'audio/wav',
-  'audio/x-wav',
-  'audio/mp4',
-  'audio/mpeg',
-] as const;
+export const VOICE_MAX_BYTES = OPERATIONAL_LIMITS.audioBytes;
+export const VOICE_MAX_DURATION_MS = OPERATIONAL_LIMITS.audioDurationMs;
+export const VOICE_MIME_TYPES = OPERATIONAL_LIMITS.audioMimeTypes;
 
 export class VoiceTurnService {
   constructor(
     private readonly conversations: ConversationService,
     private readonly transcriber: SpeechTranscriber,
+    private readonly telemetry:Telemetry={record:()=>undefined},
   ) {}
 
   async turn(input: {
@@ -40,6 +36,7 @@ export class VoiceTurnService {
       input.durationMs > VOICE_MAX_DURATION_MS
     ) throw new Error('AUDIO_DURATION_EXCEEDED');
     const deadline = new Date(Date.now() + 45_000);
+    const started=Date.now();
     const result = await this.transcriber.transcribe(
       {
         audio: input.audio,
@@ -48,7 +45,8 @@ export class VoiceTurnService {
         language: '',
       },
       { deadline, ...(input.signal ? { signal: input.signal } : {}) },
-    );
+    ).catch((error:unknown)=>{this.telemetry.record({operation:'speech',outcome:'failure',durationMs:Date.now()-started,count:1});throw error;});
+    this.telemetry.record({operation:'speech',outcome:'success',durationMs:Date.now()-started,count:1});
     if (input.signal?.aborted) throw new AiError('cancelled');
     return this.conversations.turn(
       input.accountId,

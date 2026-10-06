@@ -1,13 +1,18 @@
+import { PRIVACY_LIMITS } from '@fluentcoach/domain';
 import 'reflect-metadata';
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { loadServerConfig } from '@fluentcoach/infrastructure';
 import { AppModule } from './app.module.js';
+import { json } from 'express';
+import { securityMiddleware } from './security.js';
 import cookieParser from 'cookie-parser';
 import { ApiExceptionFilter } from './api-exception.filter.js';
 
 const config = loadServerConfig(process.env);
-const app = await NestFactory.create(AppModule, { rawBody: true, logger: ['error', 'warn', 'log'] });
+const app = await NestFactory.create(AppModule, { rawBody: true, bodyParser: false, logger: false });
+app.use(securityMiddleware());
+app.use(json({limit:PRIVACY_LIMITS.jsonBodyBytes,verify:(req,_res,buffer)=>{(req as import('@nestjs/common').RawBodyRequest<import('express').Request>).rawBody=buffer;}}));
 app.use(cookieParser());
 app.useGlobalFilters(new ApiExceptionFilter());
 app.enableCors({origin:config.PUBLIC_ORIGIN,credentials:true,allowedHeaders:['content-type','x-csrf-token']});

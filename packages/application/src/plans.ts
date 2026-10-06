@@ -1,3 +1,4 @@
+import { OPERATIONAL_LIMITS } from '@fluentcoach/domain';
 import {
   SCENARIOS,
   ISSUE_TAXONOMY_VERSION,
@@ -120,7 +121,7 @@ export function validatePlanSelection(
   if (
     !Array.isArray(ids) ||
     ids.length < 2 ||
-    ids.length > 5 ||
+    ids.length > OPERATIONAL_LIMITS.planActivities ||
     ids.some((id) => typeof id !== 'string') ||
     new Set(ids).size !== ids.length
   )

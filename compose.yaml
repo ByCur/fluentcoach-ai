@@ -16,7 +16,7 @@ services:
     ports: ["6379:6379"]
     healthcheck: { test: [CMD, redis-cli, ping], interval: 3s, timeout: 3s, retries: 20 }
   migrate:
-    build: { context: ., target: api }
+    build: { context: ., target: migrate }
     user: node
     command: ["packages/infrastructure/node_modules/.bin/prisma", "migrate", "deploy", "--schema", "packages/infrastructure/prisma/schema.prisma"]
     environment: { DATABASE_URL: "postgresql://fluentcoach:local-development-only@postgres:5432/fluentcoach" }

@@ -24,6 +24,7 @@ type Row = {
   transcript_revision: number;
   status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED';
   attempts: number;
+  deletion_epoch: number;
   lease_until?: Date;
   lease_token?: string;
   error_code?: string;
@@ -36,6 +37,7 @@ const map = (r: Row): AnalysisRun => ({
   revision: r.transcript_revision,
   status: r.status.toLowerCase() as AnalysisRun['status'],
   attempts: r.attempts,
+  deletionEpoch: r.deletion_epoch,
   ...(r.lease_token ? { leaseToken: r.lease_token } : {}),
   ...(r.lease_until ? { leaseUntil: r.lease_until } : {}),
   ...(r.error_code ? { errorCode: r.error_code } : {}),
@@ -59,6 +61,7 @@ async function lockSession(
   accountId: string,
   sessionId: string,
 ) {
+  await c.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[accountId]);
   const session = (
     await c.query<Session>(
       "SELECT s.state,s.transcript_revision FROM practice_sessions s JOIN accounts a ON a.id=s.account_id WHERE s.account_id=$1 AND s.id=$2 AND a.status='ACTIVE' FOR UPDATE OF s,a",
@@ -161,6 +164,7 @@ async function createRevision(
     accountId,
     sessionId,
     transcriptRevision: revision,
+    deletionEpoch: run.deletion_epoch,
   };
   const outbox = (
     await c.query<{ id: string }>(
@@ -277,6 +281,8 @@ export class PostgresJobStore implements JobStore {
   }
   claim(job: AnalysisJob, now: Date, leaseUntil: Date, maxAttempts: number) {
     return transaction(async (c) => {
+      const a=(await c.query<{status:string;deletion_epoch:number}>('SELECT status,deletion_epoch FROM accounts WHERE id=$1 FOR UPDATE',[job.accountId])).rows[0];
+      if(!a || a.status!=='ACTIVE')return null;
       const row = (
         await c.query<Row>(
           'SELECT * FROM analysis_runs WHERE id=$1 AND account_id=$2 AND session_id=$3 AND transcript_revision=$4 FOR UPDATE',
@@ -289,6 +295,7 @@ export class PostgresJobStore implements JobStore {
         )
       ).rows[0];
       if (!row) throw new Error('JOB_ENVELOPE_MISMATCH');
+      if(row.deletion_epoch!==a.deletion_epoch || (job.deletionEpoch!==undefined && job.deletionEpoch!==a.deletion_epoch))return null;
       if (
         row.status !== 'PENDING' &&
         !(row.status === 'RUNNING' && row.lease_until && row.lease_until <= now)
@@ -319,6 +326,8 @@ export class PostgresJobStore implements JobStore {
     const c = await pool.connect();
     try {
       await c.query('BEGIN');
+      const a=(await c.query<{status:string;deletion_epoch:number}>('SELECT status,deletion_epoch FROM accounts WHERE id=$1 FOR UPDATE',[claimed.accountId])).rows[0];
+      if(!a || a.status!=='ACTIVE' || a.deletion_epoch!==(claimed.deletionEpoch??0))throw new AiError('cancelled');
       const run = (
         await c.query<Row>(
           'SELECT * FROM analysis_runs WHERE id=$1 FOR UPDATE',
@@ -432,6 +441,8 @@ export class PostgresJobStore implements JobStore {
   }
   async fail(run: AnalysisRun, code: string, retry: boolean) {
     await transaction(async (c) => {
+      const a=(await c.query<{status:string}>('SELECT status FROM accounts WHERE id=$1 FOR UPDATE',[run.accountId])).rows[0];
+      if(a?.status!=='ACTIVE')return;
       const updated = await c.query(
         "UPDATE analysis_runs SET status=$3,lease_until=NULL,error_code=$4 WHERE id=$1 AND account_id=$2 AND status='RUNNING' AND attempts=$5 AND lease_until=$6 AND lease_token=$7 RETURNING id",
         [

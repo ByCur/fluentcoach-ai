@@ -225,6 +225,8 @@ depends on the required PostgreSQL/Redis/Chromium CI gates. See ADR 0013 and
 
 ## M10 — Privacy lifecycle and operational hardening
 
+**Status: Implementation ready for technical review. GitHub CI and manual/production gates must be assessed before the private pilot.**
+
 - **Objective:** Close real-data and recovery risks before pilot.
 - **Scope:** Export/deletion/retention jobs, in-flight deletion protection,
   sanitized telemetry/alerts, limits, secret/dependency/image scans, critical

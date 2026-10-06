@@ -58,7 +58,7 @@ it('invalid generation refresh rolls back replacement and preserves current acti
   expect(current.active!.id).toBe(p.id);
   expect(current.proposal!.id).toBe(proposal.id);
 });
-it('profile/goal changes conflict acceptance and concurrent snapshot writes serialize', async () => {
+it('profile/goal changes conflict acceptance and in-flight selection revalidates its snapshot', async () => {
   const a = await account('goal-change'),
     p = await repo.generate(a.id, { requestKey: randomUUID() });
   await sql(
@@ -94,26 +94,13 @@ it('profile/goal changes conflict acceptance and concurrent snapshot writes seri
     "/* m09_snapshot_race */ UPDATE learner_profiles SET cefr_level='B2',version=version+1 WHERE account_id=$1",
     [a.id],
   );
-  try {
-    await expect
-      .poll(
-        async () =>
-          (
-            await sql<{ blocked: boolean }>(
-              "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE query LIKE '/* m09_snapshot_race */ UPDATE%' AND wait_event_type='Lock') AS blocked",
-            )
-          )[0]!.blocked,
-      )
-      .toBe(true);
-  } finally {
-    release();
-  }
-  const replacement = await generated;
-  await changed;
-  expect(replacement.activities.every((a) => a.level === 'A2')).toBe(true);
-  await expect(repo.accept(a.id, replacement.id, 1)).rejects.toThrow(
-    'PLAN_SOURCES_CHANGED',
-  );
+  // M10 releases the account mutex during provider selection so deletion can revoke.
+  try { await changed; } finally { release(); }
+  await expect(generated).rejects.toThrow('PLAN_GENERATION_RETRYABLE');
+  expect((await repo.current(a.id)).proposal!.id).toBe(p.id);
+  const replacement=await repo.generate(a.id,{requestKey:randomUUID(),planId:p.id,expectedVersion:1});
+  expect(replacement.activities.every(activity=>activity.level==='B2')).toBe(true);
+  await expect(repo.accept(a.id,p.id,1)).rejects.toThrow('STALE_PLAN_VERSION');
 });
 
 it('ignored vocabulary never becomes a plan review activity', async () => {

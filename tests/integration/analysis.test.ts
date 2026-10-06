@@ -361,10 +361,14 @@ describe('automatic analysis, PostgreSQL report persistence and retry', () => {
     await sql("UPDATE accounts SET status='DELETING' WHERE id=$1", [x.account]);
     await expect(
       x.store.succeed(run!, response.providerRunId, response),
-    ).rejects.toThrow('unauthorized');
-    await sql("UPDATE accounts SET status='ACTIVE' WHERE id=$1", [x.account]);
-    await x.store.succeed(run!, response.providerRunId, response);
+    ).rejects.toThrow('cancelled');
+    await expect(sql("UPDATE accounts SET status='ACTIVE' WHERE id=$1", [x.account])).rejects.toThrow('ACCOUNT_DELETING');
     await sql('DELETE FROM accounts WHERE id=$1', [x.account]);
+    // An independent active account still commits a report, which physical deletion cascades.
+    const active=await setup();
+    expect(await active.jobs.execute(active.job)).toBe('succeeded');
+    await sql('DELETE FROM accounts WHERE id=$1',[active.account]);
+    expect(await sql('SELECT id FROM session_reports WHERE session_id=$1',[active.session.id])).toHaveLength(0);
     expect(
       await sql('SELECT id FROM session_reports WHERE session_id=$1', [
         x.session.id,

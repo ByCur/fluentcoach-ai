@@ -286,6 +286,10 @@ targets, not measured claims. Default session limit: 20 minutes, configurable.
   including termination of direct media sessions at expiry.
 - Proposed retention: transcript/report purge after 90 days; remove linked raw
   evidence and rebuild aggregates. Retain only permitted structured summaries.
+  M10 `retention-v1` uses server UTC minus exactly 90 days and strict `<` against
+  `COALESCE(session.ended_at, session.created_at)`; equality remains. Structured
+  practice/review history may remain after source expiry; ordinary explicit turn
+  deletion still removes its progress source. See ADR 0016.
 - Account deletion revokes access, cancels jobs and removes derived data; deletion
   epoch checks prevent in-flight workers recreating records. Proposed completion
   within seven days, backup expiry within 30 days, restore replays tombstones.

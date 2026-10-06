@@ -1,3 +1,4 @@
+import { OPERATIONAL_LIMITS } from '@fluentcoach/domain';
 import {
   boundedPracticeTelemetry,
   type PracticeTelemetry,
@@ -146,6 +147,7 @@ export class ConversationService {
     telemetry: PracticeTelemetry = { kind: 'text', durationMs: 0 },
   ) {
     const practice = boundedPracticeTelemetry(telemetry);
+    if(text.length>(practice.kind==='voice'?OPERATIONAL_LIMITS.speechTranscriptChars:OPERATIONAL_LIMITS.textTurnChars))return Promise.reject(Error('TEXT_TOO_LONG'));
     const scope = `${accountId}:${id}`,
       pending = this.inFlight.get(scope);
     if (pending)
@@ -227,7 +229,7 @@ export class ConversationService {
           if (chunk.metadata)
             await this.repo.recordProvider?.(accountId, id, chunk.metadata);
           if (controller.signal.aborted) throw new AiError('cancelled');
-          if (done || reply.length + chunk.text.length > 8000)
+          if (done || reply.length + chunk.text.length > OPERATIONAL_LIMITS.tutorOutputChars)
             throw new AiError('invalid-output');
           reply += chunk.text;
           done = chunk.done;
@@ -319,7 +321,7 @@ export class ConversationService {
       while (true) {
         const next = await beforeDeadline(iterator.next(), options);
         if (next.done) break;
-        if (done || text.length + next.value.text.length > 8000)
+        if (done || text.length + next.value.text.length > OPERATIONAL_LIMITS.tutorOutputChars)
           throw new AiError('invalid-output');
         text += next.value.text;
         done = next.value.done;

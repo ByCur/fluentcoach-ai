@@ -19,4 +19,4 @@ export async function session(accountId: string, withTurn = true) {
   }
   return record;
 }
-export const envelope = (run: AnalysisRun): AnalysisJob => ({version: 1, analysisRunId: run.id, accountId: run.accountId, sessionId: run.sessionId, transcriptRevision: run.revision});
+export const envelope = (run: AnalysisRun): AnalysisJob => ({version: 1, analysisRunId: run.id, accountId: run.accountId, sessionId: run.sessionId, transcriptRevision: run.revision, ...(run.deletionEpoch===undefined?{}:{deletionEpoch:run.deletionEpoch})});

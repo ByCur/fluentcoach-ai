@@ -1,4 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+
+// Each browser test owns its learner; reloads retain that same authenticated account.
+// Voice preference tests deliberately leave live sessions, which must not consume
+// another test's five-session pilot allowance.
+test.beforeEach(async ({ page }) => {
+  const subject = `voice-e2e-${randomUUID()}`;
+  await page.route('**/api/v1/auth/synthetic-login', route => route.continue({
+    postData: JSON.stringify({ subject }),
+  }));
+});
 
 type SpeechProbe = {
   __voices: SpeechSynthesisVoice[];
