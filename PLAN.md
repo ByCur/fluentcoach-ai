@@ -267,6 +267,14 @@ depends on the required PostgreSQL/Redis/Chromium CI gates. See ADR 0013 and
 
 ## M12 — Future-mode discovery only
 
+**Status: Discovery specs and pre-implementation matrices prepared and document
+consistency reviewed (2026-10-06); PR approval pending. Neither future mode is
+implemented.** See [M12 discovery/review record](docs/m12-discovery.md),
+[exam spec](docs/m12-exam-practice-spec.md),
+[learner-sharing spec](docs/m12-learner-sharing-spec.md),
+[test matrices](docs/m12-test-matrices.md) and proposed ADRs 0018/0019.
+Specialist gates remain open; implementation requires a separately accepted plan.
+
 - **Objective:** Scope exam practice and teacher/family dashboards.
 - **Scope:** Exam/rubric choice, content rights, revocable sharing, role access,
   learner visibility and age/consent requirements.
@@ -276,7 +284,8 @@ depends on the required PostgreSQL/Redis/Chromium CI gates. See ADR 0013 and
   matrix before any future implementation.
 - **Validation commands:** Manual document/decision review; future feature
   commands belong to a separately accepted implementation plan.
-- **Out of scope:** Implementation of either future mode under this plan.
+- **Out of scope:** Implementation of either future mode under this plan, M13
+  work, and any change to current learner privacy/access behavior.
 
 ## Release cuts and traceability
 
