@@ -39,12 +39,35 @@ inherited HTTP proxy for loopback BusyBox wget; external proxy and CA trust stay
 enabled. This override is not a hosting configuration change. Existing Compose's
 worker remains local test infrastructure, never a deployed cloud worker.
 
-GitHub PR CI is pending at PR creation; local success is not a GitHub CI or release
-pass. All earlier CI commands remain, and all five requested M11 commands are
-added. CI OCI artifact export is pending with GitHub CI; the local OCI test uses
-a synthetic archive and verifies forged identity/tampering refusal. Real previous
-immutable container rollback remains a manual gate; SQL
-compatibility and OCI identity tests alone do not prove that deployment operation.
+## GitHub CI evidence
+
+[GitHub Actions run #59](https://github.com/ByCur/fluentcoach-ai/actions/runs/37438128977)
+completed successfully for PR #28 implementation head
+`4739b6e82d31abd42fbaa2460901a4f1dd8523e1`.
+
+| CI evidence | Result |
+| --- | --- |
+| `quality` job | success |
+| `images` job | success |
+| `pnpm test:migrations` | executed successfully |
+| `pnpm release:preflight` | executed successfully; cloud deployment remains blocked |
+| `pnpm test:deployment` | executed successfully |
+| `pnpm test:release` | executed successfully |
+| `pnpm test:e2e:cold-start` | executed successfully |
+| OCI API archive export, identity generation and artifact upload | completed successfully |
+
+All earlier CI commands remain. The images job generated the real OCI artifact
+`m11-immutable-api-9cff7402b0a2a18ee66a277628b6a7a00ad92fe6`, using CI's
+merge commit SHA `9cff7402b0a2a18ee66a277628b6a7a00ad92fe6`; the API archive and
+verified release identity were uploaded successfully. This evidence is tied to
+run #59 and those revisions, rather than a later documentation-only head. The
+local OCI test separately uses a synthetic archive and verifies forged identity/
+tampering refusal.
+
+M11 remains incomplete and cloud release remains blocked. Successful CI does not
+establish hosted Ollama/whisper.cpp voice or production readiness. Real previous
+immutable container rollback remains a manual gate; SQL compatibility and OCI
+identity tests alone do not prove that deployment operation.
 
 ## Environment and milestone exit gates
 
