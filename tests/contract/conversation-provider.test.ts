@@ -16,10 +16,10 @@ describe('conversation provider contract', () => {
     }
   });
 
-  it('keeps all 48 synthetic eval fixtures on tutor-v4 with the grounded-help review rubric', () => {
+  it('keeps all 112 synthetic eval fixtures on tutor-v4 with the grounded-help review rubric', () => {
     expect(TUTOR_PROMPT_VERSION).toBe('tutor-v4');
-    expect(PILOT_TEXT_SUITE_VERSION).toBe('pilot-text-fixtures-v2');
-    expect(PILOT_TEXT_CASES).toHaveLength(48);
+    expect(PILOT_TEXT_SUITE_VERSION).toBe('pilot-text-fixtures-v3');
+    expect(PILOT_TEXT_CASES).toHaveLength(112);
     expect(new Set(PILOT_TEXT_CASES.map(f => f.snapshot.level))).toEqual(new Set(['A1', 'A2', 'B1', 'B2']));
     expect(new Set(PILOT_TEXT_CASES.map(f => f.snapshot.mode))).toEqual(new Set(['natural', 'teaching']));
     for (const fixture of PILOT_TEXT_CASES) {

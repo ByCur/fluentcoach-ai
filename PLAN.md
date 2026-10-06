@@ -207,7 +207,7 @@ depends on the required PostgreSQL/Redis/Chromium CI gates. See ADR 0013 and
 ## M09 — Plans, goals and progress
 
 - **Status:** Implementation ready for technical review. Required CI PostgreSQL/Redis/Chromium gates must pass before completion.
-- **Design:** Deterministic `plan-generator-v1`, `plan-v1`, `plan-catalog-v1`; no plan AI call. See [ADR 0014](docs/adr/0014-plans-and-active-progress.md) and [M09 data lifecycle](docs/m09-data-lifecycle.md).
+- **Design:** Roadmap-first follow-up uses `plan-generator-v2`, `plan-v1`, `plan-catalog-v2`, safe local Ollama selection and deterministic fallback; see [ADR 0020](docs/adr/0020-roadmap-first-learning.md). Original M09 baseline: see [ADR 0014](docs/adr/0014-plans-and-active-progress.md) and [M09 data lifecycle](docs/m09-data-lifecycle.md).
 
 - **Objective:** Convert learning evidence into manageable practice.
 - **Scope:** Plan generator/activities, practice events/aggregates, minutes,
@@ -219,7 +219,7 @@ depends on the required PostgreSQL/Redis/Chromium CI gates. See ADR 0013 and
   DST/midnight/timezone changes, streak breaks, concurrent plan refresh and rebuild.
 - **Validation commands:** Common gates, `pnpm test:integration:plans`,
   `pnpm test:integration:progress`, `pnpm test:e2e:progress`,
-  `pnpm eval:ai -- --suite plans --billing-mode free_only` only if a model-backed plan generator is added; M09 uses no model and verifies the generator in deterministic unit/integration gates.
+  `pnpm eval:ai -- --suite plans --billing-mode free_only` only if a model-backed plan generator is added; the roadmap follow-up supplies `roadmap-eval-v1` with a zero-cost deterministic default and an optional six-call local Ollama cap.
 - **Out of scope:** Official proficiency scores, leaderboards, push alerts,
   exam practice and third-party dashboards.
 

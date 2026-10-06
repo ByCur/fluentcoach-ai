@@ -1,83 +1,102 @@
-import { useEffect, useState } from 'react';
-import type { LearningPlan } from '@fluentcoach/application';
-import type { RecurringIssue, progressMetrics } from '@fluentcoach/domain';
-import type { LearnerPage } from './learner-navigation.js';
+import { useEffect, useRef, useState } from 'react';
+import type { LearningPlan, PlanActivity } from '@fluentcoach/application';
+import type { progressMetrics } from '@fluentcoach/domain';
 
 type Metrics = ReturnType<typeof progressMetrics>;
-export function LearnerHome({ onNavigate, onPractice, continuing }: {
-  onNavigate: (page: LearnerPage) => void;
+export function LearnerHome({ csrf, onStart, onVocabulary, onPractice }: {
+  csrf: string;
+  onStart: (sessionId: string, activity: PlanActivity) => void;
+  onVocabulary: (activity: PlanActivity) => void;
   onPractice: () => void;
-  continuing: boolean;
 }) {
-  const [plans, setPlans] = useState<{ active: LearningPlan | null; proposal: LearningPlan | null } | null>(null);
-  const [issues, setIssues] = useState<RecurringIssue[] | null>(null);
+  const [route, setRoute] = useState<LearningPlan | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const starting = useRef(false);
+  const mounted = useRef(false);
+  const startController = useRef<AbortController | null>(null);
   const [reload, setReload] = useState(0);
   useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; startController.current?.abort(); };
+  }, []);
+  useEffect(() => {
     const controller = new AbortController();
-    setErrors([]);
-    async function read<T>(path: string, apply: (value: T) => void) {
-      try {
-        const response = await fetch(`/api/v1${path}`, { credentials: 'include', signal: controller.signal });
-        if (!response.ok) throw Error('LOAD_FAILED');
-        const value = await response.json() as T;
-        if (!controller.signal.aborted) apply(value);
-      } catch {
-        if (!controller.signal.aborted) setErrors((current) => [...current, path]);
-      }
-    }
-    void Promise.all([
-      read('/plans/current', setPlans),
-      read('/issues', setIssues),
-      read('/progress', setMetrics),
-    ]);
+    void fetch('/api/v1/roadmap', { method: 'POST', credentials: 'include',
+      headers: { 'x-csrf-token': csrf }, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+    }).then(async response => {
+      if (!response.ok) throw Error('LOAD_FAILED');
+      const value = await response.json() as LearningPlan;
+      if (!controller.signal.aborted) setRoute(value);
+    }).catch(() => {
+      if (!controller.signal.aborted) setError('No pudimos cargar tu ruta. Tu progreso se conserva. Vuelve a intentarlo.');
+    });
+    void fetch('/api/v1/progress', { credentials: 'include', signal: controller.signal })
+      .then(async response => { if (response.ok) { const value = await response.json() as Metrics; if (!controller.signal.aborted) setMetrics(value); } })
+      .catch(() => undefined);
     return () => controller.abort();
-  }, [reload]);
-  const recommendations = (plans?.active ?? plans?.proposal)?.activities
-    .filter((activity) => ['pending', 'started'].includes(activity.state)).slice(0, 2) ?? [];
-  const priorities = issues?.filter((issue) => !issue.dismissed).slice(0, 2);
-  const loading = (path: string) => errors.includes(path)
-    ? <p role="status">No pudimos cargar esta información. Puedes volver a intentarlo.</p>
-    : <p role="status">Cargando…</p>;
-  return <div className="learner-home">
-    <p className="welcome">Un poco de práctica, a tu ritmo.</p>
-    <section className="home-card practice-card" aria-labelledby="home-practice">
-      <h2 id="home-practice">{continuing ? 'Continuar práctica' : 'Practicar ahora'}</h2>
-      <p>{continuing ? 'Retoma la conversación donde la dejaste.' : 'Elige una situación cotidiana y practica inglés paso a paso.'}</p>
-      <button onClick={onPractice}>{continuing ? 'Continuar práctica' : 'Practicar ahora'}</button>
-    </section>
-    <section className="home-card" aria-labelledby="home-recommendations">
-      <h2 id="home-recommendations">Recomendado para ti</h2>
-      {!plans ? loading('/plans/current') : recommendations.length ? <ul className="summary-list">
-        {recommendations.map((activity) => <li key={activity.id}>
-          <h3>{activity.title}</h3><p>{activity.targetMinutes} minutos · {activity.rationale}</p>
-        </li>)}
-      </ul> : <p>{plans.active ? 'Has terminado las actividades de tu plan. Puedes preparar el siguiente.' : 'Tu plan te ayudará a elegir por dónde empezar, según tu nivel y tu ritmo.'}</p>}
-      {!!metrics?.dueCards && <p>{metrics.dueCards} expresiones pendientes de repaso. <button className="text-button" onClick={() => onNavigate('vocabulary')}>Repasar mi vocabulario</button></p>}
-      <button className="secondary" onClick={() => onNavigate('recommendations')}>Ver mis recomendaciones</button>
-    </section>
-    <section className="home-card" aria-labelledby="home-issues">
-      <h2 id="home-issues">Lo que debo mejorar</h2>
-      {!priorities ? loading('/issues') : priorities.length ? <ul className="summary-list">
-        {priorities.map((issue) => <li key={issue.issueKey}><h3>{issue.label}</h3>
-          <p>Lo hemos observado en {issue.sessionCount} prácticas durante los últimos 30 días.</p>
-        </li>)}
-      </ul> : <p>Aún no hay aspectos que se repitan en tus prácticas. Sigue practicando para descubrir en qué centrarte.</p>}
-      <button className="secondary" onClick={() => onNavigate('issues')}>Ver mis ejemplos</button>
-    </section>
-    <section className="home-card" aria-labelledby="home-progress">
-      <h2 id="home-progress">Mi progreso</h2>
-      {!metrics ? loading('/progress') : <>
-        <dl className="home-metrics">
-          <div><dt>Minutos de práctica esta semana</dt><dd>{metrics.activeMinutes.toFixed(1)} de {metrics.targetMinutes}</dd></div>
-          <div><dt>Días de práctica esta semana</dt><dd>{metrics.practicedDays} de {metrics.targetDays}</dd></div>
-          <div><dt>Prácticas terminadas esta semana</dt><dd>{metrics.completedSessionsThisWeek}</dd></div>
-        </dl>
-        <p>Cuenta el tiempo de hablar y escribir. La espera no cuenta.</p>
-      </>}
-      <button className="secondary" onClick={() => onNavigate('progress')}>Ver mi progreso</button>
-    </section>
-    {!!errors.length && <button className="secondary" onClick={() => setReload((value) => value + 1)}>Volver a cargar</button>}
+  }, [csrf, reload]);
+  const current = route?.activities.find(a => a.state === 'started') ?? route?.activities.find(a => a.state === 'pending');
+  const completed = route?.activities.filter(a => a.state === 'completed').length ?? 0;
+  async function start() {
+    if (!route || !current || starting.current) return;
+    starting.current = true;
+    const controller = new AbortController();
+    startController.current = controller;
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/v1/plans/${route.id}/activities/${current.id}/start`, {
+        method: 'POST', credentials: 'include', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+        headers: { 'content-type': 'application/json', 'x-csrf-token': csrf },
+        body: JSON.stringify({ expectedVersion: route.version }),
+      });
+      if (!mounted.current) return;
+      if (!response.ok) {
+        if (response.status === 409 || response.status === 404) setReload(value => value + 1);
+        throw Error('No pudimos abrir esta práctica. Vuelve a intentarlo; tu progreso se conserva.');
+      }
+      const result = await response.json() as { plan: LearningPlan; sessionId: string | null };
+      if (!mounted.current) return;
+      setRoute(result.plan);
+      if (current.type === 'vocabulary-review') onVocabulary(current);
+      else if (result.sessionId) onStart(result.sessionId, current);
+      else throw Error('No pudimos abrir esta práctica. Vuelve a intentarlo.');
+    } catch (cause) {
+      if (!mounted.current) return;
+      setError(cause instanceof Error && cause.message.startsWith('No pudimos') ? cause.message : 'No pudimos abrir esta práctica. Vuelve a intentarlo; tu progreso se conserva.');
+    } finally { starting.current = false; if (mounted.current) setBusy(false); }
+  }
+  return <div className="learner-home roadmap-home">
+    <p className="welcome">Paso a paso, a tu ritmo.</p>
+    {route ? <>
+      <div className="roadmap-summary">
+        <p>Objetivo semanal: <strong>{route.sourceSnapshot.goal.minutesPerDay * route.sourceSnapshot.goal.daysPerWeek} minutos · {route.sourceSnapshot.goal.daysPerWeek} días</strong></p>
+        {metrics && <p>{metrics.activeMinutes.toFixed(1)} minutos practicados esta semana</p>}
+        <label htmlFor="roadmap-progress">{completed} de {route.activities.length} pasos completados</label>
+        <progress id="roadmap-progress" value={completed} max={Math.max(1, route.activities.length)} />
+      </div>
+      {route.adaptedAt && <p className="adaptation-note">He adaptado las próximas prácticas según lo que estás trabajando.</p>}
+      {current && <section className="home-card current-step" aria-labelledby="current-step-title" data-activity={current.id}>
+        <p className="eyebrow">Tu siguiente paso</p>
+        <h2 id="current-step-title">{current.title}</h2>
+        <p>{current.targetMinutes} minutos · {current.type === 'vocabulary-review' ? 'Un repaso breve para recordar tus expresiones.' : current.type === 'recurring-issue-practice' ? 'Practica con ayuda un aspecto que aparece en tus conversaciones.' : 'Una conversación cotidiana para ganar confianza.'}</p>
+        <button className="roadmap-continue" disabled={busy} onClick={() => void start()}>{busy ? 'Abriendo tu práctica…' : 'Continuar mi ruta'}</button>
+      </section>}
+      <section aria-labelledby="roadmap-timeline-title" className="roadmap-timeline">
+        <h2 id="roadmap-timeline-title">Tu camino, paso a paso</h2>
+        <ol>
+          {route.activities.filter(a => ['completed', 'started', 'pending'].includes(a.state)).map(activity => <li key={activity.id}
+            className={activity.id === current?.id ? 'current' : activity.state === 'completed' ? 'completed' : ''}
+            aria-current={activity.id === current?.id ? 'step' : undefined}>
+            <span className="step-marker" aria-hidden="true">{activity.state === 'completed' ? '✓' : activity.id === current?.id ? '→' : '○'}</span>
+            <div><h3>{activity.title}</h3><p>{activity.state === 'completed' ? 'Completada' : activity.id === current?.id ? 'Ahora' : 'Próximamente'} · {activity.targetMinutes} minutos</p></div>
+          </li>)}
+        </ol>
+      </section>
+    </> : !error && <p role="status">Preparando tu ruta…</p>}
+    {error && <div><p role="alert">{error}</p>{!route && <button className="secondary" onClick={() => setReload(value => value + 1)}>Volver a intentar</button>}</div>}
+    <div className="free-practice"><button className="secondary" onClick={onPractice}>Práctica libre</button><p>Opcional: elige lo que te apetezca practicar hoy.</p></div>
   </div>;
 }

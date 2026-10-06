@@ -6,8 +6,8 @@ import {
   type SessionSnapshot,
 } from '@fluentcoach/domain';
 export const PLAN_SCHEMA_VERSION = 'plan-v1';
-export const PLAN_GENERATOR_VERSION = 'plan-generator-v1';
-export const PLAN_CATALOG_VERSION = 'plan-catalog-v1';
+export const PLAN_GENERATOR_VERSION = 'plan-generator-v2';
+export const PLAN_CATALOG_VERSION = 'plan-catalog-v2';
 export const PLAN_ACTIVITY_CATALOG = [
   'conversation',
   'recurring-issue-practice',
@@ -31,29 +31,23 @@ export type PlanCandidate = {
 export type PlanInputs = {
   level: SessionSnapshot['level'];
   profileVersion: number;
+  interests: string[];
   goal: { minutesPerDay: number; daysPerWeek: number; version: number };
   issues: RecurringIssue[];
   dueCardIds: string[];
   recentScenarioSlugs: string[];
-};
-const SCENARIO_LABELS: Record<string, string> = {
-  restaurant: 'Restaurante',
-  travel: 'Viajes',
-  hotel: 'Hotel',
-  shopping: 'Compras',
-  'doctor-visit': 'Consulta médica',
-  'free-conversation': 'Conversación libre',
 };
 export function planCandidates(input: PlanInputs): PlanCandidate[] {
   const minutes = Math.min(
     10,
     Math.max(2, Math.floor(input.goal.minutesPerDay / 2)),
   );
-  const scenarios = [...SCENARIOS].sort(
-    (a, b) =>
-      Number(input.recentScenarioSlugs.includes(a.slug)) -
-        Number(input.recentScenarioSlugs.includes(b.slug)) ||
-      a.slug.localeCompare(b.slug),
+  const interests = input.interests.map(value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase());
+  const interestScore = (scenario: (typeof SCENARIOS)[number]) =>
+    scenario.interests.filter(keyword => interests.some(value => value.includes(keyword))).length;
+  const scenarios = [...SCENARIOS].sort((a, b) =>
+    Number(input.recentScenarioSlugs.includes(a.slug)) - Number(input.recentScenarioSlugs.includes(b.slug)) ||
+    interestScore(b) - interestScore(a) || SCENARIOS.indexOf(a) - SCENARIOS.indexOf(b),
   );
   const result: PlanCandidate[] = input.issues
     .filter((i) => !i.dismissed)
@@ -82,11 +76,11 @@ export function planCandidates(input: PlanInputs): PlanCandidate[] {
       cardIds: cards,
       targetCount: cards.length,
     });
-  for (const scenario of scenarios.slice(0, 2))
+  for (const scenario of scenarios)
     result.push({
       candidateId: `conversation:${scenario.slug}`,
       type: 'conversation',
-      title: `Conversación: ${SCENARIO_LABELS[scenario.slug]}`,
+      title: `Conversación: ${scenario.title}`,
       rationale: `Basada en tu nivel seleccionado ${input.level} y tu objetivo de ${input.goal.minutesPerDay} minutos, ${input.goal.daysPerWeek} días por semana.`,
       targetMinutes: minutes,
       scenarioSlug: scenario.slug,
@@ -97,7 +91,7 @@ export function planCandidates(input: PlanInputs): PlanCandidate[] {
 }
 /** A provider can select server candidate IDs only. Database identifiers are never provider output. */
 export interface PlanGenerator {
-  select(candidates: readonly PlanCandidate[]): Promise<unknown>;
+  select(candidates: readonly PlanCandidate[], input?: PlanInputs): Promise<unknown>;
 }
 export class DeterministicPlanGenerator implements PlanGenerator {
   select(candidates: readonly PlanCandidate[]) {
@@ -151,9 +145,11 @@ export type LearningPlan = {
   sourceSnapshot: PlanInputs;
   rationale: string;
   insufficientData: boolean;
+  adaptedAt?: string | null;
   activities: PlanActivity[];
 };
 export interface PlanRepository {
+  roadmap(accountId: string): Promise<LearningPlan>;
   current(
     accountId: string,
   ): Promise<{ active: LearningPlan | null; proposal: LearningPlan | null }>;
@@ -181,6 +177,9 @@ export interface PlanRepository {
 }
 export class PlanService {
   constructor(private readonly repo: PlanRepository) {}
+  roadmap(accountId: string) {
+    return this.repo.roadmap(accountId);
+  }
   current(accountId: string) {
     return this.repo.current(accountId);
   }
@@ -198,5 +197,15 @@ export class PlanService {
   }
   start(accountId: string, id: string, activityId: string, version: number) {
     return this.repo.start(accountId, id, activityId, version);
+  }
+}
+
+/** Roadmap selection always has a safe, reproducible zero-cost fallback. */
+export async function selectRoadmapCandidates(generator: PlanGenerator, input: PlanInputs): Promise<PlanCandidate[]> {
+  const candidates = planCandidates(input);
+  try {
+    return validatePlanSelection(await generator.select(structuredClone(candidates), structuredClone(input)), candidates);
+  } catch {
+    return validatePlanSelection(await new DeterministicPlanGenerator().select(candidates), candidates);
   }
 }

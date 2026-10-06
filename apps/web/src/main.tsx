@@ -66,6 +66,7 @@ function App() {
   const [privacy,setPrivacy]=useState(false);
   const [page, setPage] = useState<LearnerPage>('profile');
   const [configured, setConfigured] = useState(false);
+  const [roadmapReview, setRoadmapReview] = useState<readonly string[] | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [navigationError, setNavigationError] = useState('');
@@ -79,6 +80,7 @@ function App() {
     [step, setStep] = useState(1),
     [message, setMessage] = useState(''),
     [practice, setPractice] = useState(false),
+    [sessionLoading, setSessionLoading] = useState(false),
     [scenario, setScenario] = useState('restaurant'),
     [mode, setMode] = useState('natural'),
     [session, setSession] = useState<{
@@ -286,8 +288,10 @@ function App() {
     return () => controller.abort();
   }, [auth, configured, practice, page, navigationAttempt]);
   const navigate = (next: LearnerPage) => {
+    setRoadmapReview(null);
     stopPracticeMedia();
     setPractice(false);
+    if (next === 'privacy') { setPrivacy(true); return; }
     setPrivacy(false);
     setPage(next);
     if (next === 'profile') setStep(1);
@@ -296,18 +300,43 @@ function App() {
     setMessage('');
     pageHeading.current?.focus();
   };
-  const openPractice = () => {
-    if (!session && resumeSession) {
+  const openPractice = async () => {
+    const generation = mediaGenerationRef.current;
+    let previous = resumeSession;
+    // The optional action can be clicked before the home history request finishes after reload.
+    // Read canonical sessions before deciding whether to offer a fresh practice.
+    if (!session && !previous) {
+      try {
+        const response = await api('/sessions');
+        if (!response.ok) throw Error('LOAD_FAILED');
+        const records = await response.json() as (SessionResponse & {state: string; snapshot: {level: string; mode: string}})[];
+        previous = records.find(record => ['created', 'active'].includes(record.state)) ?? null;
+      } catch {
+        if (generation === mediaGenerationRef.current) setNavigationError('No pudimos abrir tu práctica. Vuelve a intentarlo; tu conversación se conserva.');
+        return;
+      }
+    }
+    if (generation !== mediaGenerationRef.current) return;
+    if (!session && previous) {
       cursorRef.current = 0;
-      reconcileSession(resumeSession);
-      setLevel(resumeSession.snapshot.level);
-      setMode(resumeSession.snapshot.mode);
-      spokenTurnCountRef.current = resumeSession.turns.filter((turn) => turn.speaker === 'tutor').length;
+      reconcileSession(previous);
+      setLevel(previous.snapshot.level);
+      setMode(previous.snapshot.mode);
+      spokenTurnCountRef.current = previous.turns.filter(turn => turn.speaker === 'tutor').length;
     } else if (!session) setLevel(data.cefrLevel);
+    setNavigationError('');
+    setSessionLoading(false);
     setPractice(true);
   };
   const startPlannedSession = (id: string, activity: PlanActivity) => {
-    setPracticeObjective(activity.title + ' · ' + activity.rationale);
+    stopPracticeMedia();
+    const generation = mediaGenerationRef.current;
+    setReportId(null);
+    setProviderError('');
+    setPracticeObjective(activity.title);
+    setLevel(activity.level ?? data.cefrLevel);
+    setMode(activity.mode ?? 'natural');
+    setScenario(activity.scenarioSlug ?? 'free-conversation');
     spokenTurnCountRef.current = 0;
     typing.current.reset();
     pendingDuration.current = null;
@@ -316,17 +345,17 @@ function App() {
     cursorRef.current = 0;
     setCursor(0);
     setSession({ id, turns: [] });
+    setSessionLoading(true);
     setPractice(true);
-    void api('/sessions').then(async (response) => {
+    void api(`/sessions/${id}`, {signal: AbortSignal.timeout(10000)}).then(async response => {
       if (!response.ok) throw Error('LOAD_FAILED');
-      const records = await response.json() as (SessionResponse & { snapshot: { level: string; mode: string } })[];
-      const record = records.find((value) => value.id === id);
-      if (record) {
-        reconcileSession(record);
-        setLevel(record.snapshot.level);
-        setMode(record.snapshot.mode);
-      }
-    }).catch(() => setProviderError('No pudimos cargar la práctica.'));
+      const record = await response.json() as SessionResponse & { snapshot: { level: string; mode: string } };
+      if (generation !== mediaGenerationRef.current) return;
+      reconcileSession(record);
+      setLevel(record.snapshot.level);
+      setMode(record.snapshot.mode);
+    }).catch(() => { if (generation === mediaGenerationRef.current) setProviderError('No pudimos cargar la práctica. Vuelve a Inicio y continúa tu ruta para reintentar.'); }).finally(() => { if (generation === mediaGenerationRef.current) setSessionLoading(false); });
+
   };
   const logout = async () => {
     stopPracticeMedia();
@@ -466,7 +495,7 @@ function App() {
       }
     };
     const send = async () => {
-      if (!session || busy || !text.trim()) return;
+      if (!session || busy || sessionLoading || !text.trim()) return;
       setBusy(true);
       setProviderError('');
       setStreamed('');
@@ -608,7 +637,7 @@ function App() {
       }
     };
     const help = async () => {
-      if (!session || busy) return;
+      if (!session || busy || sessionLoading) return;
       try {
         const r = await checked(`/sessions/${session.id}/help`, {
           method: 'POST',
@@ -626,7 +655,7 @@ function App() {
       }
     };
     const end = async () => {
-      if (!session) return;
+      if (!session || sessionLoading) return;
       stopPracticeMedia();
       try {
         await checked(`/sessions/${session.id}/end`, { method: 'POST' });
@@ -655,6 +684,7 @@ function App() {
       <main>
         {header('Práctica en inglés')}
         {connection!=='ready'&&<p role="status">{connection==='unavailable'?'No hay conexión. Tu sesión se conserva. Vuelve a abrir Practicar para reconectar.':'Reconectando… Tu sesión se conserva.'}</p>}
+        {sessionLoading && <p role="status">Cargando tu conversación…</p>}
         {providerError && <p role="alert">{providerError}</p>}
         {reportId && (
           <ReportPanel
@@ -672,14 +702,7 @@ function App() {
                 value={scenario}
                 onChange={(e) => setScenario(e.target.value)}
               >
-                {[
-                  'restaurant',
-                  'travel',
-                  'hotel',
-                  'shopping',
-                  'doctor-visit',
-                  'free-conversation',
-                ].map((x) => (
+                {Object.keys(scenarioLabels).map((x) => (
                   <option key={x} value={x}>
                     {scenarioLabels[x] ?? x}
                   </option>
@@ -782,7 +805,7 @@ function App() {
                   Detener y enviar
                 </button>
               ) : (
-                <button type="button" disabled={busy || voiceState !== 'idle'} onClick={() => void startRecording()}>
+                <button type="button" disabled={busy || sessionLoading || voiceState !== 'idle'} onClick={() => void startRecording()}>
                   Hablar
                 </button>
               )}
@@ -818,17 +841,17 @@ function App() {
               </small>
             </div>
             <nav>
-              <button disabled={busy} onClick={() => void send()}>
+              <button disabled={busy || sessionLoading} onClick={() => void send()}>
                 {busy
                   ? 'Esperando respuesta…'
                   : turnKey
                     ? 'Reintentar respuesta'
                     : 'Enviar'}
               </button>
-              <button className="secondary" onClick={() => void help()}>
+              <button className="secondary" disabled={sessionLoading} onClick={() => void help()}>
                 Ayuda en español
               </button>
-              <button className="secondary" onClick={() => void end()}>
+              <button className="secondary" disabled={sessionLoading} onClick={() => void end()}>
                 Terminar
               </button>
             </nav>
@@ -853,22 +876,21 @@ function App() {
       </main>
     );
   if (configured && page !== 'profile') return <main className="learner-shell">
-    {header(page === 'home' ? 'Tu espacio de inglés' : learnerPages[page])}
+    {header(page === 'home' ? `Tu ruta de inglés · ${data.cefrLevel}` : learnerPages[page])}
     {message && <p role="status">{message}</p>}
     {reportId && <ReportPanel sessionId={reportId} csrf={csrf} onClose={() => setReportId(null)} />}
-    {page === 'home' && <LearnerHome onNavigate={navigate} onPractice={openPractice} continuing={!!session || !!resumeSession} />}
+    {page === 'home' && <LearnerHome csrf={csrf} onStart={startPlannedSession} onVocabulary={activity => { navigate('vocabulary'); setRoadmapReview(activity.cardIds ?? []); }} onPractice={() => void openPractice()} />}
     {page === 'issues' && <IssuesPanel csrf={csrf} />}
-    {page === 'vocabulary' && <VocabularyPanel csrf={csrf} />}
-    {['plan', 'progress', 'recommendations'].includes(page) && <PlanProgressPanel
-      key={page} view={page as 'plan' | 'progress' | 'recommendations'} csrf={csrf}
-      onEvidence={setReportId} onStart={startPlannedSession} onVocabulary={() => navigate('vocabulary')} />}
+    {page === 'vocabulary' && <VocabularyPanel csrf={csrf} targetCardIds={roadmapReview} onComplete={() => navigate('home')} />}
+    {page === 'progress' && <PlanProgressPanel />}
+
   </main>;
   return (
     <main>
       {header(configured ? 'Mi perfil' : 'Prepara tu aprendizaje')}
       {!configured && <p aria-label={`Paso ${step} de 3`}>Paso {step} de 3</p>}
       {configured && <p>Ajusta tu nivel, tus intereses y tu ritmo de práctica.</p>}
-      <button className="secondary" onClick={openPractice}>Practicar</button>
+
       <button className="secondary" onClick={()=>setPrivacy(true)}>Privacidad y tus datos</button>
       {!configured && <div className="progress">
         <i style={{ width: `${(step / 3) * 100}%` }} />

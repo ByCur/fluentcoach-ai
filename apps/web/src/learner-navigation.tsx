@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 
 export const learnerPages = {
   profile: 'Mi perfil',
-  recommendations: 'Mis recomendaciones',
+  progress: 'Mi progreso',
   issues: 'Lo que debo mejorar',
   vocabulary: 'Mi vocabulario',
-  plan: 'Mi plan',
-  progress: 'Mi progreso',
+  privacy: 'Privacidad',
 } as const;
 export type LearnerPage = 'home' | keyof typeof learnerPages;
 

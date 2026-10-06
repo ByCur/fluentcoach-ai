@@ -33,3 +33,17 @@
 main p,main li{line-height:1.6;overflow-wrap:anywhere}
 nav{flex-wrap:wrap}
 @media(max-width:520px){.learner-shell{width:100%}.learner-header{display:flex}.profile-trigger>span{display:none}.profile-dropdown{width:min(260px,calc(100vw - 3rem))}.home-metrics{grid-template-columns:1fr}.home-card{padding:1rem}.home-card>button{width:100%}}
+
+/* Roadmap: a single next action and a readable history on every screen. */
+.roadmap-summary{display:grid;gap:.5rem;margin:1.5rem 0}.roadmap-summary p{margin:0;color:#53655f}.roadmap-summary label{margin-top:.75rem}
+.roadmap-summary progress{width:100%;height:12px;accent-color:#176a54}
+.current-step{background:#eef8f2;border:2px solid #91bca5;padding:clamp(1.3rem,4vw,2.4rem);box-shadow:0 8px 24px #19463810}
+.current-step h2{font-size:clamp(1.5rem,5vw,2rem)}.current-step .roadmap-continue{width:100%;min-height:56px;margin-top:.6rem;font-size:1.1rem}
+.adaptation-note{padding:.7rem 1rem;border-radius:12px;background:#f4f7ee;color:#385044}
+.roadmap-timeline h2{font-size:1.2rem}.roadmap-timeline ol{list-style:none;margin:0;padding:0}
+.roadmap-timeline li{display:flex;gap:1rem;align-items:flex-start;padding:1rem .5rem;border-left:2px solid #d8e4de;margin-left:1rem}
+.roadmap-timeline h3{margin:0;font-size:1rem;line-height:1.5}.roadmap-timeline p{margin:.2rem 0 0;color:#53655f;font-size:.9rem}
+.step-marker{border:1px solid #abc7b8;border-radius:50%;width:30px;min-width:30px;height:30px;text-align:center;line-height:28px;background:white;margin-left:-1.5rem;color:#176a54}
+.roadmap-timeline .current{background:#eef8f2;border-radius:0 12px 12px 0}.roadmap-timeline .current .step-marker,.roadmap-timeline .completed .step-marker{background:#176a54;color:#fff}
+.free-practice{margin-top:2rem;border-top:1px solid #d8e4de;padding-top:1.5rem}.free-practice p{font-size:.9rem;color:#53655f}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}

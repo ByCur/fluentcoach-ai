@@ -1,11 +1,5 @@
-export const scenarioLabels: Record<string, string> = {
-  restaurant: 'En un restaurante',
-  travel: 'De viaje',
-  hotel: 'En un hotel',
-  shopping: 'De compras',
-  'doctor-visit': 'En el médico',
-  'free-conversation': 'Conversación libre',
-};
+import { SCENARIOS } from '@fluentcoach/domain';
+export const scenarioLabels: Record<string, string> = Object.fromEntries(SCENARIOS.map(s => [s.slug, s.title]));
 export const sessionLabels: Record<string, string> = {
   created: 'Lista para empezar', active: 'En curso', ended: 'Terminada',
   abandoned: 'Sin terminar', failed: 'No se pudo completar',

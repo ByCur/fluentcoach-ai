@@ -121,7 +121,7 @@ async function enterPractice(page: Page) {
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
-  await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/ }).click();
+  await page.getByRole('button', { name: 'Práctica libre' }).click();
   await page.getByRole('button', { name: 'Empezar práctica' }).click();
 }
 
@@ -168,7 +168,7 @@ for (const destination of ['Inicio', 'Mi perfil']) {
         handlerDetached: probe.__recorders[0]!.ondataavailable === null };
     })).toEqual({ state: 'inactive', recorders: 1, tracks: 1, speech: true, handlerDetached: true });
     if (destination !== 'Inicio') await page.getByRole('button', { name: 'Inicio', exact: true }).click();
-    await page.getByRole('button', { name: 'Continuar práctica', exact: true }).click();
+    await page.getByRole('button', { name: 'Práctica libre', exact: true }).click();
     await expect(page.locator('[data-session]')).toHaveAttribute('data-session', sessionId!);
     await expect(page.getByText('Voz: lista')).toBeVisible();
     expect(uploads).toBe(0);
@@ -204,7 +204,7 @@ test('leaving before microphone permission resolves releases the late stream wit
   await page.evaluate(() => (window as unknown as SpeechProbe).__releaseMicrophone!());
   await expect.poll(() => page.evaluate(() => (window as unknown as SpeechProbe).__stoppedTracks)).toBe(1);
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__recorders.length)).toBe(0);
-  await page.getByRole('button', { name: 'Continuar práctica', exact: true }).click();
+  await page.getByRole('button', { name: 'Práctica libre', exact: true }).click();
   await expect(page.getByText('Voz: lista')).toBeVisible();
   expect(uploads).toBe(0);
 });
@@ -233,7 +233,7 @@ test('navigation during the recorder stop event discards the pending recording w
   await page.evaluate(() => (window as unknown as SpeechProbe).__finishStop!());
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__stoppedTracks)).toBe(1);
   await page.getByRole('button', { name: 'Inicio', exact: true }).click();
-  await page.getByRole('button', { name: 'Continuar práctica', exact: true }).click();
+  await page.getByRole('button', { name: 'Práctica libre', exact: true }).click();
   await expect(page.getByText('Voz: lista')).toBeVisible();
   expect(uploads).toBe(0);
 });
@@ -306,8 +306,8 @@ test('English local quality preference and selected voice/rate affect the next u
   expect(await page.evaluate(() => [localStorage.getItem('fluentcoach.tutorVoice'), localStorage.getItem('fluentcoach.tutorRate')]))
     .toEqual(['basic', '1.1']);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Tu espacio de inglés' })).toBeVisible();
-  await page.getByRole('button', { name: 'Continuar práctica', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /Tu ruta de inglés/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Práctica libre', exact: true }).click();
   await expect(selector).toHaveValue('basic');
   await expect(page.getByLabel('Velocidad')).toHaveValue('1.1');
   await voiceTurn(page);
@@ -386,7 +386,11 @@ test('mute prevents playback and unmute only speaks the next tutor turn; stop ca
   await installBrowserFakes(page, 'allowed');
   await enterPractice(page);
   await page.getByRole('button', { name: 'Silenciar voz del tutor' }).click();
+  const mutedTurn = page.waitForResponse(response => response.url().endsWith('/voice-turns'));
   await voiceTurn(page);
+  await mutedTurn;
+  // Streamed tutor text can appear before the canonical turn is reconciled; finish that turn before unmuting.
+  await expect(page.getByRole('button', { name: 'Hablar' })).toBeEnabled();
   await expect(page.getByText(/Tutor:.*Synthetic spoken turn/)).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as SpeechProbe).__spoken)).toHaveLength(0);
   await page.getByRole('button', { name: 'Activar voz del tutor' }).click();

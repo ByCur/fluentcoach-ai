@@ -1,4 +1,4 @@
-import { OPERATIONAL_LIMITS } from '@fluentcoach/domain';
+import { SCENARIOS, OPERATIONAL_LIMITS } from '@fluentcoach/domain';
 import { z } from 'zod';
 
 export type HealthResponse = { status: 'ok' | 'not-ready'; service: string };
@@ -28,7 +28,7 @@ export type LearnerProfileInput = z.infer<typeof learnerProfileInput>;
 export type PracticeGoalInput = z.infer<typeof practiceGoalInput>;
 export type ConsentInput = z.infer<typeof consentInput>;
 export type ApiError = { error: { code: string; message: string } };
-export const startSessionInput=z.object({scenarioSlug:z.enum(['restaurant','travel','hotel','shopping','doctor-visit','free-conversation']),level:z.enum(['A1','A2','B1','B2']),mode:z.enum(['natural','teaching'])}).strict();
+export const startSessionInput=z.object({scenarioSlug:z.enum(SCENARIOS.map(s => s.slug)),level:z.enum(['A1','A2','B1','B2']),mode:z.enum(['natural','teaching'])}).strict();
 export const turnInput=z.object({sourceEventKey:z.string().min(1).max(100),activeDurationMs:z.number().int().min(0).max(86400000).optional(),text:z.string().trim().min(1).max(OPERATIONAL_LIMITS.textTurnChars)}).strict();
 export const analysisJobInput=z.object({version:z.literal(1),analysisRunId:z.uuid(),accountId:z.uuid(),sessionId:z.uuid(),transcriptRevision:z.number().int().positive(),deletionEpoch:z.number().int().nonnegative().optional()}).strict();
 
@@ -44,6 +44,7 @@ export const vocabularyReviewInput = z.object({
   expectedVersion:z.number().int().positive(),
 }).strict();
 
+export const roadmapInput = z.object({}).strict();
 export const planGenerateInput = z.object({ requestKey: z.string().uuid() }).strict();
 export const planVersionInput = z.object({ expectedVersion: z.number().int().positive() }).strict();
 export const planRefreshInput = z.object({ requestKey: z.string().uuid(), expectedVersion: z.number().int().positive() }).strict();

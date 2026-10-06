@@ -389,6 +389,8 @@ model IssueDismissal {
 
 // Partial current-plan indexes, checks, date/immutability triggers are owned by M09 SQL.
 model LearningPlan {
+ roadmapSignature String? @map("roadmap_signature")
+ adaptedAt DateTime? @map("adapted_at") @db.Timestamptz
  deletionEpoch Int @default(0) @map("deletion_epoch")
  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  accountId String @map("account_id") @db.Uuid
@@ -410,6 +412,8 @@ model LearningPlan {
  @@map("learning_plans")
 }
 model LearningPlanActivity {
+ position Int @default(0)
+ startedFromVersion Int? @map("started_from_version")
  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  accountId String @map("account_id") @db.Uuid
  planId String @map("plan_id") @db.Uuid

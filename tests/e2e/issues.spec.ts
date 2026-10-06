@@ -19,7 +19,7 @@ test('synthetic sessions cross threshold, expose exact evidence, dismiss across 
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
-  await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/ }).click();
+  await page.getByRole('button', { name: 'Práctica libre' }).click();
   await openLearnerPage(page, 'Lo que debo mejorar');
   const priorities = page.getByRole('region', {
     name: 'Lo que debo mejorar',
@@ -32,7 +32,7 @@ test('synthetic sessions cross threshold, expose exact evidence, dismiss across 
     [2, 1],
   ] as const) {
     await page.getByRole('button', { name: 'Inicio', exact: true }).click();
-    await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/ }).click();
+    await page.getByRole('button', { name: 'Práctica libre' }).click();
     await page.getByRole('button', { name: 'Empezar práctica' }).click();
     for (let turn = 0; turn < count; turn++) {
       const text = `Yesterday I go to hotel session ${sessionIndex} turn ${turn}`;

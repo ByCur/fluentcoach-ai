@@ -39,7 +39,7 @@
     "test:e2e:vocabulary": "playwright test tests/e2e/vocabulary.spec.ts",
     "test:integration:plans": "vitest run --project plans",
     "test:integration:progress": "vitest run --project progress",
-    "test:e2e:progress": "playwright test tests/e2e/progress.spec.ts tests/e2e/learner-home.spec.ts",
+    "test:e2e:progress": "playwright test tests/e2e/progress.spec.ts tests/e2e/roadmap-provider.spec.ts tests/e2e/learner-home.spec.ts",
     "test:integration:privacy": "vitest run --project privacy",
     "test:load": "vitest run --project load",
     "test:resilience": "vitest run --project job-resilience --project privacy --project voice-contract --project ai-contract",

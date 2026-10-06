@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { PlanService, ProgressService } from '@fluentcoach/application';
 import {
+  roadmapInput,
   planGenerateInput,
   planVersionInput,
   planRefreshInput,
@@ -24,6 +25,10 @@ export class PlanProgressController {
     @Inject(PlanService) private readonly plans: PlanService,
     @Inject(ProgressService) private readonly progress: ProgressService,
   ) {}
+  @Post('roadmap') @UseGuards(CsrfGuard) roadmap(@Req() r: AuthRequest, @Body() raw: unknown) {
+    roadmapInput.parse(raw ?? {});
+    return this.plans.roadmap(r.accountId!);
+  }
   @Get('plans/current') current(@Req() r: AuthRequest) {
     return this.plans.current(r.accountId!);
   }

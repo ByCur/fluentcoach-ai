@@ -12,16 +12,17 @@ release tooling, but secure zero-cost cloud text/voice hosting remains blocked;
 staging/production and the private learner pilot are not complete. See
 [release runbook](docs/m11-release-runbook.md) and [provider verification](docs/m11-provider-verification.md).
 
-After completing onboarding, learners land on Inicio: practice or continue a
-conversation, recommendations from their existing plan and due vocabulary,
-recurring practice examples, and a weekly progress summary. The top-right profile
-menu opens Mi perfil, Mis recomendaciones, Lo que debo mejorar, Mi vocabulario,
-Mi plan, Mi progreso, and Cerrar sesión. Privacy/export/deletion controls remain
-available from Mi perfil. These views reuse M07–M09 account-scoped endpoints;
-opening Inicio does not generate or accept a plan. Returning learners edit their
-profile and practice goal together in Mi perfil without repeating onboarding or
-recording new consent. Leaving practice stops microphone capture and tutor speech
-and discards unsubmitted audio; the conversation remains available to continue.
+After onboarding, FluentCoach automatically opens **Tu ruta de inglés**: current
+level, weekly goal, overall progress, one current-step **Continuar mi ruta**
+button, and a timeline of completed/upcoming steps. **Práctica libre** is optional.
+The profile menu keeps Mi perfil, Mi progreso, Lo que debo mejorar, Mi vocabulario,
+Privacidad and Cerrar sesión. Learners never manage proposals or accept plans.
+Interests, level, goals, recent topics, recurring issues and due vocabulary shape
+the route. Local Ollama can reorder safe candidates; deterministic fallback keeps
+the route available without recurring API costs. See [roadmap design](docs/adr/0020-roadmap-first-learning.md).
+Returning learners edit preferences without repeating consent. Leaving practice
+stops capture and tutor speech and discards unsubmitted audio; reload resumes the
+same roadmap session. Apply migration `202610060003_roadmap` before the new API.
 
 ## Prerequisites
 

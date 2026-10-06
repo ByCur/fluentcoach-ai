@@ -1,3 +1,4 @@
+import { evaluateRoadmap } from './eval-roadmap.js';
 import { parseArgs } from 'node:util';
 import { writeFile } from 'node:fs/promises';
 import {
@@ -41,6 +42,10 @@ async function main() {
       },
     },
   });
+  if (values.suite === 'plans' && values['billing-mode'] === 'free_only') {
+    await evaluateRoadmap({live: values.live, maxCalls: Number(values['max-calls']), output: values.output});
+    return;
+  }
   if (values.suite !== 'pilot-text' || values['billing-mode'] !== 'free_only')
     throw Error(
       'Use --suite pilot-text --billing-mode free_only. Paid evaluations are forbidden.',

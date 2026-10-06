@@ -20,76 +20,86 @@ async function readyLearner(page: Page) {
   });
   expect(saved.status()).toBe(201);
   await page.reload();
-  await expect(page.getByRole('heading', { level: 1, name: 'Tu espacio de inglés' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Tu ruta de inglés · A2' })).toBeVisible();
 }
 
-test('home order, read-only recommendations, profile destinations and keyboard focus', async ({ page }) => {
+test('roadmap home has one next action, profile destinations and keyboard focus', async ({page}) => {
   await readyLearner(page);
-  await expect(page.locator('.learner-home h2')).toHaveText([
-    'Practicar ahora', 'Recomendado para ti', 'Lo que debo mejorar', 'Mi progreso',
-  ]);
-  await expect(page.getByRole('region', { name: 'Lo que debo mejorar' })).toContainText('Aún no hay aspectos');
-  await expect(page.getByRole('region', { name: 'Mi progreso' })).toContainText('0.0 de 30');
-  expect(await (await page.request.get('/api/v1/plans/current')).json()).toEqual({ active: null, proposal: null });
-  const trigger = page.getByRole('button', { name: 'Abrir menú de perfil' });
+  await expect(page.getByRole('button', {name: 'Continuar mi ruta'})).toBeVisible();
+  await expect(page.getByRole('button', {name: 'Práctica libre'})).toBeVisible();
+  const trigger = page.getByRole('button', {name: 'Abrir menú de perfil'});
   await trigger.focus();
   await page.keyboard.press('Enter');
-  const menu = page.getByRole('navigation', { name: 'Mi aprendizaje' });
+  const menu = page.getByRole('navigation', {name: 'Mi aprendizaje'});
   await expect(menu.getByRole('button')).toHaveText([
-    'Mi perfil', 'Mis recomendaciones', 'Lo que debo mejorar', 'Mi vocabulario', 'Mi plan', 'Mi progreso', 'Cerrar sesión',
+    'Mi perfil', 'Mi progreso', 'Lo que debo mejorar', 'Mi vocabulario', 'Privacidad', 'Cerrar sesión',
   ]);
   await page.keyboard.press('Tab');
-  await expect(menu.getByRole('button', { name: 'Mi perfil', exact: true })).toBeFocused();
+  await expect(menu.getByRole('button', {name: 'Mi perfil', exact: true})).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
-  await expect(menu).toHaveCount(0);
-  for (const name of ['Mi perfil', 'Mis recomendaciones', 'Lo que debo mejorar', 'Mi vocabulario', 'Mi plan', 'Mi progreso']) {
+  for (const name of ['Mi perfil', 'Mi progreso', 'Lo que debo mejorar', 'Mi vocabulario']) {
     await openLearnerPage(page, name);
-    await expect(page.getByRole('heading', { level: 1, name })).toBeFocused();
+    await expect(page.getByRole('heading', {level: 1, name})).toBeFocused();
   }
-  await openLearnerPage(page, 'Mi perfil');
-  await page.getByRole('button', { name: 'Privacidad y tus datos' }).click();
-  await expect(page.getByRole('button', { name: 'Exportar mis datos', exact: true })).toBeVisible();
-  await expect(trigger).toBeVisible();
+  await openLearnerPage(page, 'Privacidad');
+  await expect(page.getByRole('button', {name: 'Exportar mis datos', exact: true})).toBeVisible();
 });
 
-test('home uses the accepted plan and vocabulary due count; one failed summary does not hide the others', async ({ page }) => {
+test('failed roadmap loading offers an inline retry and keeps optional practice available', async ({page}) => {
   await readyLearner(page);
-  await openLearnerPage(page, 'Mi plan');
-  await page.getByRole('button', { name: 'Preparar mi plan' }).click();
-  const proposal = page.getByRole('article', { name: 'Propuesta de plan' });
-  const title = await proposal.getByRole('heading', { level: 4 }).first().innerText();
-  await proposal.getByRole('button', { name: 'Aceptar plan' }).click();
-  await expect(page.getByRole('article', { name: 'Plan activo' })).toBeVisible();
-  await page.route('**/api/v1/progress', async (route) => {
+  await page.route('**/api/v1/roadmap', route => route.fulfill({status: 503, json: {}}));
+  await page.reload();
+  await expect(page.getByRole('alert')).toContainText('No pudimos cargar tu ruta');
+  await expect(page.getByRole('button', {name: 'Práctica libre'})).toBeVisible();
+  await page.unroute('**/api/v1/roadmap');
+  await page.getByRole('button', {name: 'Volver a intentar'}).click();
+  await expect(page.getByRole('button', {name: 'Continuar mi ruta'})).toBeVisible();
+});
+
+test('leaving Home during a committed start keeps the destination open and resumes the same session later', async ({page}) => {
+  await readyLearner(page);
+  let release!: () => void;
+  const held = new Promise<void>(resolve => {release = resolve;});
+  let committed!: (id: string) => void;
+  const sessionId = new Promise<string>(resolve => {committed = resolve;});
+  let delivered!: () => void;
+  const delivery = new Promise<void>(resolve => {delivered = resolve;});
+  const startUrl = '**/api/v1/plans/*/activities/*/start';
+  await page.route(startUrl, async route => {
     const response = await route.fetch();
-    const metrics = await response.json() as Record<string, unknown>;
-    await route.fulfill({ json: { ...metrics, dueCards: 3 } });
+    committed((await response.json() as {sessionId: string}).sessionId);
+    await held;
+    await route.fulfill({response});
+    delivered();
   });
-  await page.route('**/api/v1/issues', (route) => route.fulfill({ status: 503, json: {} }));
-  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Recomendado para ti' })).toContainText(title);
-  await expect(page.getByRole('region', { name: 'Recomendado para ti' })).toContainText('3 expresiones pendientes');
-  await expect(page.getByRole('region', { name: 'Lo que debo mejorar' })).toContainText('No pudimos cargar');
-  await expect(page.getByRole('region', { name: 'Mi progreso' })).toContainText('0.0 de 30');
-  await page.unroute('**/api/v1/issues');
-  await page.getByRole('button', { name: 'Volver a cargar' }).click();
-  await expect(page.getByRole('region', { name: 'Lo que debo mejorar' })).toContainText('Aún no hay aspectos');
-  await page.getByRole('button', { name: 'Repasar mi vocabulario' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Mi vocabulario' })).toBeVisible();
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  const id = await sessionId;
+  await openLearnerPage(page, 'Mi perfil');
+  release();
+  await delivery;
+  // Let the released response and any resulting render settle before checking the destination.
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await expect(page.getByRole('heading', {level: 1, name: 'Mi perfil'})).toBeVisible();
+  await expect(page.locator('[data-session]')).toHaveCount(0);
+  await page.unroute(startUrl);
+  await page.getByRole('button', {name: 'Inicio', exact: true}).click();
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.locator('[data-session]')).toHaveAttribute('data-session', id);
+  expect(await (await page.request.get('/api/v1/sessions')).json() as unknown[]).toHaveLength(1);
 });
 
 test('continue keeps the same practice after home navigation and reload; logout invalidates the server session', async ({ page }) => {
   await readyLearner(page);
-  await page.getByRole('button', { name: 'Practicar ahora', exact: true }).click();
+  await page.getByRole('button', { name: 'Práctica libre', exact: true }).click();
   await expect(page.getByLabel('Nivel de práctica')).toHaveValue('A2');
   await page.getByRole('button', { name: 'Empezar práctica' }).click();
   const id = await page.locator('[data-session]').getAttribute('data-session');
   await page.getByRole('button', { name: 'Inicio', exact: true }).click();
-  await page.getByRole('button', { name: 'Continuar práctica', exact: true }).click();
+  await page.getByRole('button', { name: 'Práctica libre', exact: true }).click();
   await expect(page.locator('[data-session]')).toHaveAttribute('data-session', id!);
   await page.reload();
-  await page.getByRole('button', { name: 'Continuar práctica', exact: true }).click();
+  await page.getByRole('button', { name: 'Práctica libre', exact: true }).click();
   await expect(page.locator('[data-session]')).toHaveAttribute('data-session', id!);
   await page.route('**/api/v1/auth/logout', (route) => route.fulfill({ status: 503, json: {} }));
   await openLearnerPage(page, 'Cerrar sesión');

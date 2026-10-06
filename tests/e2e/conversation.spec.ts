@@ -19,7 +19,7 @@ async function onboarding(page: Page) {
   await page.getByRole('checkbox').check();
   await page.getByRole('button', {name: 'Aceptar y guardar'}).click();
   await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
-  await page.getByRole('button', {name: /Practicar ahora|Continuar práctica/}).click();
+  await page.getByRole('button', {name: 'Práctica libre'}).click();
 }
 test('delayed chunks reach the browser progressively; disconnect and cursor resume preserve each chunk once', async ({page}) => {
   await onboarding(page);
@@ -42,7 +42,7 @@ test('delayed chunks reach the browser progressively; disconnect and cursor resu
   // Leaving practice closes the live EventSource while the POST/provider keeps running.
   await page.getByRole('button', {name: 'Inicio', exact: true}).click();
   const resumedRequest = page.waitForRequest(r => r.url().includes(`/sessions/${started.id}/events?cursor=1`));
-  await page.getByRole('button', {name: /Practicar ahora|Continuar práctica/}).click();
+  await page.getByRole('button', {name: 'Práctica libre'}).click();
   await resumedRequest;
   await expect(stream).toHaveText("Tutor: Let's continue: I need a room.");
   expect(turnCompleted).toBe(false);
@@ -63,13 +63,13 @@ test('delayed chunks reach the browser progressively; disconnect and cursor resu
   await expect(page.getByRole('button', {name: 'Enviar', exact: true})).toBeEnabled();
   await page.getByRole('button', {name: 'Terminar'}).click();
   await page.reload();
-  await page.getByRole('button', {name: /Practicar ahora|Continuar práctica/}).click();
+  await page.getByRole('button', {name: 'Práctica libre'}).click();
   await page.getByRole('button', {name: 'Ver historial'}).click();
   await expect(page.locator(`[data-session-history="${started.id}"]`)).toHaveText('En un hotel · Terminada');
 });
-test('all six scenarios and A1/A2/B1/B2 are selectable with persisted snapshots and a fresh stream cursor per session', async ({page}) => {
+test('all roadmap scenarios and A1/A2/B1/B2 are selectable with persisted snapshots and a fresh stream cursor per session', async ({page}) => {
   await onboarding(page);
-  const scenarios = ['restaurant','travel','hotel','shopping','doctor-visit','free-conversation'];
+  const scenarios = ['introductions','past-experiences','travel','hotel','restaurant','shopping','family-friends','work','hobbies','doctor-visit','future-plans','opinions','problem-solving','free-conversation'];
   expect(await page.getByLabel('Situación').locator('option').evaluateAll(options => options.map(o => (o as HTMLOptionElement).value))).toEqual(scenarios);
   for (const level of ['A1','A2','B1','B2']) {
     await page.getByLabel('Nivel de práctica').selectOption(level);
