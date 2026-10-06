@@ -10,7 +10,7 @@ test('learner confirms, reviews, reloads, and cannot double advance a card',asyn
   await page.getByRole('button',{name:'Continuar'}).click();
   await page.getByRole('checkbox').check();
   await page.getByRole('button',{name:'Aceptar y guardar'}).click();
-  await page.getByRole('button',{name:/Practicar ahora|Continuar práctica/}).click();
+  await page.getByRole('button',{name:'Práctica libre'}).click();
   await page.getByRole('button',{name:'Empezar práctica'}).click();
   await page.getByLabel('Tu respuesta').fill('Yesterday I go to the hotel');
   await page.getByRole('button',{name:'Enviar',exact:true}).click();

@@ -1,5 +1,8 @@
 # ADR 0014: Versioned practice plans and canonical active progress
 
+The current learner lifecycle and selection policy are superseded by
+[ADR 0020](0020-roadmap-first-learning.md); this document records the original M09 design.
+
 ## Status
 
 Implementation ready for technical review (M09, 2026-10-05). Required CI

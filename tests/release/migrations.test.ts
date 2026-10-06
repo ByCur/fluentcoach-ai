@@ -2,7 +2,8 @@ import { readFile, readdir } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { expect, it } from 'vitest';
-import { RELEASE_MIGRATION } from '@fluentcoach/infrastructure';
+// This historical test verifies the M10 -> M11 drain upgrade specifically.
+const RELEASE_MIGRATION = '202610060002_m11_release_control';
 it('upgrades populated M10 without changing prior schema; M10 SQL can drain, resume and roll back safely',async()=>{
   if(!process.env['DATABASE_URL'])throw new Error('DATABASE_URL required');
   const db=new pg.Pool({connectionString:process.env['DATABASE_URL']}), c=await db.connect(), schema='m11_upgrade_'+randomUUID().replaceAll('-','');

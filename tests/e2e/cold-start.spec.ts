@@ -31,7 +31,7 @@ test('lost turn acknowledgement and stream reconnect retain the session and idem
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
-  await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/, exact: true }).click();
+  await page.getByRole('button', { name: 'Práctica libre', exact: true }).click();
   await page.getByRole('button', { name: 'Empezar práctica' }).click();
   const sessionId = await page.locator('[data-session]').getAttribute('data-session');
   expect(sessionId).toBeTruthy();
@@ -79,7 +79,7 @@ test('lost turn acknowledgement and stream reconnect retain the session and idem
   const recovered = page.waitForResponse((response) => isSessionStream(new URL(response.url())));
   const reconnecting = page.getByRole('status').filter({ hasText: 'Reconectando' });
   try {
-    await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/, exact: true }).click();
+    await page.getByRole('button', { name: 'Práctica libre', exact: true }).click();
     const request = await resumed;
     expect(streamCursor(new URL(request.url()))).toBeGreaterThanOrEqual(cursor);
     await expect(page.locator('[data-session]')).toHaveAttribute('data-session', sessionId!);

@@ -174,3 +174,20 @@ it('partial multi-card review progress survives no-longer-due sources and comple
     )!.state,
   ).toBe('completed');
 });
+
+it('replays concurrent and lost-acknowledgement starts with the original version into exactly one session', async () => {
+  const a = await account('start-retry');
+  const proposal = await repo.generate(a.id, {requestKey: randomUUID()});
+  const active = await repo.accept(a.id, proposal.id, proposal.version);
+  const activity = active.activities.find(a => a.type === 'conversation')!;
+  const results = await Promise.all([
+    repo.start(a.id, active.id, activity.id, active.version),
+    repo.start(a.id, active.id, activity.id, active.version),
+  ]);
+  const replay = await repo.start(a.id, active.id, activity.id, active.version);
+  expect(new Set([...results, replay].map(r => r.sessionId)).size).toBe(1);
+  expect(await sql('SELECT id FROM practice_sessions WHERE account_id=$1', [a.id])).toHaveLength(1);
+  expect(replay.plan.version).toBe(active.version + 1);
+  const next = active.activities.find(a => a.id !== activity.id)!;
+  await expect(repo.start(a.id, active.id, next.id, active.version)).rejects.toThrow('STALE_PLAN_VERSION');
+});

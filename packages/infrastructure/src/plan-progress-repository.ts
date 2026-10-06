@@ -6,6 +6,7 @@ import {
   PLAN_GENERATOR_VERSION,
   PLAN_CATALOG_VERSION,
   planCandidates,
+  selectRoadmapCandidates,
   validatePlanSelection,
   validateReport,
   type PlanGenerator,
@@ -61,9 +62,10 @@ async function inputs(
     await c.query<{
       cefr_level: PlanInputs['level'];
       version: number;
+      interests: string[];
       timezone: string;
     }>(
-      'SELECT cefr_level,version,timezone FROM learner_profiles WHERE account_id=$1',
+      'SELECT cefr_level,version,timezone,interests FROM learner_profiles WHERE account_id=$1',
       [accountId],
     )
   ).rows[0];
@@ -149,6 +151,7 @@ async function inputs(
   return {
     level: profile.cefr_level,
     profileVersion: profile.version,
+    interests: profile.interests,
     timezone: profile.timezone,
     now,
     goal: {
@@ -179,6 +182,8 @@ type PlanRow = {
   source_snapshot: PlanInputs;
   rationale: string;
   insufficient_data: boolean;
+  roadmap_signature: string | null;
+  adapted_at: Date | null;
 };
 type ActivityRow = {
   id: string;
@@ -187,6 +192,7 @@ type ActivityRow = {
   started_at: Date | null;
   session_id: string | null;
   skipped_from_version: number | null;
+  started_from_version: number | null;
 };
 function isAvailable(activity: PlanCandidate, snapshot: PlanInputs): boolean {
   if (activity.type === 'conversation')
@@ -237,7 +243,7 @@ async function hydrate(
   if (!r) throw Error('PLAN_NOT_FOUND');
   const rows = (
     await c.query<ActivityRow>(
-      'SELECT * FROM learning_plan_activities WHERE plan_id=$1 AND account_id=$2 ORDER BY candidate_id',
+      'SELECT * FROM learning_plan_activities WHERE plan_id=$1 AND account_id=$2 ORDER BY position,candidate_id',
       [id, accountId],
     )
   ).rows;
@@ -265,8 +271,22 @@ async function hydrate(
           ).rowCount;
       }
     }
+    let reviewAvailable = false;
+    if (a.started_at && a.definition.type === 'vocabulary-review') {
+      const reviewed = (await c.query<{card_id: string}>(
+        'SELECT DISTINCT card_id FROM vocabulary_review_events WHERE account_id=$1 AND card_id=ANY($2::uuid[]) AND reviewed_at>=$3',
+        [accountId, a.definition.cardIds, a.started_at],
+      )).rows.map(r => r.card_id);
+      reviewAvailable = !!a.definition.cardIds?.length && a.definition.cardIds.every(id => snapshot.dueCardIds.includes(id) || reviewed.includes(id));
+    }
+    const sessionAvailable = !a.started_at || a.definition.type === 'vocabulary-review' || completed || !!(a.session_id && (await c.query(
+      "SELECT 1 FROM practice_sessions WHERE id=$1 AND account_id=$2 AND state IN ('CREATED','ACTIVE')",
+      [a.session_id, accountId],
+    )).rowCount);
+    const sourceAvailable = isAvailable(a.definition, snapshot) || reviewAvailable;
+    const continuingRoadmapSession = r.roadmap_signature !== null && !!a.started_at && a.definition.type !== 'vocabulary-review' && sessionAvailable;
     const available =
-      isAvailable(a.definition, snapshot) &&
+      (sourceAvailable || continuingRoadmapSession) && sessionAvailable &&
       !(
         a.started_at &&
         a.definition.type !== 'vocabulary-review' &&
@@ -275,7 +295,7 @@ async function hydrate(
     const state =
       a.state === 'skipped'
         ? 'skipped'
-        : completed
+        : completed || (r.roadmap_signature !== null && a.state === 'completed')
           ? 'completed'
           : !available
             ? 'unavailable'
@@ -288,14 +308,14 @@ async function hydrate(
         'UPDATE learning_plan_activities SET state=$3 WHERE id=$1 AND account_id=$2',
         [a.id, accountId, state],
       );
-    const definition = available
+    const definition = sourceAvailable
       ? a.definition
       : {
           ...a.definition,
           evidence: [],
           cardIds: [],
           rationale:
-            'La fuente ha cambiado o ya no está pendiente. Actualiza el plan si necesitas nuevas actividades.',
+            'Esta práctica ya no necesita el ejemplo anterior. Tu ruta tendrá en cuenta lo que estás trabajando ahora.',
         };
     activities.push({
       ...definition,
@@ -319,6 +339,7 @@ async function hydrate(
     sourceSnapshot,
     rationale: r.rationale,
     insufficientData: r.insufficient_data,
+    adaptedAt: r.adapted_at?.toISOString() ?? null,
     activities,
   };
 }
@@ -340,10 +361,82 @@ function currentVersion(r: PlanRow, version: number) {
   if (r.version !== version || !['active', 'proposal'].includes(r.state))
     throw Error('STALE_PLAN_VERSION');
 }
+function roadmapSignature(snapshot: PlanInputs): string {
+  return JSON.stringify([snapshot.profileVersion, snapshot.goal.version, snapshot.interests,
+    snapshot.recentScenarioSlugs, planCandidates(snapshot)]);
+}
 export class PostgresPlanRepository implements PlanRepository {
   constructor(
     private readonly generator: PlanGenerator = new DeterministicPlanGenerator(),
   ) {}
+  async roadmap(accountId: string): Promise<LearningPlan> {
+    // Snapshot and provider work are separated so account deletion never waits for inference.
+    const prepared = await m09Transaction(accountId, async c => {
+      const snapshot = await inputs(c, accountId);
+      const row = (await c.query<PlanRow>(
+        "SELECT * FROM learning_plans WHERE account_id=$1 AND state='active'", [accountId],
+      )).rows[0];
+      const signature = roadmapSignature(snapshot);
+      const plan = row ? await hydrate(c, accountId, row.id, snapshot) : null;
+      return { snapshot, signature, plan, unchanged: row?.roadmap_signature === signature && !plan?.activities.some(a => a.state === 'unavailable'),
+        epoch: (await c.query<{deletion_epoch:number}>('SELECT deletion_epoch FROM accounts WHERE id=$1', [accountId])).rows[0]!.deletion_epoch };
+    });
+    if (prepared.unchanged && prepared.plan) return prepared.plan;
+    let preferred = await selectRoadmapCandidates(this.generator, prepared.snapshot);
+    return m09Transaction(accountId, async c => {
+      const epoch = (await c.query<{deletion_epoch:number}>('SELECT deletion_epoch FROM accounts WHERE id=$1', [accountId])).rows[0]!.deletion_epoch;
+      if (epoch !== prepared.epoch) throw Error('ACCOUNT_DELETING');
+      const snapshot = await inputs(c, accountId), signature = roadmapSignature(snapshot);
+      let row = (await c.query<PlanRow>(
+        "SELECT * FROM learning_plans WHERE account_id=$1 AND state='active'", [accountId],
+      )).rows[0];
+      let plan = row ? await hydrate(c, accountId, row.id, snapshot) : null;
+      if (row?.roadmap_signature === signature && plan && !plan.activities.some(a => a.state === 'unavailable')) return plan;
+      // Concurrent evidence/profile edits are resolved from fresh server candidates, never stale model references.
+      const fresh = planCandidates(snapshot);
+      if (signature !== prepared.signature) preferred = fresh.slice(0, 4);
+      const ordered = [
+        ...fresh.filter(a => a.type !== 'conversation'),
+        ...preferred.filter(a => a.type === 'conversation').map(a => fresh.find(f => f.candidateId === a.candidateId)!).filter(Boolean),
+        ...fresh.filter(a => a.type === 'conversation'),
+      ].filter((a, index, all) => all.findIndex(b => b.candidateId === a.candidateId) === index);
+      // A provider cannot force a recently completed topic ahead of an unpractised topic.
+      ordered.sort((a,b) => Number(a.type === 'conversation' && snapshot.recentScenarioSlugs.includes(a.scenarioSlug!)) - Number(b.type === 'conversation' && snapshot.recentScenarioSlugs.includes(b.scenarioSlug!)));
+      if (!row) {
+        // Adopt an eligible existing proposal for compatibility, or create the learner's first route atomically.
+        row = (await c.query<PlanRow>("SELECT * FROM learning_plans WHERE account_id=$1 AND state='proposal'", [accountId])).rows[0];
+        if (!row) row = (await c.query<PlanRow>(
+          `INSERT INTO learning_plans(account_id,schema_version,generator_version,catalog_version,source_snapshot,rationale,insufficient_data) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+          [accountId, PLAN_SCHEMA_VERSION, PLAN_GENERATOR_VERSION, PLAN_CATALOG_VERSION, snapshot, 'Tu ruta se basa en tu nivel, tus intereses y tu ritmo de práctica.', !snapshot.issues.length && !snapshot.dueCardIds.length],
+        )).rows[0]!;
+        await c.query("UPDATE learning_plans SET state='active',accepted_at=clock_timestamp(),accepted_from_version=version WHERE id=$1 AND account_id=$2", [row.id, accountId]);
+        plan = await hydrate(c, accountId, row.id, snapshot);
+      }
+      const history = plan!.activities.filter(a => a.state === 'completed' || a.state === 'started');
+      let upcoming = ordered.filter(candidate => !history.some(activity => {
+        if (activity.candidateId !== candidate.candidateId) return false;
+        if (activity.state === 'started' || candidate.type === 'conversation') return true;
+        if (candidate.type === 'vocabulary-review') return false; // Newly due cards can be reviewed again.
+        return JSON.stringify(activity.evidence) === JSON.stringify(candidate.evidence);
+      }));
+      // Finishing the full topic cycle opens a fresh cycle while retaining completed steps.
+      if (!upcoming.length && !history.some(a => a.state === 'started')) upcoming = ordered.filter(a => a.type === 'conversation');
+      await c.query("DELETE FROM learning_plan_activities WHERE plan_id=$1 AND account_id=$2 AND NOT (id=ANY($3::uuid[]))", [row.id, accountId, history.map(a => a.id)]);
+      for (const [position, activity] of history.entries())
+        await c.query('UPDATE learning_plan_activities SET position=$3 WHERE id=$1 AND account_id=$2', [activity.id, accountId, position]);
+      for (const [index, activity] of upcoming.entries())
+        await c.query(
+          'INSERT INTO learning_plan_activities(account_id,plan_id,catalog_version,candidate_id,activity_type,definition,position) VALUES($1,$2,$3,$4,$5,$6,$7)',
+          [accountId, row.id, PLAN_CATALOG_VERSION, `${activity.candidateId}@${row.version + 1}`, activity.type, activity, history.length + index],
+        );
+      await c.query(
+        `UPDATE learning_plans SET roadmap_signature=$3,source_snapshot=$4,version=version+1,rationale=$5,generator_version=$6,catalog_version=$7,
+         adapted_at=CASE WHEN roadmap_signature IS NOT NULL THEN clock_timestamp() ELSE adapted_at END WHERE id=$1 AND account_id=$2`,
+        [row.id, accountId, signature, snapshot, 'Tu ruta se basa en tu nivel, tus intereses y tu ritmo de práctica.', PLAN_GENERATOR_VERSION, PLAN_CATALOG_VERSION],
+      );
+      return hydrate(c, accountId, row.id, snapshot);
+    });
+  }
   current(accountId: string) {
     return m09Transaction(accountId, async (c) => {
       const snapshot = await inputs(c, accountId);
@@ -452,10 +545,10 @@ export class PostgresPlanRepository implements PlanRepository {
             ],
           )
         ).rows[0]!.id;
-        for (const a of selected)
+        for (const [position, a] of selected.entries())
           await c.query(
-            'INSERT INTO learning_plan_activities(account_id,plan_id,catalog_version,candidate_id,activity_type,definition) VALUES($1,$2,$3,$4,$5,$6)',
-            [accountId, id, PLAN_CATALOG_VERSION, a.candidateId, a.type, a],
+            'INSERT INTO learning_plan_activities(account_id,plan_id,catalog_version,candidate_id,activity_type,definition,position) VALUES($1,$2,$3,$4,$5,$6,$7)',
+            [accountId, id, PLAN_CATALOG_VERSION, a.candidateId, a.type, a, position],
           );
       }
       await c.query(
@@ -536,12 +629,21 @@ export class PostgresPlanRepository implements PlanRepository {
     return m09Transaction(accountId, async (c) => {
       const r = await required(c, accountId, id),
         snapshot = await inputs(c, accountId);
-      currentVersion(r, expectedVersion);
       if (r.state !== 'active') throw Error('ACTIVITY_STATE_CONFLICT');
+      const receipt = (await c.query<ActivityRow>(
+        'SELECT * FROM learning_plan_activities WHERE id=$1 AND plan_id=$2 AND account_id=$3',
+        [activityId, id, accountId],
+      )).rows[0];
+      if (!receipt) throw Error('PLAN_NOT_FOUND');
+      // A lost acknowledgement must replay the committed start before checking the new version.
+      if (receipt.started_at && receipt.started_from_version === expectedVersion)
+        return { plan: await hydrate(c, accountId, id, snapshot), sessionId: receipt.session_id };
+      currentVersion(r, expectedVersion);
       const plan = await hydrate(c, accountId, id, snapshot),
         a = plan.activities.find((a) => a.id === activityId);
       if (!a) throw Error('PLAN_NOT_FOUND');
       if (a.state === 'started') return { plan, sessionId: a.sessionId };
+      if (r.roadmap_signature !== null && plan.activities.find(a => ['pending', 'started'].includes(a.state))?.id !== activityId) throw Error('ACTIVITY_STATE_CONFLICT');
       if (a.state !== 'pending') throw Error('ACTIVITY_STATE_CONFLICT');
       let sessionId: string | null = null;
       if (a.type !== 'vocabulary-review')
@@ -559,8 +661,8 @@ export class PostgresPlanRepository implements PlanRepository {
           )
         ).rows[0]!.id;
       await c.query(
-        "UPDATE learning_plan_activities SET state='started',started_at=clock_timestamp(),session_id=$3 WHERE id=$1 AND account_id=$2",
-        [activityId, accountId, sessionId],
+        "UPDATE learning_plan_activities SET state='started',started_at=clock_timestamp(),session_id=$3,started_from_version=$4 WHERE id=$1 AND account_id=$2",
+        [activityId, accountId, sessionId, expectedVersion],
       );
       await c.query(
         'UPDATE learning_plans SET version=version+1 WHERE id=$1 AND account_id=$2',

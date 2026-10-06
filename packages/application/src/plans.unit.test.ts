@@ -8,6 +8,7 @@ import {
 const base: PlanInputs = {
   level: 'A1',
   profileVersion: 1,
+  interests: [],
   goal: { minutesPerDay: 10, daysPerWeek: 3, version: 1 },
   issues: [],
   dueCardIds: [],
@@ -21,7 +22,7 @@ it.each(['A1', 'B1', 'B2'] as const)(
       await new DeterministicPlanGenerator().select(candidates),
       candidates,
     );
-    expect(selected).toHaveLength(2);
+    expect(selected).toHaveLength(4);
     expect(
       selected.every(
         (a) =>
@@ -67,4 +68,13 @@ it('accepts only catalog-owned values and never turns injection into instruction
       candidates,
     ),
   ).toThrow();
+});
+
+it('interests prioritize adult topics while recent topics are deferred and catalog order breaks ties', () => {
+  expect(planCandidates({...base, level: 'B1', interests: ['viajes']})[0]?.scenarioSlug).toBe('travel');
+  expect(planCandidates({...base, interests: ['cocina']})[0]?.scenarioSlug).toBe('restaurant');
+  const recent = planCandidates({...base, interests: ['viajes'], recentScenarioSlugs: ['travel','hotel']});
+  expect(recent[0]?.scenarioSlug).toBe('introductions');
+  expect(recent.slice(-2).map(a => a.scenarioSlug)).toEqual(['travel','hotel']);
+  expect(recent).toHaveLength(14);
 });

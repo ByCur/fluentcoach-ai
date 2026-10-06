@@ -377,6 +377,9 @@ export class ConversationService {
       s.events.filter((e) => e.sequence > cursor),
     );
   }
+  get(accountId: string, id: string) {
+    return this.required(accountId, id);
+  }
   history(accountId: string) {
     return this.repo.history(accountId);
   }

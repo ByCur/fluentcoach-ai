@@ -79,7 +79,7 @@ collecting data.
 | F07 | History shows session settings, status, transcript availability and report status; repeated end requests do not duplicate reports. |
 | F08 | Automatically produce strengths, up to three priority corrections, transcript evidence, explanations and practice suggestions. Show pending/failed/retry states; empty sessions produce no fabricated feedback. |
 | F09 | Aggregate recurring grammar/vocabulary issues across distinct sessions using normalized categories; retain evidence/uncertainty and allow dismissal. |
-| F10 | Propose a small personalized plan using level, goals, recurring issues and due vocabulary; explain priorities; allow accept/skip/refresh. |
+| F10 | Automatically activate a learner roadmap using selected level, interests, weekly goal, recent topics, recurring issues and due vocabulary. Show one current step, completed history and upcoming practices; adapt upcoming steps without manual plan acceptance. Local Ollama may reorder validated server candidates with deterministic fallback and no paid provider. |
 | F11 | Track phrase/lemma, contextual meaning, Spanish translation, example, source and status. Learner confirms suggestions before scheduled review. |
 | F12 | Spaced repetition uses a deterministic, versioned algorithm and ratings; duplicate review submission cannot advance twice. |
 | F13 | Show minutes, sessions, goals, speaking streaks, review activity and evidence-based issue trends; display insufficient-data states instead of invented fluency scores. |

@@ -21,7 +21,7 @@ async function start(page: Page) {
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Aceptar y guardar' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Configuración guardada' })).toContainText('Configuración guardada');
-  await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/ }).click();
+  await page.getByRole('button', { name: 'Práctica libre' }).click();
   await page.getByLabel('Situación').selectOption('hotel');
   await page.getByRole('button', { name: 'Empezar práctica' }).click();
 }
@@ -43,7 +43,7 @@ test('automatic report cites actual learner text and survives history reload', a
   ).toBeVisible();
   await expect(panel.getByText(/no certifica tu nivel/)).toBeVisible();
   await page.reload();
-  await page.getByRole('button', { name: /Practicar ahora|Continuar práctica/ }).click();
+  await page.getByRole('button', { name: 'Práctica libre' }).click();
   await page
     .getByRole('button', { name: 'Ver historial', exact: true })
     .click();

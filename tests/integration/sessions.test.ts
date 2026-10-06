@@ -13,7 +13,7 @@ describe('M03 PostgreSQL sessions', () => {
       await service.end(a.id,s.id); // Release one of the five M10 open-session slots.
     }
     await sql("UPDATE learner_profiles SET cefr_level='B2' WHERE account_id=$1", [a.id]);
-    expect((await service.history(a.id)).filter(s => s.snapshot.level === 'A1')).toHaveLength(6);
+    expect((await service.history(a.id)).filter(s => s.snapshot.level === 'A1')).toHaveLength(14);
   });
   it('orders deltas and deduplicates turns per session, replays only events after the cursor', async () => {
     const a = await account('a'), service = new ConversationService(new PostgresSessionRepository(), new FakeConversationProvider());

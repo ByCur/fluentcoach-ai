@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import type { ConversationService } from '@fluentcoach/application';
-import { startSessionInput, turnInput } from '@fluentcoach/contracts';
+import { startSessionInput, turnInput, resourceId } from '@fluentcoach/contracts';
 import { AuthGuard, type AuthRequest } from './auth.guard.js';
 import { CsrfGuard } from './csrf.guard.js';
 import { CONVERSATION_SERVICE } from './tokens.js';
@@ -29,6 +29,9 @@ export class ConversationController {
   }
   @Get('sessions') history(@Req() r: AuthRequest) {
     return this.service.history(r.accountId!);
+  }
+  @Get('sessions/:id') session(@Req() r: AuthRequest, @Param('id') id: string) {
+    return this.service.get(r.accountId!, resourceId.parse(id));
   }
   @Post('sessions') @UseGuards(CsrfGuard) start(
     @Req() r: AuthRequest,

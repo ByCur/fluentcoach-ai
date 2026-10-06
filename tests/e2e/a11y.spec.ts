@@ -54,7 +54,7 @@ test("practice, conversation, fake voice controls, report, issues, vocabulary an
   await check(page, "profile-navigation");
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Abrir menú de perfil' })).toBeFocused();
-  await page.getByRole("button", { name: /Practicar ahora|Continuar práctica/ }).click();
+  await page.getByRole("button", { name: 'Práctica libre' }).click();
   await check(page, "practice-selection");
   // Transient fake media exercises the recording UI without device access.
   await page.evaluate(() => {
@@ -102,15 +102,9 @@ test("practice, conversation, fake voice controls, report, issues, vocabulary an
   await page.getByRole("button", { name: "Actualizar vocabulario" }).click();
   await page.getByRole("button", { name: "Añadir al repaso" }).first().click();
   await check(page, "vocabulary-review");
-  await openLearnerPage(page, 'Mi plan');
-  const plan = page.getByRole("region", { name: "Mi plan" });
-  await plan.getByRole("button", { name: "Preparar mi plan" }).click();
-  await expect(
-    plan.getByRole("article", { name: "Propuesta de plan" }),
-  ).toBeVisible();
-  await check(page, "plan");
-  await openLearnerPage(page, 'Mis recomendaciones');
-  await check(page, 'recommendations');
+  await page.getByRole('button', {name: 'Inicio', exact: true}).click();
+  await expect(page.getByRole('button', {name: 'Continuar mi ruta'})).toBeVisible();
+  await check(page, 'adaptive-roadmap');
   await openLearnerPage(page, 'Mi progreso');
   await check(page, 'progress');
 });

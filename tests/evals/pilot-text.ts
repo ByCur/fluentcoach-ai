@@ -3,10 +3,18 @@ import {
   type ConversationMode,
   type SessionSnapshot,
 } from '@fluentcoach/domain';
-export const PILOT_TEXT_SUITE_VERSION = 'pilot-text-fixtures-v2';
+export const PILOT_TEXT_SUITE_VERSION = 'pilot-text-fixtures-v3';
 // Synthetic-only review matrix: each case checks policy and evidence mechanically.
 // Human live review must additionally score usefulness, level fit, scenario coherence and Spanish clarity.
-const inputs: Record<string, string> = {
+const inputs: Record<(typeof SCENARIOS)[number]['slug'], string> = {
+  introductions: 'I live in Madrid and work in a shop',
+  'past-experiences': 'Last weekend I visit my friends',
+  'family-friends': 'My sister live near my house',
+  work: 'I have a meeting with my colleague tomorrow',
+  hobbies: 'I enjoy reading books in my free time',
+  'future-plans': 'Next year I will travel with my family',
+  opinions: 'I think public transport is very useful',
+  'problem-solving': 'My train is cancelled and I need another ticket',
   restaurant: 'I want order soup',
   travel: 'Where is train station?',
   hotel: 'I need room for two nights',
@@ -25,7 +33,7 @@ export const PILOT_TEXT_CASES = SCENARIOS.flatMap((scenario) =>
         mode,
         promptVersion: 'tutor-v4',
       } satisfies SessionSnapshot,
-      input: inputs[scenario.slug]!,
+      input: inputs[scenario.slug],
       rubric: {
         maxWords:
           level === 'A1'

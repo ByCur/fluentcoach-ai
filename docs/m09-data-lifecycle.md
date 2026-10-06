@@ -1,5 +1,7 @@
 # M09 plan and progress data lifecycle
 
+For the current roadmap behavior and additive migration, see [ADR 0020](adr/0020-roadmap-first-learning.md). The rows below record legacy plan behavior.
+
 Implementation ready for technical review. See [ADR 0014](adr/0014-plans-and-active-progress.md)
 for complete versions, catalog selection, lifecycle, metric definitions and limits.
 

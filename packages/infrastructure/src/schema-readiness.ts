@@ -5,7 +5,9 @@ export const M02_MIGRATION = '202609290001_m02_identity';
 export const M08_MIGRATION = '202610050002_m08_vocabulary_reviews';
 export const M09_MIGRATION = '202610050003_m09_plans_progress';
 export const M10_MIGRATION = '202610060001_m10_privacy';
+export const ROADMAP_MIGRATION = '202610060003_roadmap';
 const requiredMigrations = [
+ '202610060002_m11_release_control',
  RELEASE_MIGRATION,
  M10_MIGRATION,
   M09_MIGRATION,
@@ -17,6 +19,8 @@ const requiredMigrations = [
   '202609300005_m05_hardening_compatibility',
 ];
 const requiredColumns = [
+ ['learning_plans','roadmap_signature'], ['learning_plans','adapted_at'],
+ ['learning_plan_activities','position'], ['learning_plan_activities','started_from_version'],
  ['release_control','draining'],
  ['qstash_publication_budgets','day'], ['qstash_publication_budgets','publications'], ['qstash_publication_budgets','blocked'],
  ['accounts','deletion_epoch'], ['practice_sessions','deletion_epoch'], ['analysis_runs','deletion_epoch'], ['learning_plans','deletion_epoch'],

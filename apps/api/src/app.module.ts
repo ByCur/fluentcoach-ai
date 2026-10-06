@@ -24,6 +24,8 @@ import {
   ProgressService,
 } from '@fluentcoach/application';
 import {
+  OllamaTextAdapter,
+  loadAiConfig,
   Auth0OidcAdapter,
   PostgresAccountRepository,
   PostgresJobStore,
@@ -73,7 +75,10 @@ import {
   providers: [
     {provide:PrivacyService,useFactory:()=>new PrivacyService(new PostgresPrivacyRepository(Number(process.env['PRIVACY_EXPORT_MAX_BYTES']??8388608)))},
     PrivacyReconciler,
-    { provide: PlanService, useFactory: () => new PlanService(new PostgresPlanRepository(process.env['AI_PROVIDER'] === 'fake' ? new FakePlanGenerator() : undefined)) },
+    { provide: PlanService, useFactory: () => {
+      const config = loadAiConfig(process.env);
+      return new PlanService(new PostgresPlanRepository(config.provider === 'fake' ? new FakePlanGenerator() : config.provider === 'ollama' ? new OllamaTextAdapter(config.ollama) : undefined));
+    } },
     { provide: ProgressService, useFactory: () => new ProgressService(new PostgresProgressRepository()) },
     {
       provide: IssueService,

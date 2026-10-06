@@ -97,7 +97,9 @@ describe('M09 authenticated HTTP transport', () => {
       .get('/api/v1/plans/current')
       .set('Cookie', cookie(b))
       .expect(200);
-    expect(current.body).toEqual({ active: null, proposal: null });
+    expect(current.body.proposal).toBeNull();
+    expect(current.body.active.id).not.toBe(p.id);
+    expect(current.body.active.state).toBe('active');
     const ownerId = (
       await sql<{ id: string }>(
         "SELECT id FROM accounts WHERE oidc_subject='owner'",
@@ -206,4 +208,19 @@ describe('M09 authenticated HTTP transport', () => {
       durationMs: 300000,
     }).expect(404);
   });
+});
+
+it('roadmap ensure uses only the authenticated owner, rejects injected state and protects direct session resume', async () => {
+  const a = await login('roadmap-owner'), b = await login('roadmap-other');
+  await onboard(a); await onboard(b);
+  const active = (await post(a, '/roadmap', {}).expect(201)).body;
+  await post(a, '/roadmap', {accountId: randomUUID(), candidateIds: ['exam']}).expect(400);
+  await request(app.getHttpServer()).post('/api/v1/roadmap').send({}).expect(401);
+  await request(app.getHttpServer()).post('/api/v1/roadmap').set('Cookie', cookie(a)).set('Origin', origin).send({}).expect(400).expect(response => {expect(response.body.error.code).toBe('CSRF_REJECTED');});
+  const started = (await post(a, `/plans/${active.id}/activities/${active.activities[0].id}/start`, {expectedVersion: active.version}).expect(201)).body;
+  await request(app.getHttpServer()).get(`/api/v1/sessions/${started.sessionId}`).set('Cookie', cookie(a)).expect(200);
+  await request(app.getHttpServer()).get(`/api/v1/sessions/${started.sessionId}`).set('Cookie', cookie(b)).expect(404);
+  const other = (await post(b, '/roadmap', {}).expect(201)).body;
+  expect(other.id).not.toBe(active.id);
+  expect(other.activities.every((activity: {sessionId: string | null}) => activity.sessionId === null)).toBe(true);
 });
