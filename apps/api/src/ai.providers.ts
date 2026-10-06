@@ -88,7 +88,7 @@ export function createJobs(reports: ReportService) {
       : process.env['QSTASH_TOKEN']
         ? new QStashTransport({
             token: process.env['QSTASH_TOKEN'],
-            destination: `${process.env['PUBLIC_ORIGIN']}/api/v1/jobs/analysis`,
+            destination: `${process.env['PUBLIC_API_ORIGIN'] ?? process.env['PUBLIC_ORIGIN']}/api/v1/jobs/analysis`,
           })
         : { enqueue: () => Promise.reject(new Error('QSTASH_UNAVAILABLE')) };
   const jobs = new JobService(new PostgresJobStore(), transport, reports,3,new StructuredTelemetry());

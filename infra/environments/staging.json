@@ -1,0 +1,12 @@
+{
+  "APP_ENVIRONMENT": "staging",
+  "NODE_ENV": "production",
+  "BILLING_MODE": "free_only",
+  "AI_PROVIDER": "ollama",
+  "SPEECH_PROVIDER": "whisper-cpp",
+  "AI_FALLBACK_PROVIDER": "none",
+  "DEPLOY_WORKER": "false",
+  "PUBLIC_ORIGIN": "https://staging.invalid",
+  "OLLAMA_BASE_URL": "http://127.0.0.1:11434",
+  "WHISPER_BASE_URL": "http://127.0.0.1:8080"
+}

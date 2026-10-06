@@ -47,7 +47,20 @@
     "privacy:tombstones:export": "tsx scripts/privacy-tombstones.ts export",
     "privacy:tombstones:replay": "tsx scripts/privacy-tombstones.ts replay",
     "drill:restore": "tsx scripts/drill-restore.ts",
-    "test:security": "tsx scripts/security-scan.ts"
+    "test:security": "tsx scripts/security-scan.ts",
+    "release:preflight": "tsx scripts/release.ts preflight",
+    "release:check": "tsx scripts/release.ts check",
+    "release:migrate": "tsx scripts/release-operations.ts migrate",
+    "release:drain": "tsx scripts/release-operations.ts drain",
+    "release:status": "tsx scripts/release-operations.ts status",
+    "release:resume": "tsx scripts/release-operations.ts resume",
+    "release:identity": "tsx scripts/release-identity.ts",
+    "test:migrations": "vitest run --project migrations",
+    "test:deployment": "vitest run --project deployment",
+    "test:release": "vitest run --project release",
+    "test:e2e:cold-start": "playwright test tests/e2e/cold-start.spec.ts",
+    "test:smoke:staging": "tsx scripts/smoke-release.ts staging",
+    "test:smoke:production": "tsx scripts/smoke-release.ts production"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.10.2",
@@ -60,22 +73,23 @@
     "@nestjs/testing": "11.1.6",
     "@playwright/test": "1.55.1",
     "@types/cookie-parser": "1.4.9",
+    "@types/express": "5.0.3",
     "@types/node": "20.19.17",
     "@types/pg": "8.15.5",
     "@types/supertest": "6.0.3",
     "cookie-parser": "1.4.7",
     "eslint": "9.36.0",
+    "express": "5.2.1",
     "pg": "8.16.3",
     "prisma": "6.16.2",
+    "redis": "5.8.2",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "supertest": "7.1.4",
     "tsx": "4.20.5",
     "typescript": "5.9.2",
     "typescript-eslint": "8.44.1",
-    "vitest": "3.2.4",
-    "express": "5.2.1",
-    "@types/express": "5.0.3"
+    "vitest": "3.2.4"
   },
   "pnpm": {
     "overrides": {

@@ -1,5 +1,10 @@
 # ADR 0005: Strict zero-cost initial learner pilot
 
+> M11 current verification: [ADR 0017](0017-m11-blocked-zero-cost-release.md) and
+> [provider review](../m11-provider-verification.md) supersede historical hosting
+> feasibility and quota snapshots below. Cloud promotion is blocked; local
+> defaults remain. No resources, billing or deployed worker were added.
+
 > **Current provider defaults: ADRs [0010](0010-local-first-ollama-text.md) and
 > [0011](0011-local-composed-turn-voice.md).** Ollama local text, whisper.cpp local
 > transcription and browser speechSynthesis supersede the historical Gemini

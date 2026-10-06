@@ -6,6 +6,7 @@ export interface SessionStore { get(id: string): Promise<Session | null>; set(id
 export class RedisSessionStore implements SessionStore {
   private client: RedisClientType;
   constructor(url: string) { this.client = createClient({ url, socket: {reconnectStrategy:false,connectTimeout:2000} }); this.client.on('error',()=>undefined); }
+  async close() { if (this.client.isOpen) await this.client.quit(); }
   private async ready() { if (!this.client.isOpen) await this.client.connect(); }
   async get(id:string) { await this.ready(); const value=await this.client.get(`session:${id}`); return value ? JSON.parse(value) as Session : null; }
   async set(id:string, value:Session) { await this.ready(); await this.client.set(`session:${id}`,JSON.stringify(value),{PX:Math.max(1,value.absoluteExpiresAt-Date.now())}); }

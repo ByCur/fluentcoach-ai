@@ -7,7 +7,10 @@ bounded Gemini adapter retained as an explicit optional provider, and M05 adds
 validated automatic reports with retry and cited learner turns. Its offline
 checks pass; real local-model performance still requires host smoke validation,
 while Gemini's optional live checks require separately approved Free-Tier
-credentials. Voice remains outside this implementation.
+credentials. Local push-to-talk voice uses whisper.cpp and browser speechSynthesis. M11 adds
+release tooling, but secure zero-cost cloud text/voice hosting remains blocked;
+staging/production and the private learner pilot are not complete. See
+[release runbook](docs/m11-release-runbook.md) and [provider verification](docs/m11-provider-verification.md).
 
 ## Prerequisites
 

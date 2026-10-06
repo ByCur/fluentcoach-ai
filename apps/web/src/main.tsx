@@ -1,3 +1,4 @@
+import { waitForApi, type ConnectionState } from './reconnect.js';
 import { PrivacyPanel } from './privacy-panel.js';
 import { PlanProgressPanel } from './plan-progress-panel.js';
 import { ActiveTypingTimer } from './active-typing.js';
@@ -55,6 +56,9 @@ const initial: Data = {
   accepted: false,
 };
 function App() {
+  const [connection,setConnection]=useState<ConnectionState>('starting');
+  const [authMode,setAuthMode]=useState<'synthetic'|'oidc'|null>(null);
+  const [connectionAttempt,setConnectionAttempt]=useState(0);
   const [privacy,setPrivacy]=useState(false);
   const [deleted,setDeleted]=useState(false);
   const [auth, setAuth] = useState(false),
@@ -121,14 +125,25 @@ function App() {
       ...options,
     });
   useEffect(() => {
-    void api('/me').then(async (r) => {
-      if (!r.ok) return;
+    const controller=new AbortController();
+    void waitForApi(setConnection,controller.signal).then(async ready=>{
+      if(!ready || controller.signal.aborted)return;
+      const mode=await api('/auth/mode');
+      if(!mode.ok)throw Error('AUTH_MODE_UNAVAILABLE');
+      const authModeValue=(await mode.json() as {mode?:unknown}).mode;
+      if(authModeValue!=='synthetic'&&authModeValue!=='oidc')throw Error('AUTH_MODE_UNAVAILABLE');
+      setAuthMode(authModeValue);
+      return api('/me');
+    }).then(async (r) => {
+      if(!r || controller.signal.aborted)return;
+      if (!r.ok) {if(r.status!==401)setConnection('unavailable');return;}
       const [p, g, c, csrfResponse] = await Promise.all([
         api('/learner-profile'),
         api('/practice-goal'),
         api('/consent'),
         api('/auth/csrf'),
       ]);
+      if(![p,g,c,csrfResponse].every(response=>response.ok)){setConnection('unavailable');return;}
       const pv = (await p.json()) as ProfileResponse | null,
         gv = (await g.json()) as GoalResponse | null,
         cv = (await c.json()) as ConsentResponse,
@@ -147,14 +162,33 @@ function App() {
             consent.providerDisclosureVersion === currentConsent.providerDisclosureVersion &&
             consent.revokedAt === null),
         }));
-    });
-  }, []);
+    }).catch(()=>setConnection('unavailable'));
+    return ()=>controller.abort();
+  }, [connectionAttempt]);
   useEffect(() => {
     if (!session || !practice) return;
-    const source = new EventSource(
+    let source:EventSource;
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    let attempts=0;
+    let stableTimer:ReturnType<typeof setTimeout>|undefined;
+    let disposed=false;
+    const connect=()=>{
+    source = new EventSource(
       `${API}/sessions/${session.id}/events?cursor=${cursorRef.current}`,
       { withCredentials: true },
     );
+    source.onopen=()=>{
+      setConnection('ready');
+      // Normal bounded server streams close periodically. Only consecutive failures exhaust retries.
+      stableTimer=setTimeout(()=>{attempts=0;},5000);
+    };
+    source.onerror=()=>{
+      source.close();
+      clearTimeout(stableTimer);
+      if(disposed)return;
+      setConnection(++attempts>5?'unavailable':'reconnecting');
+      if(attempts<=5)timer=setTimeout(connect,Math.min(5000,1000*attempts));
+    };
     source.onmessage = (event) => {
       const value = JSON.parse(String(event.data)) as {
         sequence: number;
@@ -173,7 +207,9 @@ function App() {
       if (value.kind === 'tutor.delta' && value.payload?.text)
         setStreamed((current) => current + value.payload!.text!);
     };
-    return () => source.close();
+    };
+    connect();
+    return () => {disposed=true;clearTimeout(timer);clearTimeout(stableTimer);source?.close();};
   }, [session?.id, practice]);
   useEffect(() => {
     if (!session || !('speechSynthesis' in window)) return;
@@ -191,10 +227,13 @@ function App() {
     window.speechSynthesis.speak(utterance);
   }, [session, muted, speech.voice, speech.rate]);
   const login = async () => {
+    if(!authMode)return;
+    if(authMode==='oidc'){window.location.assign(`${API}/auth/login`);return;}
     const r = await api('/auth/synthetic-login', {
       method: 'POST',
       body: JSON.stringify({ subject: 'learner-demo' }),
     });
+    if(!r.ok){setConnection('unavailable');return;}
     const b = (await r.json()) as CsrfResponse;
     setCsrf(b.csrfToken);
     setAuth(true);
@@ -461,6 +500,7 @@ function App() {
           </button>
         </header>
         <button className="secondary" onClick={()=>setPrivacy(true)}>Privacidad y tus datos</button>
+        {connection!=='ready'&&<p role="status">{connection==='unavailable'?'No hay conexión. Tu sesión se conserva. Vuelve a abrir Practicar para reconectar.':'Reconectando… Tu sesión se conserva.'}</p>}
         {providerError && <p role="alert">{providerError}</p>}
         {reportId && (
           <ReportPanel
@@ -680,6 +720,7 @@ function App() {
       </main>
     );
   }
+  if(!auth && (connection!=='ready'||!authMode))return <main><h1>FluentCoach AI</h1><p role="status">{connection==='unavailable'?'Servicio no disponible. Tus datos se conservan.':'Iniciando el servicio…'}</p>{connection==='unavailable'&&<button onClick={()=>setConnectionAttempt(x=>x+1)}>Reintentar conexión</button>}</main>;
   if (!auth)
     return (
       <main className="signed">
@@ -687,7 +728,7 @@ function App() {
         <h1>Practica inglés con confianza.</h1>
         <p>Tu espacio privado para avanzar paso a paso.</p>
         <button onClick={() => void login()}>
-          Entrar con identidad de desarrollo
+          {authMode==='synthetic'?'Entrar con identidad de desarrollo':'Entrar con tu invitación'}
         </button>
         <small>
           En producción, el acceso será mediante el proveedor OIDC invitado.

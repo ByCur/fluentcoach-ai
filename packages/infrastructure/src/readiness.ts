@@ -16,6 +16,6 @@ export async function probeTcpUrl(rawUrl: string, timeoutMs = 1_000): Promise<bo
 }
 
 export async function dependenciesReady(probes: readonly DependencyProbe[]): Promise<boolean> {
-  const results = await Promise.all(probes.map(async (probe) => await probe()));
+  const results = await Promise.all(probes.map(async (probe) => await probe().catch(() => false)));
   return results.every(Boolean);
 }

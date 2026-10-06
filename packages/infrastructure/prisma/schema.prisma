@@ -491,3 +491,17 @@ model DeletionTombstone {
  schemaVersion String @map("schema_version") @db.VarChar(40)
  @@map("deletion_tombstones")
 }
+
+model ReleaseControl {
+ singleton Boolean @id @default(true)
+ draining Boolean @default(false)
+ changedAt DateTime @default(now()) @map("changed_at") @db.Timestamptz
+ @@map("release_control")
+}
+
+model QstashPublicationBudget {
+ day DateTime @id @db.Date
+ publications Int
+ blocked Boolean @default(false)
+ @@map("qstash_publication_budgets")
+}

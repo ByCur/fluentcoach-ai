@@ -1,0 +1,12 @@
+{
+  "APP_ENVIRONMENT": "local",
+  "NODE_ENV": "development",
+  "BILLING_MODE": "free_only",
+  "AI_PROVIDER": "ollama",
+  "SPEECH_PROVIDER": "whisper-cpp",
+  "AI_FALLBACK_PROVIDER": "none",
+  "DEPLOY_WORKER": "false",
+  "PUBLIC_ORIGIN": "http://127.0.0.1:4173",
+  "OLLAMA_BASE_URL": "http://127.0.0.1:11434",
+  "WHISPER_BASE_URL": "http://127.0.0.1:8080"
+}

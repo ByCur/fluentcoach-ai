@@ -13,11 +13,10 @@ const legacyConsent = {
 test('synthetic learner accepts local-first onboarding and values survive reload', async ({ page }) => {
   await page.goto('/');
   const loginButton = page.getByRole('button', { name: /Entrar/ });
-  if (await loginButton.isVisible()) {
-    const responsePromise = page.waitForResponse(response => response.url().includes('/auth/synthetic-login'));
-    await loginButton.evaluate((element: HTMLElement) => element.click());
-    expect((await responsePromise).status()).toBe(201);
-  }
+  await expect(loginButton).toBeVisible();
+  const responsePromise = page.waitForResponse(response => response.url().includes('/auth/synthetic-login'));
+  await loginButton.click();
+  expect((await responsePromise).status()).toBe(201);
   await expect(page.getByRole('heading', { name: 'Prepara tu aprendizaje' })).toBeVisible();
   await page.getByLabel('B1').check();
   await page.getByLabel(/Intereses/).fill('viajes, cocina');

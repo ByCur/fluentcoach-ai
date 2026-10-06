@@ -21,3 +21,4 @@ export * from './plan-progress-repository.js';
 
 export * from './privacy-repository.js';
 export * from './telemetry.js';
+export * from './release-policy.js';

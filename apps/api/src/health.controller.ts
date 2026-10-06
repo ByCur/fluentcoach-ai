@@ -1,7 +1,7 @@
 import { Controller, Get, HttpCode, Inject, Optional, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { HealthResponse } from '@fluentcoach/contracts';
-import { dependenciesReady, probeTcpUrl, schemaReady, type DependencyProbe } from '@fluentcoach/infrastructure';
+import { dependenciesReady, probeTcpUrl, schemaReady, releaseIdentitySchema, RELEASE_MIGRATION, type DependencyProbe } from '@fluentcoach/infrastructure';
 
 export const READINESS_PROBES = Symbol('READINESS_PROBES');
 
@@ -19,6 +19,17 @@ export class HealthController {
 
   @Get('live')
   live(): HealthResponse { return { status: 'ok', service: 'api' }; }
+
+  @Get('release')
+  release(@Res({passthrough:true}) response:Response) {
+    const identity = releaseIdentitySchema.safeParse({
+      commitSha:process.env['RELEASE_COMMIT_SHA'], imageDigest:process.env['RELEASE_IMAGE_DIGEST'],
+      migrationVersion:process.env['RELEASE_MIGRATION_VERSION'],
+      compatibleMigrationVersions:['202610060001_m10_privacy',RELEASE_MIGRATION],
+    });
+    if (!identity.success) {response.status(503);return {status:'unreleased'};}
+    return identity.data;
+  }
 
   @Get('ready')
   @HttpCode(200)

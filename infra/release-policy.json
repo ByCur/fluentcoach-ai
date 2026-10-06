@@ -1,0 +1,8 @@
+{
+  "version": "release-policy-v1",
+  "billingMode": "free_only",
+  "monthlyTargetEur": 0,
+  "workerDeployed": false,
+  "topology": "render-free-local-ai-blocked",
+  "blockers": ["LOCAL_AI_VOICE_HOSTING_UNVERIFIED", "REDIS_FREE_ENCRYPTION_AT_REST_UNAVAILABLE", "INDEPENDENT_TOMBSTONE_STORAGE_UNVERIFIED"]
+}
