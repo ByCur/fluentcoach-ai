@@ -70,6 +70,7 @@ test("practice, conversation, fake voice controls, report, issues, vocabulary an
     Object.defineProperty(window,'MediaRecorder',{configurable:true,value:FakeRecorder});
   });
   for (let n = 0; n < 2; n++) {
+    if (n > 0) await page.getByRole('button', {name: 'Práctica libre'}).click();
     await page.getByRole("button", { name: "Empezar práctica" }).click();
     await check(page, "text-conversation-and-voice-controls");
     if(n===0){
@@ -93,7 +94,11 @@ test("practice, conversation, fake voice controls, report, issues, vocabulary an
       timeout: 15000,
     });
     await check(page, "report");
-    await report.getByRole("button", { name: "Cerrar informe" }).click();
+    await expect(page.getByRole('heading', {name: '¿Qué quieres practicar?'})).toHaveCount(0);
+    await report.getByRole("button", { name: n === 0 ? 'Continuar mi ruta' : 'Cerrar informe' }).click();
+    await expect(page.getByRole('heading', {level: 1, name: 'Tu ruta de inglés · A1'})).toBeFocused();
+    await expect(page.getByRole('button', {name: 'Continuar mi ruta'})).toBeVisible();
+    await check(page, 'roadmap-after-report');
   }
   await openLearnerPage(page, 'Lo que debo mejorar');
   await page.getByRole("button", { name: "Actualizar mis ejemplos" }).click();

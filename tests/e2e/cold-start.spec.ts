@@ -124,11 +124,43 @@ test('lost turn acknowledgement and stream reconnect retain the session and idem
     && response.request().method() === 'POST');
   const history = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/sessions'
     && response.request().method() === 'GET');
+  let newConversationRequests = 0;
+  page.on('request', request => {
+    const path = new URL(request.url()).pathname;
+    if (request.method() === 'POST' && (path === '/api/v1/sessions' || path.endsWith('/start'))) newConversationRequests++;
+  });
   await page.getByRole('button', { name: 'Terminar', exact: true }).click();
   const endResponse = await ended;
   expect(endResponse.ok()).toBe(true);
   const records = await (await history).json() as SessionRecord[];
   expect(records.find((record) => record.id === sessionId)).toMatchObject({ state: 'ended', turns: retriedSession.turns });
   await expect(page.locator('[data-session]')).toHaveCount(0);
-  await expect(page.locator(`[data-session-history="${sessionId}"]`)).toContainText('Terminada');
+  const report = page.getByRole('region', { name: 'Informe de sesión' });
+  await expect(report).toBeVisible();
+  await expect(page.getByRole('heading', { name: '¿Qué quieres practicar?' })).toHaveCount(0);
+  for (const name of ['Situación', 'Nivel de práctica', 'Cómo quieres practicar']) {
+    await expect(page.getByRole('combobox', { name, exact: true })).toHaveCount(0);
+  }
+  await expect(page.getByRole('button', { name: 'Empezar práctica' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Ver historial' })).toHaveCount(0);
+  await expect(page.locator('[data-session-history]')).toHaveCount(0);
+  const continueRoute = report.getByRole('button', { name: 'Continuar mi ruta' });
+  await expect(continueRoute).toBeVisible();
+  const roadmap = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/roadmap'
+    && response.request().method() === 'POST');
+  await continueRoute.click();
+  expect((await roadmap).ok()).toBe(true);
+  await expect(page.getByRole('heading', { level: 1, name: /Tu ruta de inglés/ })).toBeVisible();
+  await expect(page.locator('.current-step')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continuar mi ruta' })).toBeEnabled();
+  await expect(report).toHaveCount(0);
+  await expect(page.locator('[data-session]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Empezar práctica' })).toHaveCount(0);
+  await expect(page.locator('[data-session-history]')).toHaveCount(0);
+  const canonicalHistory = await page.request.get('/api/v1/sessions');
+  expect(canonicalHistory.ok()).toBe(true);
+  expect(await canonicalHistory.json() as SessionRecord[]).toMatchObject([
+    { id: sessionId, state: 'ended', turns: retriedSession.turns },
+  ]);
+  expect(newConversationRequests).toBe(0);
 });

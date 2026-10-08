@@ -1,5 +1,6 @@
 import {setSessionInitiator} from '../support/session-initiator.js';
 import { randomUUID } from 'node:crypto';
+import type { LearningPlan } from '@fluentcoach/application';
 import { expect, test, type Page } from '@playwright/test';
 import { openLearnerPage } from './learner-navigation.js';
 
@@ -152,6 +153,111 @@ async function forceRoadmapInitiator(page: Page, initiator: 'tutor'|'learner') {
     await page.unroute('**/api/v1/plans/*/activities/*/start');
   });
 }
+
+async function expectNoPracticeForm(page: Page) {
+  await expect(page.getByRole('heading', {name: '¿Qué quieres practicar?'})).toHaveCount(0);
+  for (const name of ['Situación', 'Nivel de práctica', 'Cómo quieres practicar']) {
+    await expect(page.getByRole('combobox', {name, exact: true})).toHaveCount(0);
+  }
+  await expect(page.getByRole('button', {name: 'Empezar práctica'})).toHaveCount(0);
+  await expect(page.getByRole('button', {name: 'Ver historial'})).toHaveCount(0);
+}
+
+for (const action of ['Continuar mi ruta', 'Cerrar informe']) {
+  test(`roadmap session report returns to the canonical next step through ${action}`, async ({page}) => {
+    await readyLearner(page);
+    await expect(page.locator('.current-step')).toBeVisible();
+    const firstId = await page.locator('.current-step').getAttribute('data-activity');
+    let starts = 0;
+    page.on('request', request => {if (request.url().endsWith('/start')) starts++;});
+    await expectNoPracticeForm(page);
+    await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+    await expect(page.getByRole('button', {name: 'Enviar', exact: true})).toBeEnabled();
+    await page.getByLabel('Tu respuesta').fill('I would like to travel by train');
+    await page.getByRole('button', {name: 'Enviar', exact: true}).click();
+    await expect(page.getByLabel('Tu respuesta')).toHaveValue('');
+    await page.getByRole('button', {name: 'Terminar'}).click();
+    const report = page.getByRole('region', {name: 'Informe de sesión'});
+    await expect(report.getByRole('status')).toContainText('Informe listo', {timeout: 15000});
+    await expectNoPracticeForm(page);
+    await expect(page.getByRole('button', {name: 'Práctica libre'})).toHaveCount(0);
+    await expect(report.getByRole('button', {name: 'Continuar mi ruta'})).toBeVisible();
+    const reloaded = page.waitForResponse(response => response.url().endsWith('/roadmap') && response.request().method() === 'POST');
+    await report.getByRole('button', {name: action}).click();
+    const canonical = await (await reloaded).json() as LearningPlan;
+    expect(canonical.activities.find(activity => activity.id === firstId)?.state).toBe('completed');
+    const next = canonical.activities.find(activity => activity.state === 'started') ?? canonical.activities.find(activity => activity.state === 'pending');
+    expect(next!.id).not.toBe(firstId);
+    await expect(page.getByRole('heading', {level: 1, name: 'Tu ruta de inglés · A2'})).toBeFocused();
+    await expect(page.locator('.current-step')).toHaveAttribute('data-activity', next!.id);
+    await expect(page.locator('.current-step h2')).toHaveText(next!.title);
+    await expect(report).toHaveCount(0);
+    await expectNoPracticeForm(page);
+    await expect(page.getByLabel('Tu respuesta')).toHaveCount(0);
+    expect(starts).toBe(1);
+    expect(await (await page.request.get('/api/v1/sessions')).json() as unknown[]).toHaveLength(1);
+    // Only a separate choice on Inicio opens the next conversation.
+    await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+    await expect(page.getByLabel('Tu respuesta')).toBeVisible();
+    expect(starts).toBe(2);
+  });
+}
+
+for (const initiator of ['learner', 'tutor'] as const) {
+  test(`roadmap report without learner turns returns to the canonical step without recording completion (${initiator} starts)`, async ({page}) => {
+    await readyLearner(page);
+    await forceRoadmapInitiator(page, initiator);
+    await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+    await expect(page.getByRole('button', {name: 'Terminar'})).toBeEnabled();
+    if (initiator === 'tutor') await expect(page.locator('[data-session] p')).toHaveCount(1);
+    await page.getByRole('button', {name: 'Terminar'}).click();
+    const report = page.getByRole('region', {name: 'Informe de sesión'});
+    await expect(report.getByRole('status')).toContainText('Sin respuestas para analizar');
+    await expect(report.getByRole('heading', {name: 'Lo que haces bien'})).toHaveCount(0);
+    await expectNoPracticeForm(page);
+    const reloaded = page.waitForResponse(response => response.url().endsWith('/roadmap') && response.request().method() === 'POST');
+    await report.getByRole('button', {name: initiator === 'learner' ? 'Continuar mi ruta' : 'Cerrar informe'}).click();
+    const canonical = await (await reloaded).json() as LearningPlan;
+    const next = canonical.activities.find(activity => activity.state === 'started') ?? canonical.activities.find(activity => activity.state === 'pending');
+    await expect(page.getByRole('heading', {level: 1, name: 'Tu ruta de inglés · A2'})).toBeVisible();
+    await expect(page.locator('.current-step')).toHaveAttribute('data-activity', next!.id);
+    await expect(page.getByLabel('Tu respuesta')).toHaveCount(0);
+    expect(canonical.activities.filter(activity => activity.state === 'completed')).toHaveLength(0);
+    expect(await (await page.request.get('/api/v1/sessions')).json() as unknown[]).toHaveLength(1);
+  });
+}
+
+test('free practice selection requires the explicit home action, including after closing current and historical reports', async ({page}) => {
+  await readyLearner(page);
+  await expectNoPracticeForm(page);
+  await page.getByRole('button', {name: 'Práctica libre'}).click();
+  for (const name of ['Situación', 'Nivel de práctica', 'Cómo quieres practicar']) {
+    await expect(page.getByRole('combobox', {name, exact: true})).toBeVisible();
+  }
+  await page.getByLabel('Situación').selectOption('hotel');
+  await page.getByRole('button', {name: 'Empezar práctica'}).click();
+  await expect(page.getByRole('button', {name: 'Terminar'})).toBeEnabled();
+  await page.getByRole('button', {name: 'Terminar'}).click();
+  const report = page.getByRole('region', {name: 'Informe de sesión'});
+  await expect(report.getByRole('status')).toContainText('Sin respuestas para analizar');
+  await expectNoPracticeForm(page);
+  await report.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.getByRole('heading', {level: 1, name: 'Tu ruta de inglés · A2'})).toBeVisible();
+  await expectNoPracticeForm(page);
+  await page.getByRole('button', {name: 'Práctica libre'}).click();
+  await expect(page.getByLabel('Nivel de práctica')).toHaveValue('A2');
+  await page.getByRole('button', {name: 'Ver historial'}).click();
+  await page.getByRole('button', {name: 'Ver informe · En un hotel'}).click();
+  await expect(report).toBeVisible();
+  await expectNoPracticeForm(page);
+  await report.getByRole('button', {name: 'Cerrar informe'}).click();
+  await expect(page.getByRole('heading', {level: 1, name: 'Tu ruta de inglés · A2'})).toBeVisible();
+  await expectNoPracticeForm(page);
+  await page.getByRole('button', {name: 'Práctica libre'}).click();
+  await page.getByRole('button', {name: 'Empezar práctica'}).click();
+  await expect(page.getByLabel('Tu respuesta')).toHaveValue('');
+  expect(await (await page.request.get('/api/v1/sessions')).json() as unknown[]).toHaveLength(2);
+});
 
 test('five empty persistent practices are abandoned and a double click opens one valid roadmap practice', async ({page}) => {
   const csrf = await readyLearner(page);
