@@ -1,3 +1,4 @@
+import {learnerStarts} from './session-initiator.js';
 import { expect, test, type Page } from '@playwright/test';
 import { openLearnerPage } from './learner-navigation.js';
 import { randomUUID } from 'node:crypto';
@@ -6,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 // Voice preference tests deliberately leave live sessions, which must not consume
 // another test's five-session pilot allowance.
 test.beforeEach(async ({ page }) => {
+  await learnerStarts(page);
   const subject = `voice-e2e-${randomUUID()}`;
   await page.route('**/api/v1/auth/synthetic-login', route => route.continue({
     postData: JSON.stringify({ subject }),

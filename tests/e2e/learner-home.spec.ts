@@ -1,3 +1,4 @@
+import {setSessionInitiator} from '../support/session-initiator.js';
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { openLearnerPage } from './learner-navigation.js';
@@ -21,6 +22,7 @@ async function readyLearner(page: Page) {
   expect(saved.status()).toBe(201);
   await page.reload();
   await expect(page.getByRole('heading', { level: 1, name: 'Tu ruta de inglés · A2' })).toBeVisible();
+  return csrfToken;
 }
 
 test('roadmap home has one next action, profile destinations and keyboard focus', async ({page}) => {
@@ -139,4 +141,163 @@ test('returning settings report a failed goal save and allow retry without chang
   await expect(page.getByRole('status')).toContainText('Cambios guardados');
   expect(await (await page.request.get('/api/v1/practice-goal')).json()).toMatchObject({ minutesPerDay: 20 });
   expect(await (await page.request.get('/api/v1/consent')).json()).toEqual(consent);
+});
+
+async function forceRoadmapInitiator(page: Page, initiator: 'tutor'|'learner') {
+  await page.route('**/api/v1/plans/*/activities/*/start', async route => {
+    const response = await route.fetch();
+    const body = await response.json() as {sessionId: string};
+    body.sessionId = await setSessionInitiator(body.sessionId, initiator);
+    await route.fulfill({response, json: body});
+    await page.unroute('**/api/v1/plans/*/activities/*/start');
+  });
+}
+
+test('five empty persistent practices are abandoned and a double click opens one valid roadmap practice', async ({page}) => {
+  const csrf = await readyLearner(page);
+  for (let i = 0; i < 5; i++) expect((await page.request.post('/api/v1/sessions', {
+    headers: {Origin: 'http://127.0.0.1:4173', 'x-csrf-token': csrf}, data: {scenarioSlug: 'hotel', level: 'A2', mode: 'natural'},
+  })).status()).toBe(201);
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).evaluate(button => {(button as HTMLButtonElement).click(); (button as HTMLButtonElement).click();});
+  await expect(page.getByLabel('Tu respuesta')).toBeVisible();
+  const sessions = await (await page.request.get('/api/v1/sessions')).json() as {state: string}[];
+  expect(sessions).toHaveLength(6);
+  expect(sessions.filter(s => s.state === 'abandoned')).toHaveLength(5);
+  expect(sessions.filter(s => s.state === 'created')).toHaveLength(1);
+});
+
+test('open-session limits stay below the CTA and never trigger blind retries or roadmap refresh', async ({page}) => {
+  await readyLearner(page);
+  let starts = 0, refreshes = 0;
+  await page.route('**/api/v1/roadmap', route => {refreshes++; return route.continue();});
+  await page.route('**/api/v1/plans/*/activities/*/start', route => {starts++; return route.fulfill({status: 409, json: {error: {code: 'OPEN_SESSION_LIMIT'}}});});
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  const alert = page.locator('.current-step [role="alert"]');
+  await expect(alert).toContainText('cinco prácticas sin terminar');
+  expect(await alert.evaluate(node => node.previousElementSibling?.textContent)).toBe('Continuar mi ruta');
+  expect(starts).toBe(1);
+  expect(refreshes).toBe(0);
+});
+
+test('stale versions refresh and retry only once; lost acknowledgement resumes the committed session', async ({page}) => {
+  await readyLearner(page);
+  let starts = 0;
+  const url = '**/api/v1/plans/*/activities/*/start';
+  await page.route(url, route => {starts++; return starts === 1
+    ? route.fulfill({status: 409, json: {error: {code: 'STALE_PLAN_VERSION'}}}) : route.continue();});
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.getByLabel('Tu respuesta')).toBeVisible();
+  expect(starts).toBe(2);
+  expect(await (await page.request.get('/api/v1/sessions')).json() as unknown[]).toHaveLength(1);
+  await page.unroute(url);
+  await page.getByRole('button', {name: 'Inicio', exact: true}).click();
+  await page.route(url, async route => {
+    await route.fetch();
+    return route.fulfill({status: 409, json: {error: {code: 'STALE_PLAN_VERSION'}}});
+  });
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.getByLabel('Tu respuesta')).toBeVisible();
+  expect(await (await page.request.get('/api/v1/sessions')).json() as unknown[]).toHaveLength(1);
+});
+
+test('a repeated version conflict stops after one retry and remains next to the CTA', async ({page}) => {
+  await readyLearner(page);
+  let starts = 0;
+  await page.route('**/api/v1/plans/*/activities/*/start', route => {starts++; return route.fulfill({status: 409, json: {error: {code: 'STALE_PLAN_VERSION'}}});});
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.locator('.current-step [role="alert"]')).toContainText('Tu ruta se ha actualizado');
+  expect(starts).toBe(2);
+  expect(await (await page.request.get('/api/v1/sessions')).json() as unknown[]).toHaveLength(0);
+});
+
+test('the persisted tutor opener is shown and spoken normally, with no duplicate after reload or another request', async ({page}) => {
+  await page.addInitScript(() => {
+    const probe = window as unknown as {__spoken: string[]}; probe.__spoken = [];
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', {value: class {constructor(public text: string) {} }});
+    const synthesis = new EventTarget();
+    Object.assign(synthesis, {getVoices: () => [], cancel: () => undefined, speak: (utterance: SpeechSynthesisUtterance) => {probe.__spoken.push(utterance.text);}});
+    Object.defineProperty(window, 'speechSynthesis', {value: synthesis});
+  });
+  const csrf = await readyLearner(page);
+  await forceRoadmapInitiator(page, 'tutor');
+  let release!: () => void;
+  const held = new Promise<void>(resolve => {release = resolve;});
+  let openingRequests = 0;
+  await page.route('**/api/v1/sessions/*/opening', async route => {
+    openingRequests++;
+    const response = await route.fetch();
+    await held;
+    await route.fulfill({response});
+  });
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.getByLabel('Tu respuesta')).toBeVisible();
+  await expect(page.getByRole('status').filter({hasText: 'El tutor empieza la conversación…'})).toBeVisible();
+  release();
+  await expect(page.locator('[data-session] p')).toHaveText('Tutor: Hi! Where would you like to travel?');
+  await expect.poll(() => page.evaluate(() => (window as unknown as {__spoken: string[]}).__spoken)).toEqual(['Hi! Where would you like to travel?']);
+  const id = (await page.locator('[data-session]').getAttribute('data-session'))!;
+  const replay = await page.request.post(`/api/v1/sessions/${id}/opening`, {headers: {Origin: 'http://127.0.0.1:4173', 'x-csrf-token': csrf}});
+  expect((await replay.json() as {turns: unknown[]}).turns).toHaveLength(1);
+  await page.reload();
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.locator('[data-session] p')).toHaveText('Tutor: Hi! Where would you like to travel?');
+  expect(openingRequests).toBe(1);
+  expect((await (await page.request.get(`/api/v1/sessions/${id}`)).json() as {turns: {speaker: string}[]}).turns.map(t => t.speaker)).toEqual(['tutor']);
+});
+
+test('learner-start stays empty and an opening transport failure leaves the response field usable', async ({page}) => {
+  await readyLearner(page);
+  await forceRoadmapInitiator(page, 'learner');
+  let openings = 0;
+  page.on('request', request => {if (request.url().endsWith('/opening')) openings++;});
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.getByRole('button', {name: 'Enviar', exact: true})).toBeEnabled();
+  await expect(page.locator('[data-session] p')).toHaveCount(0);
+  expect(openings).toBe(0);
+  // Select a separate owned learner for the tutor failure branch.
+  await readyLearner(page);
+  await forceRoadmapInitiator(page, 'tutor');
+  await page.route('**/api/v1/sessions/*/opening', route => route.fulfill({status: 503, json: {error: {code: 'unavailable'}}}));
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.getByRole('status').filter({hasText: 'Puedes iniciar tú'})).toBeVisible();
+  await page.getByLabel('Tu respuesta').fill('Hello');
+  await page.getByRole('button', {name: 'Enviar', exact: true}).click();
+  await expect(page.getByText(/Tutor:.*Hello/)).toBeVisible();
+});
+
+test('an activity conflict that changes the current step refreshes the UI without starting a different practice', async ({page}) => {
+  await readyLearner(page);
+  let starts = 0;
+  await page.route('**/api/v1/plans/*/activities/*/start', route => {starts++; return route.fulfill({status: 409, json: {error: {code: 'ACTIVITY_STATE_CONFLICT'}}});});
+  await page.route('**/api/v1/roadmap', async route => {
+    const response = await route.fetch();
+    const body = await response.json() as {activities: {state: string}[]};
+    body.activities[0]!.state = 'completed';
+    await route.fulfill({response, json: body});
+  });
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.locator('.current-step [role="alert"]')).toContainText('Revisa tu siguiente paso');
+  expect(starts).toBe(1);
+  expect(await (await page.request.get('/api/v1/sessions')).json() as unknown[]).toHaveLength(0);
+});
+
+test('an in-flight opening receipt loads the persisted result without asking for another generation', async ({page}) => {
+  const csrf = await readyLearner(page);
+  await forceRoadmapInitiator(page, 'tutor');
+  let generation: Promise<unknown> | undefined, reads = 0, openingRequests = 0;
+  page.on('request', request => {if (request.url().endsWith('/opening')) openingRequests++;});
+  await page.route('**/api/v1/sessions/*', async route => {
+    const response = await route.fetch();
+    const body = await response.json() as {id: string; events: {sequence: number; kind: string}[]};
+    if (++reads === 1) {
+      generation = page.request.post(`/api/v1/sessions/${body.id}/opening`, {headers: {Origin: 'http://127.0.0.1:4173', 'x-csrf-token': csrf}});
+      body.events = [{sequence: 1, kind: 'opening.requested'}];
+      await route.fulfill({response, json: body});
+    } else await route.fulfill({response});
+  });
+  await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
+  await expect(page.locator('[data-session] p')).toHaveText('Tutor: Hi! Where would you like to travel?');
+  await generation;
+  expect(openingRequests).toBe(0);
+  expect(reads).toBeGreaterThan(1);
 });

@@ -2,6 +2,7 @@ import { StructuredTelemetry } from './telemetry.js';
 import {
   type SessionRecord,
   AiError,
+  conversationInitiator,
   type SessionRepository,
   type ProviderMetadata,
 } from '@fluentcoach/application';
@@ -42,9 +43,15 @@ async function hydrate(row: SessionRow): Promise<SessionRecord> {
     'SELECT sequence,kind,payload FROM session_events WHERE account_id=$1 AND session_id=$2 ORDER BY sequence',
     [row.account_id, row.id],
   );
+  const activity = (await sql<{definition: {title: string; type: string}}>(
+    'SELECT definition FROM learning_plan_activities WHERE account_id=$1 AND session_id=$2 LIMIT 1',
+    [row.account_id, row.id],
+  ))[0]?.definition;
   return {
     id: row.id,
     accountId: row.account_id,
+    initiator: conversationInitiator(row.id),
+    ...(activity ? {activity: {title: activity.title, type: activity.type}} : {}),
     snapshot: {
       scenarioSlug: row.scenario_slug,
       scenarioVersion: row.scenario_version,
@@ -53,7 +60,7 @@ async function hydrate(row: SessionRow): Promise<SessionRecord> {
       promptVersion: row.prompt_version,
     },
     state: states[row.state],
-    turns: turns.map((t) => ({ ...t, sourceEventKey: t.source_event_key })),
+    turns: turns.map(({source_event_key, ...turn}) => ({ ...turn, sourceEventKey: source_event_key })),
     events,
   };
 }
@@ -185,14 +192,18 @@ export class PostgresSessionRepository implements SessionRepository {
   }
   async acquireTurn(accountId: string, sessionId: string, token: string) {
     const rows = await sql(
-      `UPDATE practice_sessions s SET turn_lease_token=$3,turn_lease_until=now()+interval '30 seconds' FROM accounts a WHERE s.account_id=$1 AND s.id=$2 AND a.id=s.account_id AND a.status='ACTIVE' AND s.state IN ('CREATED','ACTIVE') AND (s.turn_lease_until IS NULL OR s.turn_lease_until<now()) RETURNING s.id`,
+      `WITH owner AS MATERIALIZED (SELECT id FROM accounts WHERE id=$1 AND status='ACTIVE' FOR UPDATE)
+       UPDATE practice_sessions s SET turn_lease_token=$3,turn_lease_until=now()+interval '30 seconds'
+       FROM owner a WHERE s.account_id=$1 AND s.id=$2 AND a.id=s.account_id AND s.state IN ('CREATED','ACTIVE') AND (s.turn_lease_until IS NULL OR s.turn_lease_until<now()) RETURNING s.id`,
       [accountId, sessionId, token],
     );
     return rows.length === 1;
   }
   async releaseTurn(accountId: string, sessionId: string, token: string) {
     await sql(
-      'UPDATE practice_sessions SET turn_lease_token=NULL,turn_lease_until=NULL WHERE account_id=$1 AND id=$2 AND turn_lease_token=$3',
+      `WITH owner AS MATERIALIZED (SELECT id FROM accounts WHERE id=$1 FOR UPDATE)
+       UPDATE practice_sessions s SET turn_lease_token=NULL,turn_lease_until=NULL FROM owner a
+       WHERE s.account_id=$1 AND s.id=$2 AND a.id=s.account_id AND s.turn_lease_token=$3`,
       [accountId, sessionId, token],
     );
   }

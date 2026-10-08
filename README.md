@@ -22,7 +22,12 @@ the route. Local Ollama can reorder safe candidates; deterministic fallback keep
 the route available without recurring API costs. See [roadmap design](docs/adr/0020-roadmap-first-learning.md).
 Returning learners edit preferences without repeating consent. Leaving practice
 stops capture and tutor speech and discards unsubmitted audio; reload resumes the
-same roadmap session. Apply migration `202610060003_roadmap` before the new API.
+same roadmap session. Empty orphaned practices are marked abandoned before a new
+roadmap start, keeping the five-session safety cap and all meaningful history.
+About half of conversations let the local Ollama tutor open with a short persisted
+question. Reload keeps that opening, and provider failure lets the learner start.
+See [startup and opening design](docs/adr/0021-roadmap-orphans-and-tutor-openings.md).
+Apply migration `202610070001_tutor_opening_progress` before the new API.
 
 ## Prerequisites
 

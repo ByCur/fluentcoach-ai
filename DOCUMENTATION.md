@@ -542,8 +542,8 @@ not count as completed. Transparent issue buckets make no direction/level claim.
 See [ADR 0014](docs/adr/0014-plans-and-active-progress.md) for precise selection,
 streak, weekly-boundary, active-time, issue-trend and legacy-UTC definitions, and
 [M09 data lifecycle](docs/m09-data-lifecycle.md) for rebuild/deletion/migration
-semantics. Apply forward migration `202610060003_roadmap` (including all predecessors) before API
-startup. Readiness rejects missing roadmap migration/columns. No aggregate cache is
+semantics. Apply forward migration `202610070001_tutor_opening_progress` (including all predecessors) before API
+startup. Readiness rejects missing roadmap/opening-progress migrations and roadmap columns. No aggregate cache is
 the sole source of truth.
 
 New required gates are `pnpm test:integration:plans`,

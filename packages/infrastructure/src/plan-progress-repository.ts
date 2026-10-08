@@ -646,7 +646,20 @@ export class PostgresPlanRepository implements PlanRepository {
       if (r.roadmap_signature !== null && plan.activities.find(a => ['pending', 'started'].includes(a.state))?.id !== activityId) throw Error('ACTIVITY_STATE_CONFLICT');
       if (a.state !== 'pending') throw Error('ACTIVITY_STATE_CONFLICT');
       let sessionId: string | null = null;
-      if (a.type !== 'vocabulary-review')
+      if (a.type !== 'vocabulary-review') {
+        // The account lock serializes cleanup with starts and transcript saves.
+        // Keep every meaningful practice, live inference lease and active plan link.
+        await c.query(
+          `UPDATE practice_sessions s SET state='ABANDONED',ended_at=clock_timestamp()
+           WHERE s.account_id=$1 AND s.state='CREATED'
+           AND (s.turn_lease_until IS NULL OR s.turn_lease_until<=clock_timestamp())
+           AND NOT EXISTS (SELECT 1 FROM conversation_turns t WHERE t.account_id=s.account_id AND t.session_id=s.id AND t.speaker IN ('learner','tutor'))
+           AND NOT EXISTS (SELECT 1 FROM learning_plan_activities activity
+             JOIN learning_plans p ON p.id=activity.plan_id AND p.account_id=activity.account_id
+             WHERE activity.account_id=s.account_id AND activity.session_id=s.id
+             AND activity.state='started' AND p.state='active')`,
+          [accountId],
+        );
         sessionId = (
           await c.query<{ id: string }>(
             `INSERT INTO practice_sessions(account_id,profile_id,scenario_slug,scenario_version,level,mode,prompt_version) SELECT $1,id,$2,$5,$3,$4,$6 FROM learner_profiles WHERE account_id=$1 RETURNING id`,
@@ -660,6 +673,7 @@ export class PostgresPlanRepository implements PlanRepository {
             ],
           )
         ).rows[0]!.id;
+      }
       await c.query(
         "UPDATE learning_plan_activities SET state='started',started_at=clock_timestamp(),session_id=$3,started_from_version=$4 WHERE id=$1 AND account_id=$2",
         [activityId, accountId, sessionId, expectedVersion],

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { ConfigurationError } from './runtime-config.js';
 
-export const RELEASE_MIGRATION = '202610060003_roadmap';
-export const PREVIOUS_MIGRATION = '202610060002_m11_release_control';
+export const RELEASE_MIGRATION = '202610070001_tutor_opening_progress';
+export const PREVIOUS_MIGRATION = '202610060003_roadmap';
 export const CLOUD_RELEASE_BLOCKERS = [
   'LOCAL_AI_VOICE_HOSTING_UNVERIFIED',
   'REDIS_FREE_ENCRYPTION_AT_REST_UNAVAILABLE',

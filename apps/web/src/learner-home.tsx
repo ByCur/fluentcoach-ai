@@ -47,25 +47,49 @@ export function LearnerHome({ csrf, onStart, onVocabulary, onPractice }: {
     setBusy(true);
     setError('');
     try {
-      const response = await fetch(`/api/v1/plans/${route.id}/activities/${current.id}/start`, {
-        method: 'POST', credentials: 'include', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
-        headers: { 'content-type': 'application/json', 'x-csrf-token': csrf },
-        body: JSON.stringify({ expectedVersion: route.version }),
-      });
-      if (!mounted.current) return;
-      if (!response.ok) {
-        if (response.status === 409 || response.status === 404) setReload(value => value + 1);
-        throw Error('No pudimos abrir esta práctica. Vuelve a intentarlo; tu progreso se conserva.');
+      let canonical = route;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await fetch(`/api/v1/plans/${canonical.id}/activities/${current.id}/start`, {
+          method: 'POST', credentials: 'include', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+          headers: { 'content-type': 'application/json', 'x-csrf-token': csrf },
+          body: JSON.stringify({ expectedVersion: canonical.version }),
+        });
+        if (!mounted.current) return;
+        if (response.ok) {
+          const result = await response.json() as { plan: LearningPlan; sessionId: string | null };
+          if (!mounted.current) return;
+          setRoute(result.plan);
+          if (current.type === 'vocabulary-review') onVocabulary(current);
+          else if (result.sessionId) onStart(result.sessionId, current);
+          else throw Error('No pudimos abrir esta práctica. Vuelve a intentarlo.');
+          return;
+        }
+        const body = await response.json() as { error?: { code?: string } };
+        if (response.status === 409 && body.error?.code === 'OPEN_SESSION_LIMIT')
+          throw Error('Tienes cinco prácticas sin terminar. Abre una desde Práctica libre y termínala antes de continuar tu ruta. Tus conversaciones se conservan.');
+        if (response.status === 409 && ['STALE_PLAN_VERSION', 'ACTIVITY_STATE_CONFLICT', 'PLAN_SOURCES_CHANGED'].includes(body.error?.code ?? '')) {
+          const refreshed = await fetch('/api/v1/roadmap', {method: 'POST', credentials: 'include',
+            headers: {'x-csrf-token': csrf}, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)])});
+          if (!refreshed.ok) throw Error('START_FAILED');
+          canonical = await refreshed.json() as LearningPlan;
+          if (!mounted.current) return;
+          setRoute(canonical);
+          const next = canonical.activities.find(a => a.state === 'started') ?? canonical.activities.find(a => a.state === 'pending');
+          // A concurrent or unacknowledged start already owns its session. Resume it.
+          if (canonical.id === route.id && next?.id === current.id && next.state === 'started') {
+            if (next.type === 'vocabulary-review') onVocabulary(next);
+            else if (next.sessionId) onStart(next.sessionId, next);
+            else throw Error('START_FAILED');
+            return;
+          }
+          if (attempt === 0 && canonical.id === route.id && next?.id === current.id && next.state === 'pending') continue;
+          throw Error('Tu ruta se ha actualizado. Revisa tu siguiente paso y pulsa Continuar mi ruta.');
+        }
+        throw Error('START_FAILED');
       }
-      const result = await response.json() as { plan: LearningPlan; sessionId: string | null };
-      if (!mounted.current) return;
-      setRoute(result.plan);
-      if (current.type === 'vocabulary-review') onVocabulary(current);
-      else if (result.sessionId) onStart(result.sessionId, current);
-      else throw Error('No pudimos abrir esta práctica. Vuelve a intentarlo.');
     } catch (cause) {
       if (!mounted.current) return;
-      setError(cause instanceof Error && cause.message.startsWith('No pudimos') ? cause.message : 'No pudimos abrir esta práctica. Vuelve a intentarlo; tu progreso se conserva.');
+      setError(cause instanceof Error && ['No pudimos', 'Tienes cinco', 'Tu ruta'].some(prefix => cause.message.startsWith(prefix)) ? cause.message : 'No pudimos abrir esta práctica. Vuelve a intentarlo; tu progreso se conserva.');
     } finally { starting.current = false; if (mounted.current) setBusy(false); }
   }
   return <div className="learner-home roadmap-home">
@@ -83,6 +107,7 @@ export function LearnerHome({ csrf, onStart, onVocabulary, onPractice }: {
         <h2 id="current-step-title">{current.title}</h2>
         <p>{current.targetMinutes} minutos · {current.type === 'vocabulary-review' ? 'Un repaso breve para recordar tus expresiones.' : current.type === 'recurring-issue-practice' ? 'Practica con ayuda un aspecto que aparece en tus conversaciones.' : 'Una conversación cotidiana para ganar confianza.'}</p>
         <button className="roadmap-continue" disabled={busy} onClick={() => void start()}>{busy ? 'Abriendo tu práctica…' : 'Continuar mi ruta'}</button>
+        {error && <p role="alert">{error}</p>}
       </section>}
       <section aria-labelledby="roadmap-timeline-title" className="roadmap-timeline">
         <h2 id="roadmap-timeline-title">Tu camino, paso a paso</h2>
@@ -96,7 +121,7 @@ export function LearnerHome({ csrf, onStart, onVocabulary, onPractice }: {
         </ol>
       </section>
     </> : !error && <p role="status">Preparando tu ruta…</p>}
-    {error && <div><p role="alert">{error}</p>{!route && <button className="secondary" onClick={() => setReload(value => value + 1)}>Volver a intentar</button>}</div>}
+    {error && !current && <div><p role="alert">{error}</p>{!route && <button className="secondary" onClick={() => setReload(value => value + 1)}>Volver a intentar</button>}</div>}
     <div className="free-practice"><button className="secondary" onClick={onPractice}>Práctica libre</button><p>Opcional: elige lo que te apetezca practicar hoy.</p></div>
   </div>;
 }

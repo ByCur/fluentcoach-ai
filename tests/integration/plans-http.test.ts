@@ -52,6 +52,19 @@ const post = (user: request.Response, path: string, body: object) =>
     .set('Origin', origin)
     .set('x-csrf-token', user.body.csrfToken)
     .send(body);
+
+it('reports the precise open-session cap when a persistent learner has five unfinished practices', async () => {
+  const user = await login('persistent-demo');
+  await onboard(user);
+  const route = (await post(user, '/roadmap', {}).expect(201)).body;
+  for (let i = 0; i < 5; i++) {
+    const session = (await post(user, '/sessions', {scenarioSlug: 'hotel', level: 'A1', mode: 'natural'}).expect(201)).body;
+    await post(user, `/sessions/${session.id}/turns`, {sourceEventKey: `meaningful-${i}`, text: 'I have a reservation.'}).expect(201);
+  }
+  const response = await post(user, `/plans/${route.id}/activities/${route.activities[0].id}/start`, {expectedVersion: route.version}).expect(409);
+  expect(response.body.error).toMatchObject({code: 'OPEN_SESSION_LIMIT', retryable: false});
+  expect(response.body.error.message).toContain('cinco prácticas sin terminar');
+});
 beforeAll(async () => {
   sessions = new MemorySessionStore();
   const module = await Test.createTestingModule({ imports: [AppModule] })

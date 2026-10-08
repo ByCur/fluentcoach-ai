@@ -48,8 +48,16 @@ export interface TutorContext {
   accountId?: string;
   sessionId?: string;
   synthetic?: boolean;
+  activity?: { title: string; type: string };
+}
+export const TUTOR_OPENING_PROMPT_VERSION = 'tutor-opening-v1';
+export const TUTOR_OPENING_KEY = 'tutor-opening:v1';
+// UUID v4's last digit is uniform and persisted; no browser randomness or reload choice.
+export function conversationInitiator(id: string): 'learner' | 'tutor' {
+  return /^[0-9a-f-]{36}$/i.test(id) && parseInt(id.slice(-1), 16) % 2 === 0 ? 'tutor' : 'learner';
 }
 export interface ConversationProvider {
+  opening?(context: TutorContext, options: AiCallOptions): Promise<{text: string; metadata?: ProviderMetadata}>;
   stream(
     context: TutorContext,
     input: string,
@@ -68,6 +76,8 @@ export interface SessionRecord {
   state: SessionState;
   turns: ConversationTurn[];
   events: { sequence: number; kind: string; payload: unknown }[];
+  initiator?: 'learner' | 'tutor';
+  activity?: { title: string; type: string };
 }
 export interface SessionRepository {
   create(accountId: string, snapshot: SessionSnapshot): Promise<SessionRecord>;
@@ -146,6 +156,7 @@ export class ConversationService {
     text: string,
     telemetry: PracticeTelemetry = { kind: 'text', durationMs: 0 },
   ) {
+    if (key === TUTOR_OPENING_KEY) return Promise.reject(Error('IDEMPOTENCY_CONFLICT'));
     const practice = boundedPracticeTelemetry(telemetry);
     if(text.length>(practice.kind==='voice'?OPERATIONAL_LIMITS.speechTranscriptChars:OPERATIONAL_LIMITS.textTurnChars))return Promise.reject(Error('TEXT_TOO_LONG'));
     const scope = `${accountId}:${id}`,
@@ -161,6 +172,57 @@ export class ConversationService {
       () => this.inFlight.delete(scope),
     );
     return result;
+  }
+  opening(accountId: string, id: string) {
+    const scope = `${accountId}:${id}`, pending = this.inFlight.get(scope);
+    if (pending) return pending.key === TUTOR_OPENING_KEY ? pending.result : Promise.reject(new AiError('unavailable'));
+    const result = this.generateOpening(accountId, id);
+    this.inFlight.set(scope, {key: TUTOR_OPENING_KEY, result});
+    void result.then(() => this.inFlight.delete(scope), () => this.inFlight.delete(scope));
+    return result;
+  }
+  private async generateOpening(accountId: string, id: string) {
+    let s = await this.required(accountId, id);
+    const alreadyAttempted = (record: SessionRecord) => record.events.some(e => e.kind === 'opening.requested');
+    if (s.initiator !== 'tutor' || s.turns.length || alreadyAttempted(s) || isTerminalSession(s.state)) return s;
+    const scope = `${accountId}:${id}`, leaseToken = crypto.randomUUID(), controller = new AbortController();
+    if (this.active.has(scope)) throw new AiError('unavailable');
+    this.active.set(scope, controller);
+    try {
+      if (this.repo.acquireTurn && !(await this.repo.acquireTurn(accountId, id, leaseToken)))
+        throw new AiError('unavailable');
+      s = await this.required(accountId, id);
+      if (s.turns.length || alreadyAttempted(s) || isTerminalSession(s.state)) return s;
+      // Commit the receipt before inference: a crash can fall back to learner-start,
+      // but must never execute another opening or manufacture learner evidence.
+      s.events.push({sequence: s.events.length + 1, kind: 'opening.requested', payload: {promptVersion: TUTOR_OPENING_PROMPT_VERSION}});
+      await this.repo.save(s, leaseToken);
+      try {
+        if (!this.provider.opening) throw new AiError('unavailable');
+        const options = {deadline: new Date(Date.now() + 10_000), signal: controller.signal};
+        const result = await beforeDeadline(this.provider.opening({snapshot: s.snapshot, recentTurns: [], accountId, sessionId: id, ...(s.activity ? {activity: s.activity} : {})}, options), options);
+        const text = result.text.trim();
+        const maxWords = {A1: 30, A2: 40, B1: 50, B2: 60}[s.snapshot.level];
+        if (!text || text.length > 500 || text.split(/\s+/).length > maxWords || (text.match(/[.!?]+(?=\s|$)/g)?.length ?? 0) > 2 || /certif|official assessment|CEFR score/i.test(text))
+          throw new AiError('invalid-output');
+        if (result.metadata) await this.repo.recordProvider?.(accountId, id, result.metadata);
+        s.turns.push({sequence: 1, sourceEventKey: TUTOR_OPENING_KEY, speaker: 'tutor', text, language: 'en'});
+        s.events.push({sequence: s.events.length + 1, kind: 'opening.completed', payload: {through: 1}});
+        await this.repo.save(s, leaseToken);
+        return s;
+      } catch (error) {
+        // No partial transcript, practice telemetry, analysis or progress is emitted.
+        s.turns = [];
+        s.events = s.events.filter(e => e.kind !== 'opening.completed');
+        s.events.push({sequence: s.events.length + 1, kind: 'opening.failed', payload: {code: error instanceof AiError ? error.code : 'unavailable'}});
+        await this.repo.save(s, leaseToken);
+        return s;
+      }
+    } finally {
+      controller.abort();
+      this.active.delete(scope);
+      await this.repo.releaseTurn?.(accountId, id, leaseToken);
+    }
   }
   private async generateTurn(
     accountId: string,

@@ -13,7 +13,8 @@ CI preserves every prior gate and adds migrations, repository preflight,
 deployment, release/recovery and cold-start browser gates. It builds a separate
 OCI API archive with the exact GitHub SHA and records Buildx's
 `containerimage.digest`, verifies archived OCI blob checksums and baked SHA/schema,
-with current migration `202610060003_roadmap`.
+with current migration `202610070001_tutor_opening_progress` and compatible previous
+schema `202610060003_roadmap`.
 The immutable identity artifact is uploaded with the archive for one day; a future
 operator must retain approved/current/previous digests in verified protected
 zero-cost storage before release. CI retention alone is not release custody. An image tag or
