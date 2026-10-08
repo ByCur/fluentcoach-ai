@@ -23,10 +23,24 @@ The Ollama adapter sends a system message containing the application prompt and
 a separate user message containing serialized context/input. Tutor responses are
 normalized into the existing stream shape (one text chunk plus final metadata).
 Analysis requests use Ollama's JSON-schema format and remain subject to existing
-application report/evidence validation. HTTP responses are bounded, requests
-have a 25-second default timeout, and connection, timeout, unavailable-model,
+application report/evidence validation. HTTP responses are bounded. Tutor turns
+remain capped at 25 seconds, tutor openings at 10 seconds, and roadmap selection
+at 3 seconds. Report analysis uses `OLLAMA_ANALYSIS_TIMEOUT_MS` (default 90000;
+validated integer range 30000–120000) in both the application service and adapter,
+including response-body reads. All local `/api/chat` requests use Ollama's
+supported `keep_alive: "10m"` to keep the model warm between turns and the report.
+Connection, timeout, unavailable-model,
 rate-limit, cancellation, and malformed-output failures map to existing
 content-free AI errors.
+
+Analysis jobs use a 150-second lease: the maximum 120-second analysis deadline
+plus 30 seconds for database reads, validation and persistence. Reconciliation
+only republishes running jobs after lease expiry; claim tokens and transactional
+report/audit/evidence writes continue to fence stale workers. A failed report
+retry resets the same run, clears its old lease/token and republishes its outbox
+event for the same immutable transcript revision. Practice and progress persist
+independently of report failure. No schema migration is required; rollback
+restores the shorter deadlines/leases, so drain in-flight analysis first.
 
 ## Consequences and limits
 

@@ -134,7 +134,14 @@ AI_PROVIDER=ollama
 AI_FALLBACK_PROVIDER=none
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_MODEL=llama3.2:3b
+OLLAMA_ANALYSIS_TIMEOUT_MS=90000
 ```
+
+Local report analysis allows 90 seconds by default; the timeout accepts integer
+milliseconds from 30000 to 120000. Tutor turns, openings and roadmap selection
+remain limited to 25, 10 and 3 seconds. Analysis jobs hold a 150-second lease,
+and local chat requests keep the model warm for 10 minutes. A failed report
+keeps the practice; **Reintentar informe** reuses the same transcript revision.
 
 On Windows, run Ollama on the host and run the API directly from the same host
 for the default loopback URL. If the API runs in a container, set an explicitly

@@ -40,9 +40,18 @@ export function loadAiConfig(env: NodeJS.ProcessEnv): AiRuntimeConfig {
     const model = env['OLLAMA_MODEL'] || 'llama3.2:3b';
     if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(model))
       fail('OLLAMA_MODEL');
+    const analysisTimeoutMs = Number(
+      env['OLLAMA_ANALYSIS_TIMEOUT_MS'] ?? '90000',
+    );
+    if (
+      !Number.isSafeInteger(analysisTimeoutMs) ||
+      analysisTimeoutMs < 30_000 ||
+      analysisTimeoutMs > 120_000
+    )
+      fail('OLLAMA_ANALYSIS_TIMEOUT_MS');
     return {
       provider,
-      ollama: { baseUrl, model, timeoutMs: 25_000 },
+      ollama: { baseUrl, model, timeoutMs: 25_000, analysisTimeoutMs },
     };
   }
   if (provider !== 'gemini-free') fail('AI_PROVIDER');

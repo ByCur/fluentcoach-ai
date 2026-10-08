@@ -40,6 +40,7 @@ export interface OllamaTextConfig {
   baseUrl?: string;
   model?: string;
   timeoutMs?: number;
+  analysisTimeoutMs?: number;
 }
 
 type NormalizedConfig = Required<OllamaTextConfig>;
@@ -63,13 +64,17 @@ export class OllamaTextAdapter
       baseUrl: config.baseUrl ?? 'http://127.0.0.1:11434',
       model: config.model ?? 'llama3.2:3b',
       timeoutMs: config.timeoutMs ?? 25_000,
+      analysisTimeoutMs: config.analysisTimeoutMs ?? 90_000,
     };
     if (
       !validBaseUrl(this.config.baseUrl) ||
       !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(this.config.model) ||
       !Number.isSafeInteger(this.config.timeoutMs) ||
       this.config.timeoutMs < 1_000 ||
-      this.config.timeoutMs > 120_000
+      this.config.timeoutMs > 120_000 ||
+      !Number.isSafeInteger(this.config.analysisTimeoutMs) ||
+      this.config.analysisTimeoutMs < 30_000 ||
+      this.config.analysisTimeoutMs > 120_000
     )
       throw new AiError('unauthorized');
   }
@@ -79,7 +84,7 @@ export class OllamaTextAdapter
     const response = await this.call('/api/chat', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: this.config.model, stream: false,
+        model: this.config.model, stream: false, keep_alive: '10m',
         format: { type: 'object', additionalProperties: false, required: ['candidateIds'], properties: {
           candidateIds: { type: 'array', minItems: 2, maxItems: 5, uniqueItems: true,
             items: { type: 'string', enum: candidates.map(a => a.candidateId) } },
@@ -105,7 +110,9 @@ export class OllamaTextAdapter
   }
 
   async assertAvailable(): Promise<void> {
-    const options = { deadline: new Date(Date.now() + this.config.timeoutMs) };
+    const options = {
+      deadline: new Date(Date.now() + Math.min(25_000, this.config.timeoutMs)),
+    };
     const response = await this.call('/api/tags', { method: 'GET' }, options);
     const raw = await this.json(response, options);
     const tags = tagsSchema.safeParse(raw);
@@ -137,6 +144,7 @@ export class OllamaTextAdapter
         body: JSON.stringify({
           model: this.config.model,
           stream: false,
+          keep_alive: '10m',
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: JSON.stringify(user) },
@@ -177,7 +185,7 @@ export class OllamaTextAdapter
       tutorPrompt(context),
       tutorInput(context, input),
       false,
-      options,
+      this.limitDeadline(options, Math.min(25_000, this.config.timeoutMs)),
     );
     yield { text: result.text, done: false };
     yield { text: '', done: true, metadata: result.metadata };
@@ -186,7 +194,7 @@ export class OllamaTextAdapter
   async opening(context: TutorContext, options: AiCallOptions) {
     const result = await this.generate(tutorOpeningPrompt(context), {
       snapshot: context.snapshot, activity: context.activity,
-    }, false, options, 160);
+    }, false, this.limitDeadline(options, Math.min(10_000, this.config.timeoutMs)), 160);
     return {...result, metadata: {...result.metadata, promptVersion: TUTOR_OPENING_PROMPT_VERSION}};
   }
 
@@ -198,7 +206,7 @@ export class OllamaTextAdapter
       analysisPrompt(transcript),
       { snapshot: transcript.snapshot, turns: transcript.turns },
       true,
-      options,
+      this.limitDeadline(options, this.config.analysisTimeoutMs),
     );
     try {
       return {
@@ -210,16 +218,21 @@ export class OllamaTextAdapter
     }
   }
 
+  // Cap the entire operation, including response-body reads, by its own budget.
+  private limitDeadline(options: AiCallOptions, timeoutMs: number): AiCallOptions {
+    return {
+      ...options,
+      deadline: new Date(Math.min(options.deadline.getTime(), Date.now() + timeoutMs)),
+    };
+  }
+
   private async call(
     path: string,
     init: RequestInit,
     options: AiCallOptions,
   ): Promise<Response> {
     if (options.signal?.aborted) throw new AiError('cancelled');
-    const remaining = Math.min(
-      this.config.timeoutMs,
-      options.deadline.getTime() - Date.now(),
-    );
+    const remaining = options.deadline.getTime() - Date.now();
     if (!Number.isFinite(remaining) || remaining <= 0)
       throw new AiError('timeout');
     const controller = new AbortController();
