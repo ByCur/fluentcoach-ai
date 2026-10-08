@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { beforeAll, describe, expect, it } from 'vitest';
+import 'reflect-metadata';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   AiError,
   ConversationService,
@@ -13,12 +14,15 @@ import {
   PostgresJobStore,
   PostgresReportRepository,
   PostgresSessionRepository,
+  OllamaTextAdapter,
   sql,
 } from '@fluentcoach/infrastructure';
 import {
   FakeConversationProvider,
   FakeSessionAnalyzer,
 } from '@fluentcoach/testing';
+import { createReports } from '../../apps/api/src/ai.providers.js';
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 // Required gate: missing PostgreSQL is a failure, never a skipped success.
 beforeAll(() => {
   expect(
@@ -79,6 +83,105 @@ async function setup(
   return { account, session, store, repo, reports, job, jobs };
 }
 describe('automatic analysis, PostgreSQL report persistence and retry', () => {
+  async function delayedOllama(x: Awaited<ReturnType<typeof setup>>, delays: number[], analysisTimeoutMs = 90_000) {
+    const transcript = await x.repo.transcript(x.job);
+    const { draft } = await new FakeSessionAnalyzer().analyzeTranscript(transcript, { deadline: new Date(Date.now() + 5000) });
+    let started = () => undefined as void;
+    let waiting = new Promise<void>(resolve => { started = resolve; });
+    const request = vi.fn<typeof fetch>().mockImplementation(() => {
+      const delay = delays.shift()!;
+      started();
+      // Intentionally ignore aborts: even a late provider response must be fenced.
+      return new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify({
+        model: 'llama3.2:3b', done: true, message: { role: 'assistant', content: JSON.stringify(draft) },
+      }))), delay));
+    });
+    vi.stubEnv('AI_PROVIDER', 'ollama');
+    vi.stubEnv('OLLAMA_ANALYSIS_TIMEOUT_MS', String(analysisTimeoutMs));
+    const reports = createReports(new OllamaTextAdapter({ analysisTimeoutMs }, request));
+    const enqueue = vi.fn<(job: AnalysisJob) => Promise<void>>().mockResolvedValue(undefined);
+    const jobs = new JobService(x.store, { enqueue }, reports, 1);
+    return { reports, jobs, request, enqueue, started: () => waiting, next: () => {
+      waiting = new Promise<void>(resolve => { started = resolve; });
+    } };
+  }
+  async function expectOneReport(x: Awaited<ReturnType<typeof setup>>, progress: unknown[]) {
+    expect(await sql('SELECT id FROM practice_sessions WHERE id=$1', [x.session.id])).toHaveLength(1);
+    expect(await sql('SELECT revision FROM transcript_revisions WHERE session_id=$1', [x.session.id])).toHaveLength(1);
+    expect(await sql('SELECT id FROM analysis_runs WHERE session_id=$1', [x.session.id])).toHaveLength(1);
+    expect(await sql('SELECT id FROM session_reports WHERE session_id=$1', [x.session.id])).toHaveLength(1);
+    expect(await sql("SELECT id FROM provider_runs WHERE session_id=$1 AND operation='analysis'", [x.session.id])).toHaveLength(1);
+    expect(await sql('SELECT * FROM practice_events WHERE session_id=$1 ORDER BY id', [x.session.id])).toEqual(progress);
+    expect(await sql('SELECT issue_key FROM issue_observations WHERE session_id=$1', [x.session.id])).toHaveLength(1);
+    const view = await x.reports.view(x.account, x.session.id);
+    expect(view).toMatchObject({ status: 'succeeded', revision: 1 });
+    const transcript = await x.repo.transcript(x.job);
+    for (const finding of [...view.report!.strengths, ...view.report!.corrections]) {
+      for (const evidence of finding.evidence) {
+        const turn = transcript.turns.find(t => t.sequence === evidence.turnSequence)!;
+        expect(turn.speaker).toBe('learner');
+        expect(turn.text.slice(evidence.start, evidence.end)).toBe(evidence.quote);
+      }
+    }
+  }
+  it.each([[60_000, 90_000], [89_000, 90_000], [119_000, 120_000]])('persists a %ims local report within a %ims deadline once while its lease blocks duplicate delivery and reconciliation', async (delay, analysisTimeoutMs) => {
+    const x = await setup('Yesterday I go to the hotel');
+    const progress = await sql('SELECT * FROM practice_events WHERE session_id=$1 ORDER BY id', [x.session.id]);
+    const local = await delayedOllama(x, [delay], analysisTimeoutMs);
+    // PostgreSQL keeps its real clock. Start the virtual worker in the past so
+    // SQL reconciliation also observes a job older than the original 30s lease.
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(Date.now() - delay);
+    const start = Date.now();
+    const pending = local.jobs.execute(x.job);
+    await local.started();
+    const run = (await sql<{ lease_until: Date; lease_token: string; attempts: number }>(
+      'SELECT lease_until,lease_token,attempts FROM analysis_runs WHERE id=$1', [x.job.analysisRunId]))[0]!;
+    expect(run.lease_until.getTime() - start).toBe(150_000);
+    await vi.advanceTimersByTimeAsync(delay - 1);
+    expect(run.lease_until.getTime()).toBeGreaterThan(Date.now());
+    expect((await local.reports.view(x.account, x.session.id)).status).toBe('running');
+    await local.jobs.reconcile();
+    expect(local.enqueue.mock.calls.map(([job]) => job.analysisRunId)).not.toContain(x.job.analysisRunId);
+    expect(await local.jobs.execute(x.job)).toBe('duplicate');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toBe('succeeded');
+    expect(await local.jobs.execute(x.job)).toBe('duplicate');
+    expect(local.request).toHaveBeenCalledOnce();
+    await expectOneReport(x, progress);
+  });
+  it('times out at 90s then resets the same run safely for a delayed, idempotent retry', async () => {
+    const x = await setup('Yesterday I go to the hotel');
+    const progress = await sql('SELECT * FROM practice_events WHERE session_id=$1 ORDER BY id', [x.session.id]);
+    const local = await delayedOllama(x, [95_000, 60_000]);
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(Date.now() - 90_000);
+    const claim = vi.spyOn(x.store, 'claim');
+    const failed = local.jobs.execute(x.job);
+    await local.started();
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(await failed).toBe('failed');
+    const oldRun = await claim.mock.results[0]!.value;
+    expect(await local.reports.view(x.account, x.session.id)).toMatchObject({ status: 'failed', errorCode: 'timeout', revision: 1 });
+    await Promise.all([local.reports.retry(x.account, x.session.id), local.reports.retry(x.account, x.session.id)]);
+    expect((await sql('SELECT status,attempts,lease_token,error_code FROM analysis_runs WHERE id=$1', [x.job.analysisRunId]))[0])
+      .toMatchObject({ status: 'PENDING', attempts: 0, lease_token: null, error_code: null });
+    local.next();
+    const retried = local.jobs.execute(x.job);
+    await local.started();
+    await x.store.fail(oldRun, 'stale-timeout', false);
+    await local.reports.retry(x.account, x.session.id);
+    expect((await local.reports.view(x.account, x.session.id)).status).toBe('running');
+    await local.jobs.reconcile();
+    expect(local.enqueue.mock.calls.map(([job]) => job.analysisRunId)).not.toContain(x.job.analysisRunId);
+    expect(await local.jobs.execute(x.job)).toBe('duplicate');
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(await retried).toBe('succeeded');
+    await local.reports.retry(x.account, x.session.id);
+    expect(await local.jobs.execute(x.job)).toBe('duplicate');
+    expect(local.request).toHaveBeenCalledTimes(2);
+    await expectOneReport(x, progress);
+  });
   it('analyzes late immutable revisions and cites their evidence while preserving the original transcript', async () => {
     const x = await setup(),
       sessions = new PostgresSessionRepository();

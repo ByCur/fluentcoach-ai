@@ -113,7 +113,7 @@ export class PostgresReportRepository implements ReportRepository {
         (row.status === 'SUCCEEDED' && !existingReport)
       ) {
         await c.query(
-          "UPDATE analysis_runs SET status='PENDING',attempts=0,error_code=NULL,lease_until=NULL WHERE id=$1",
+          "UPDATE analysis_runs SET status='PENDING',attempts=0,error_code=NULL,lease_until=NULL,lease_token=NULL WHERE id=$1",
           [row.id],
         );
         await c.query(

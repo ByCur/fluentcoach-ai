@@ -116,8 +116,11 @@ export class JobReconciler implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 }
-export const createReports = (analyzer: SessionAnalyzer) =>
-  new ReportService(
+export const createReports = (analyzer: SessionAnalyzer) => {
+  const config = loadAiConfig(process.env);
+  return new ReportService(
     new PostgresReportRepository(process.env['NODE_ENV'] !== 'production'),
     analyzer,
+    config.provider === 'ollama' ? config.ollama.analysisTimeoutMs : 25_000,
   );
+};

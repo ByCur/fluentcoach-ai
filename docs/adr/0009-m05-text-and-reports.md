@@ -38,7 +38,9 @@ Reports read the hardened M04 revision snapshots rather than mutable conversatio
 turns; explicit late evidence creates a new report without changing the frozen
 user transcript.
 
-Provider operations have a maximum 25-second deadline, abort propagation, bounded
+Provider operations initially had a maximum 25-second deadline. ADR 0010 now
+allows a separately configured local Ollama report deadline (90 seconds by
+default, up to 120), preserving interactive limits. Operations have abort propagation, bounded
 input/output and response bytes, strict finish-state checks, and normalized
 content-free errors. Failed text attempts retain the learner turn; retry uses its
 original request key. The UI exposes report pending/failure/retry and cited
