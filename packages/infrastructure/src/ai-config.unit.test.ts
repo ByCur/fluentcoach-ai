@@ -22,6 +22,7 @@ describe('free-only AI startup', () => {
         baseUrl: 'http://127.0.0.1:11434',
         model: 'llama3.2:3b',
         timeoutMs: 25_000,
+        analysisTimeoutMs: 90_000,
       },
     });
     expect(loadAiConfig({ NODE_ENV: 'production' }).provider).toBe('ollama');
@@ -44,6 +45,14 @@ describe('free-only AI startup', () => {
       { OLLAMA_MODEL: 'bad model' },
     ])
       expect(() => loadAiConfig({ AI_PROVIDER: 'ollama', ...delta })).toThrow();
+  });
+  it.each(['30000', '90000', '120000'])('accepts bounded report analysis timeout %s without changing turns', (value) => {
+    expect(loadAiConfig({ OLLAMA_ANALYSIS_TIMEOUT_MS: value })).toMatchObject({
+      ollama: { timeoutMs: 25_000, analysisTimeoutMs: Number(value) },
+    });
+  });
+  it.each(['', '29999', '120001', '90000.5', 'NaN', 'Infinity', 'bad'])('rejects invalid report analysis timeout %s', (value) => {
+    expect(() => loadAiConfig({ OLLAMA_ANALYSIS_TIMEOUT_MS: value })).toThrow('OLLAMA_ANALYSIS_TIMEOUT_MS');
   });
   it('requires explicit owner approval and verified quota for Gemini', () => {
     expect(loadAiConfig(approved).provider).toBe('gemini-free');

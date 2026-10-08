@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AiError, type AnalysisTranscript } from '@fluentcoach/application';
 import { OllamaTextAdapter } from '@fluentcoach/infrastructure';
 import { HELP_EXAMPLES, helpTurns } from './tutor-help-fixtures.js';
@@ -26,6 +26,44 @@ const completion = (content = 'What would you like to order?') => ({
   done_reason: 'stop',
   prompt_eval_count: 42,
   eval_count: 8,
+});
+afterEach(() => vi.useRealTimers());
+
+it.each([
+  ['turn', 25_000], ['opening', 10_000], ['roadmap', 3_000], ['analysis', 90_000],
+] as const)('caps Ollama %s at %i ms even when the caller allows longer', async (operation, timeoutMs) => {
+  vi.useFakeTimers();
+  const request = vi.fn<typeof fetch>().mockImplementation(() => new Promise(() => undefined));
+  const adapter = new OllamaTextAdapter({ analysisTimeoutMs: 90_000 }, request);
+  const longOptions = { deadline: new Date(Date.now() + 120_000) };
+  const pending = operation === 'turn' ? (async () => {
+    for await (const chunk of adapter.stream(context, 'Hello', longOptions)) void chunk;
+  })() : operation === 'opening' ? adapter.opening(context, longOptions)
+    : operation === 'roadmap' ? adapter.select([])
+      : adapter.analyzeTranscript({ accountId: 'a', sessionId: 's', revision: 1, snapshot: context.snapshot,
+        turns: [], partial: false, synthetic: true }, longOptions);
+  let settled = false;
+  void pending.then(() => { settled = true; }, () => { settled = true; });
+  const assertion = expect(pending).rejects.toMatchObject({ code: 'timeout' });
+  await vi.advanceTimersByTimeAsync(timeoutMs - 1);
+  expect(settled).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await assertion;
+  expect(request.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+  expect(JSON.parse(request.mock.calls[0]![1]!.body as string).keep_alive).toBe('10m');
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('caps response-body reads too and honors an earlier caller analysis deadline', async () => {
+  vi.useFakeTimers();
+  const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(new ReadableStream({ start() {} })));
+  const adapter = new OllamaTextAdapter({}, request);
+  const pending = adapter.analyzeTranscript({ accountId: 'a', sessionId: 's', revision: 1, snapshot: context.snapshot,
+    turns: [], partial: false, synthetic: true }, { deadline: new Date(Date.now() + 40_000) });
+  const assertion = expect(pending).rejects.toMatchObject({ code: 'timeout' });
+  await vi.advanceTimersByTimeAsync(39_999);
+  await vi.advanceTimersByTimeAsync(1);
+  await assertion;
 });
 
 describe('Ollama normalized text adapter (network-free)', () => {

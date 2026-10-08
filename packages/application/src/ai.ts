@@ -249,6 +249,7 @@ export class ReportService {
   constructor(
     private readonly repository: ReportRepository,
     private readonly analyzer: SessionAnalyzer,
+    private readonly analysisTimeoutMs = 25_000,
   ) {}
   async analyze(job: {
     analysisRunId: string;
@@ -258,10 +259,10 @@ export class ReportService {
   }): Promise<ReportResult> {
     const transcript = await this.repository.transcript(job);
     const controller = new AbortController();
-    const deadline = new Date(Date.now() + 25_000);
+    const deadline = new Date(Date.now() + this.analysisTimeoutMs);
     const timer = setTimeout(
       () => controller.abort(new AiError('timeout')),
-      25_000,
+      this.analysisTimeoutMs,
     );
     try {
       const result = await beforeDeadline(
