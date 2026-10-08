@@ -98,5 +98,7 @@ test('all roadmap scenarios and A1/A2/B1/B2 are selectable with persisted snapsh
     await expect(page.getByText(/Quick tip/)).toHaveCount(0);
     await expect(page.getByRole('button', {name: 'Enviar', exact: true})).toBeEnabled();
     await page.getByRole('button', {name: 'Terminar'}).click();
+    await page.getByRole('region', {name: 'Informe de sesión'}).getByRole('button', {name: 'Continuar mi ruta'}).click();
+    await page.getByRole('button', {name: 'Práctica libre'}).click();
   }
 });

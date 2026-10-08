@@ -142,6 +142,7 @@ export function ReportPanel({
           ))}
         </>
       )}
+      <button onClick={onClose}>Continuar mi ruta</button>
       <button className="secondary" onClick={onClose}>
         Cerrar informe
       </button>

@@ -274,7 +274,7 @@ function App() {
   }, [session, practice, muted, speech.voice, speech.rate]);
   useEffect(() => {
     pageHeading.current?.focus();
-  }, [page, practice, configured]);
+  }, [page, practice, configured, reportId]);
   useEffect(() => {
     setOpeningMessage('');
     if (!practice || !session || sessionLoading || session.initiator !== 'tutor' || session.turns.length) return;
@@ -319,6 +319,23 @@ function App() {
   const navigate = (next: LearnerPage) => {
     setRoadmapReview(null);
     stopPracticeMedia();
+    if (reportId) {
+      setReportId(null);
+      setSession(null);
+      setResumeSession(null);
+      setPracticeObjective('');
+      setProviderError('');
+      setSessionLoading(false);
+      setOpeningMessage('');
+      setText('');
+      setTurnKey('');
+      setStreamed('');
+      cursorRef.current = 0;
+      setCursor(0);
+      spokenTurnCountRef.current = 0;
+      typing.current.reset();
+      pendingDuration.current = null;
+    }
     setPractice(false);
     if (next === 'privacy') { setPrivacy(true); return; }
     setPrivacy(false);
@@ -478,6 +495,10 @@ function App() {
 
   if(deleted)return <main><h1>Eliminación iniciada</h1><p role="status">Se ha cerrado tu sesión. Tus datos se están eliminando.</p></main>;
   if(auth&&privacy)return <PrivacyPanel profileMenu={profileMenu} navigationError={navigationError} csrf={csrf} onClose={()=>setPrivacy(false)} onDeleted={()=>{stopPracticeMedia();setSession(null);setHistory([]);setReportId(null);setPractice(false);setData(initial);setCsrf('');setAuth(false);setPrivacy(false);setDeleted(true);}}/>;
+  if (reportId) return <main className="learner-shell">
+    {header('Práctica en inglés')}
+    <ReportPanel sessionId={reportId} csrf={csrf} onClose={() => navigate('home')} />
+  </main>;
   if (practice) {
     const checked = async (path: string, options: RequestInit = {}) => {
       const response = await api(path, options);
@@ -707,13 +728,6 @@ function App() {
         {openingLoading && <p role="status">El tutor empieza la conversación…</p>}
         {openingMessage && <p role="status">{openingMessage}</p>}
         {providerError && <p role="alert">{providerError}</p>}
-        {reportId && (
-          <ReportPanel
-            sessionId={reportId}
-            csrf={csrf}
-            onClose={() => setReportId(null)}
-          />
-        )}{' '}
         {!session ? (
           <section>
             <h2>¿Qué quieres practicar?</h2>
@@ -899,7 +913,6 @@ function App() {
   if (configured && page !== 'profile') return <main className="learner-shell">
     {header(page === 'home' ? `Tu ruta de inglés · ${data.cefrLevel}` : learnerPages[page])}
     {message && <p role="status">{message}</p>}
-    {reportId && <ReportPanel sessionId={reportId} csrf={csrf} onClose={() => setReportId(null)} />}
     {page === 'home' && <LearnerHome csrf={csrf} onStart={startPlannedSession} onVocabulary={activity => { navigate('vocabulary'); setRoadmapReview(activity.cardIds ?? []); }} onPractice={() => void openPractice()} />}
     {page === 'issues' && <IssuesPanel csrf={csrf} />}
     {page === 'vocabulary' && <VocabularyPanel csrf={csrf} targetCardIds={roadmapReview} onComplete={() => navigate('home')} />}
