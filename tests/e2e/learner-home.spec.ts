@@ -391,15 +391,22 @@ test('an in-flight opening receipt loads the persisted result without asking for
   const csrf = await readyLearner(page);
   await forceRoadmapInitiator(page, 'tutor');
   let generation: Promise<unknown> | undefined, reads = 0, openingRequests = 0;
+  let releaseGeneration!: () => void;
+  const generateAfterStaleRead = new Promise<void>(resolve => { releaseGeneration = resolve; });
   page.on('request', request => {if (request.url().endsWith('/opening')) openingRequests++;});
   await page.route('**/api/v1/sessions/*', async route => {
     const response = await route.fetch();
     const body = await response.json() as {id: string; events: {sequence: number; kind: string}[]};
     if (++reads === 1) {
-      generation = page.request.post(`/api/v1/sessions/${body.id}/opening`, {headers: {Origin: 'http://127.0.0.1:4173', 'x-csrf-token': csrf}});
+      generation = generateAfterStaleRead.then(() => page.request.post(`/api/v1/sessions/${body.id}/opening`, {headers: {Origin: 'http://127.0.0.1:4173', 'x-csrf-token': csrf}}));
       body.events = [{sequence: 1, kind: 'opening.requested'}];
       await route.fulfill({response, json: body});
-    } else await route.fulfill({response});
+    } else {
+      // The first canonical read is intentionally older than the observed
+      // receipt. Release the other process only after fetching that snapshot.
+      if (reads === 2) releaseGeneration();
+      await route.fulfill({response});
+    }
   });
   await page.getByRole('button', {name: 'Continuar mi ruta'}).click();
   await expect(page.locator('[data-session] p')).toHaveText('Tutor: Hi! Where would you like to travel?');

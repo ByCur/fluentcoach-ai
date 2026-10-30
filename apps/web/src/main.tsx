@@ -289,7 +289,9 @@ function App() {
         let record = await response.json() as SessionResponse;
         // Reload/another API process can observe the receipt while inference is
         // still running. Read canonical state briefly; never regenerate an opener.
-        while (!record.turns.length && record.events.some(e => e.kind === 'opening.requested')
+        // Keep the receipt we already observed even if the first refreshed
+        // snapshot predates it; a stale read must not report provider failure.
+        while (!record.turns.length && (alreadyRequested || record.events.some(e => e.kind === 'opening.requested'))
           && !record.events.some(e => ['opening.completed', 'opening.failed'].includes(e.kind ?? ''))) {
           signal.throwIfAborted();
           await new Promise(resolve => setTimeout(resolve, 300));
