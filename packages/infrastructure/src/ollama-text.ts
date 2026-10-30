@@ -3,7 +3,7 @@ import { z } from 'zod';
 import {
   AiError,
   beforeDeadline,
-  ANALYSIS_PROMPT_VERSION,
+  OLLAMA_ANALYSIS_PROMPT_VERSION,
   REPORT_JSON_SCHEMA,
   REPORT_SCHEMA_VERSION,
   TUTOR_PROMPT_VERSION,
@@ -19,6 +19,7 @@ import {
   type TutorContext,
 } from '@fluentcoach/application';
 import { analysisPrompt, tutorInput, tutorPrompt, tutorOpeningPrompt } from './ai-prompts.js';
+import { ollamaReportSchema } from './ollama-report-schema.js';
 
 const responseSchema = z.object({
   model: z.string().min(1).max(200),
@@ -134,6 +135,7 @@ export class OllamaTextAdapter
     structured: boolean,
     options: AiCallOptions,
     maxTokens?: number,
+    reportSchema: unknown = REPORT_JSON_SCHEMA,
   ) {
     const started = Date.now();
     const response = await this.call(
@@ -150,7 +152,7 @@ export class OllamaTextAdapter
             { role: 'user', content: JSON.stringify(user) },
           ],
           options: { temperature: 0.2, ...(maxTokens ? {num_predict: maxTokens} : {}) },
-          ...(structured ? { format: REPORT_JSON_SCHEMA } : {}),
+          ...(structured ? { format: reportSchema } : {}),
         }),
       },
       options,
@@ -163,7 +165,7 @@ export class OllamaTextAdapter
       adapter: 'ollama',
       model: raw.model,
       promptVersion: structured
-        ? ANALYSIS_PROMPT_VERSION
+        ? OLLAMA_ANALYSIS_PROMPT_VERSION
         : TUTOR_PROMPT_VERSION,
       schemaVersion: structured ? REPORT_SCHEMA_VERSION : 'text-v1',
       inputTokens: raw.prompt_eval_count ?? null,
@@ -203,10 +205,12 @@ export class OllamaTextAdapter
     options: AiCallOptions,
   ) {
     const result = await this.generate(
-      analysisPrompt(transcript),
+      analysisPrompt(transcript, { promptVersion: OLLAMA_ANALYSIS_PROMPT_VERSION, maxFindings: 1, constrainedEvidence: true }),
       { snapshot: transcript.snapshot, turns: transcript.turns },
       true,
       this.limitDeadline(options, this.config.analysisTimeoutMs),
+      undefined,
+      ollamaReportSchema(transcript),
     );
     try {
       return {

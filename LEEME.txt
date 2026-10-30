@@ -16,6 +16,9 @@ locales y se abrira http://localhost:17880 en tu navegador. No necesitas Node,
 pnpm, claves de API, Ollama ni Whisper instalados por separado.
 Para practicar por voz, permite el microfono en el navegador.
 Para apagar los servicios, abre CERRAR.cmd. Cerrar la pestana no los apaga.
+El tutor y los informes necesitan tiempo de calculo. Un informe puede tardar
+uno o dos minutos con CPU; la pantalla indica cuando esta listo o permite
+reintentar si falla. La rapidez depende del PC.
 
 DATOS Y PRIVACIDAD
 El paquete NO contiene cuentas, claves ni conversaciones de quien lo preparo.

@@ -170,6 +170,7 @@ describe('Ollama normalized text adapter (network-free)', () => {
     expect(body.format?.type).toBe('object');
     expect(result.draft).toEqual(draft);
     expect(result.metadata.schemaVersion).toBe('report-v1');
+    expect(result.metadata.promptVersion).toBe('ollama-analysis-v1');
   });
 
   it('checks model availability without sending credentials', async () => {
@@ -179,6 +180,29 @@ describe('Ollama normalized text adapter (network-free)', () => {
     await new OllamaTextAdapter({}, request).assertAvailable();
     expect(request.mock.calls[0]![0]).toBe('http://127.0.0.1:11434/api/tags');
     expect(request.mock.calls[0]![1]?.method).toBe('GET');
+  });
+
+  it('sends canonical citation choices to the local report grammar and still requires application validation', async () => {
+    const quote = 'Yesterday I go to the park';
+    const transcript: AnalysisTranscript = {accountId: 'a', sessionId: 's', revision: 1,
+      snapshot: context.snapshot, partial: false, synthetic: true,
+      turns: [{sequence: 1, sourceEventKey: 'a', speaker: 'learner', text: quote, language: 'en'}]};
+    const draft = {schemaVersion: 'report-v1', rubricVersion: 'pilot-text-v1', strengths: [{
+      text: 'Contexto claro', explanation: 'Expresas una experiencia.', practice: 'Añade un detalle.', uncertainty: 'low',
+      evidence: [{turnSequence: 1, start: 0, end: 26, quote}],
+    }], corrections: []};
+    const request = vi.fn<typeof fetch>().mockResolvedValue(response(completion(JSON.stringify(draft))));
+    const result = await new OllamaTextAdapter({}, request).analyzeTranscript(transcript, options());
+    const body = JSON.parse(request.mock.calls[0]![1]!.body as string);
+    expect(body.messages[0].content).toContain('[ollama-analysis-v1;');
+    expect(body.messages[0].content).toContain('Select one exact evidence object');
+    expect(body.format.properties.strengths.maxItems).toBe(1);
+    expect(body.format.properties.strengths.items.properties.evidence.items.oneOf[0].properties).toEqual({
+      turnSequence: {type: 'integer', const: 1}, start: {type: 'integer', const: 0},
+      end: {type: 'integer', const: 26}, quote: {type: 'string', const: quote},
+    });
+    const {validateReport} = await import('@fluentcoach/application');
+    expect(validateReport(result.draft, transcript).strengths).toHaveLength(1);
   });
 
   it.each([

@@ -32,6 +32,7 @@
     "test:e2e:voice": "playwright test tests/e2e/voice.spec.ts",
     "test:resilience:voice": "vitest run --project sessions tests/integration/voice-http.test.ts",
     "eval:ai": "tsx scripts/eval-ai.ts",
+    "eval:ollama:reports": "tsx scripts/eval-ollama-reports.ts",
     "smoke:ollama": "tsx scripts/smoke-ollama.ts",
     "smoke:whisper": "tsx scripts/smoke-whisper.ts",
     "test:integration:issues": "vitest run --project issues",

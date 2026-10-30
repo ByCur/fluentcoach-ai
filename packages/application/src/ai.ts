@@ -1,6 +1,7 @@
 import type { ConversationTurn, SessionSnapshot } from '@fluentcoach/domain';
 export const TUTOR_PROMPT_VERSION = 'tutor-v4';
 export const ANALYSIS_PROMPT_VERSION = 'analysis-v3';
+export const OLLAMA_ANALYSIS_PROMPT_VERSION = 'ollama-analysis-v1';
 export const REPORT_SCHEMA_VERSION = 'report-v1';
 export const RUBRIC_VERSION = 'pilot-text-v1';
 export type AiErrorCode =

@@ -173,6 +173,15 @@ pnpm test:e2e:reports
 pnpm eval:ai -- --suite pilot-text --billing-mode free_only
 ```
 
+Local reports use `ollama-analysis-v1`: one strength and at most one priority
+correction, with exact canonical citation choices. The application still rejects
+invalid evidence before saving a report. See [ADR 0023](docs/adr/0023-constrained-local-report-citations.md).
+For an explicit synthetic local-model check, use
+`pnpm eval:ollama:reports -- --live --max-calls 4` with a loopback
+`OLLAMA_BASE_URL` and `llama3.2:3b`. The A1–B2 structural matrix makes at most four
+calls, each capped at 120 seconds; it makes no paid calls and does not establish
+educational quality. Artifacts contain metadata only in the OS temporary folder.
+
 Set `DATABASE_URL` and `REDIS_URL` in the host environment for tests; these CLI
 suites do not load the API's `.env`. `db:migrate:test` resets the selected test
 schema. Keep that database separate from learner or ordinary development state.
