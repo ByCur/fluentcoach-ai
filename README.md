@@ -31,6 +31,14 @@ Apply migration `202610070001_tutor_opening_progress` before the new API.
 
 ## Prerequisites
 
+For the **Windows local validation package**, see [LEEME.txt](LEEME.txt).
+Install Docker Desktop/WSL 2 once, extract the complete ZIP, then run
+`INSTALAR.cmd`; subsequent launches use the desktop shortcut or `ABRIR.cmd`.
+`CERRAR.cmd` stops services while preserving data and installed models. This
+package is a development demo with local synthetic identity; target-device and
+real-learner gates remain pending. See [ADR 0022](docs/adr/0022-local-windows-validation-package.md).
+Maintainers produce the committed-input ZIP with `node scripts/package-windows.mjs`.
+
 - Node.js **20.20.x** (see `.nvmrc`)
 - pnpm **10.28.1** through Corepack
 - Docker Engine with Compose v2
@@ -168,8 +176,9 @@ pnpm eval:ai -- --suite pilot-text --billing-mode free_only
 Set `DATABASE_URL` and `REDIS_URL` in the host environment for tests; these CLI
 suites do not load the API's `.env`. `db:migrate:test` resets the selected test
 schema. Keep that database separate from learner or ordinary development state.
-The eval command defaults to the 48-case fake baseline and writes synthetic
-results to `/tmp/fluentcoach-pilot-text-eval.json`; this does not pass the live
+The eval command defaults to the synthetic fake baseline and writes results to
+`fluentcoach-pilot-text-eval.json` in the operating system temporary directory;
+this does not pass the live
 gate or establish educational quality.
 
 Gemini checks are explicit and synthetic-only:

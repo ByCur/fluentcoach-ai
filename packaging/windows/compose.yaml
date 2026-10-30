@@ -1,0 +1,100 @@
+name: fluentcoach-desktop
+services:
+  postgres:
+    image: postgres:17.6-alpine3.22
+    environment:
+      POSTGRES_DB: fluentcoach
+      POSTGRES_USER: fluentcoach
+      POSTGRES_PASSWORD: local-desktop-only
+    volumes: [learner-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U fluentcoach -d fluentcoach"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    logging: { driver: none }
+  redis:
+    image: redis:8.2.1-alpine3.22
+    command: [redis-server, --appendonly, "yes"]
+    volumes: [sessions:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    logging: { driver: none }
+  migrate:
+    build: { context: ../.., target: migrate }
+    command: [packages/infrastructure/node_modules/.bin/prisma, migrate, deploy, --schema, packages/infrastructure/prisma/schema.prisma]
+    environment:
+      DATABASE_URL: postgresql://fluentcoach:local-desktop-only@postgres:5432/fluentcoach
+    depends_on: { postgres: { condition: service_healthy } }
+    logging: { driver: none }
+  ollama:
+    image: ollama/ollama:0.40.13
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    volumes: [text-model:/root/.ollama]
+    healthcheck:
+      test: [CMD, ollama, list]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    logging: { driver: none }
+  whisper:
+    build: { context: ../.., dockerfile: packaging/windows/whisper.Dockerfile }
+    volumes: [speech-model:/models]
+    tmpfs: ["/tmp:size=128m,mode=1777"]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1:8080/]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    logging: { driver: none }
+  api:
+    build: { context: ../.., target: api }
+    environment:
+      APP_ENVIRONMENT: local
+      NODE_ENV: development
+      BILLING_MODE: free_only
+      AI_FALLBACK_PROVIDER: none
+      API_PORT: "3000"
+      PUBLIC_ORIGIN: http://localhost:17880
+      DATABASE_URL: postgresql://fluentcoach:local-desktop-only@postgres:5432/fluentcoach
+      REDIS_URL: redis://redis:6379
+      AI_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: llama3.2:3b
+      OLLAMA_ANALYSIS_TIMEOUT_MS: "120000"
+      SPEECH_PROVIDER: whisper-cpp
+      WHISPER_BASE_URL: http://whisper:8080
+      WHISPER_LANGUAGE: auto
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      ollama: { condition: service_healthy }
+      whisper: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, -qO-, http://127.0.0.1:3000/health/ready]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    logging: { driver: none }
+  web:
+    build: { context: ../.., target: web }
+    ports: ["127.0.0.1:17880:8080"]
+    depends_on: { api: { condition: service_healthy } }
+    healthcheck:
+      test: [CMD, wget, -qO-, http://127.0.0.1:8080/health/live]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    logging: { driver: none }
+volumes:
+  learner-data:
+  sessions:
+  text-model:
+  speech-model:

@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "zod": "4.1.11",
+    "zod": "4.6.6",
     "@fluentcoach/domain": "workspace:*"
   },
   "devDependencies": {

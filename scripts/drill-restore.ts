@@ -158,8 +158,13 @@ async function main() {
   const adminUrl = new URL(url);
   adminUrl.pathname = "/postgres";
   const admin = new pg.Pool({ connectionString: adminUrl.toString() });
+  // A local disposable validation container need not share the developer's
+  // Compose project. Missing/wrong containers fail when the unique DB is read.
+  const container = process.env['PRIVACY_DRILL_POSTGRES_CONTAINER'];
+  if (container && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(container))
+    throw Error('Invalid validation container');
   const docker = (args: string[], input?: Buffer) =>
-    execFileSync("docker", ["compose", "exec", "-T", "postgres", ...args], {
+    execFileSync("docker", [...(container ? ["exec", "-i", container] : ["compose", "exec", "-T", "postgres"]), ...args], {
       input,
       maxBuffer: 64 * 1024 * 1024,
       stdio: ["pipe", "pipe", "pipe"],

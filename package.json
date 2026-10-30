@@ -8,6 +8,7 @@
     "pnpm": "10.28.1"
   },
   "scripts": {
+    "package:windows": "node scripts/package-windows.mjs",
     "build": "pnpm -r --workspace-concurrency=1 --if-present build",
     "dev": "pnpm --parallel --filter @fluentcoach/web --filter @fluentcoach/api --filter @fluentcoach/worker dev",
     "lint": "node --max-old-space-size=6144 node_modules/eslint/bin/eslint.js .",
@@ -69,8 +70,8 @@
     "@fluentcoach/domain": "workspace:*",
     "@fluentcoach/infrastructure": "workspace:*",
     "@fluentcoach/testing": "workspace:*",
-    "@nestjs/common": "11.1.6",
-    "@nestjs/testing": "11.1.6",
+    "@nestjs/common": "11.1.18",
+    "@nestjs/testing": "11.1.18",
     "@playwright/test": "1.55.1",
     "@types/cookie-parser": "1.4.9",
     "@types/express": "5.0.3",
@@ -95,7 +96,11 @@
     "overrides": {
       "path-to-regexp@8": "8.4.0",
       "source-map-js": "1.2.2",
-      "multer": "2.3.0"
+      "multer": "2.5.0",
+      "body-parser@2": "2.4.0",
+      "qs": "6.16.1",
+      "file-type@21": "21.3.2",
+      "esbuild@0.27": "0.28.1"
     }
   }
 }

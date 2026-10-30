@@ -1,0 +1,56 @@
+FluentCoach AI - Windows - version local de prueba
+
+PRIMERA VEZ (puede ayudarte quien te envio el paquete)
+1. Extrae todo el ZIP en una carpeta permanente. No abras la app dentro del ZIP.
+2. Instala Docker Desktop para Windows con WSL 2 y contenedores Linux:
+   https://docs.docker.com/desktop/setup/install/windows-install/
+   Completa su configuracion y reinicia Windows si lo solicita.
+3. Revisa las licencias y requisitos que aparecen mas abajo.
+4. Abre INSTALAR.cmd. Descarga dependencias y modelos de IA y crea un acceso
+   FluentCoach en el escritorio. Necesita Internet, varios GB de descarga y
+   espacio libre. La primera vez puede tardar bastante.
+
+CADA DIA
+Abre FluentCoach desde el escritorio o ABRIR.cmd. Se iniciaran los servicios
+locales y se abrira http://localhost:17880 en tu navegador. No necesitas Node,
+pnpm, claves de API, Ollama ni Whisper instalados por separado.
+Para practicar por voz, permite el microfono en el navegador.
+Para apagar los servicios, abre CERRAR.cmd. Cerrar la pestana no los apaga.
+
+DATOS Y PRIVACIDAD
+El paquete NO contiene cuentas, claves ni conversaciones de quien lo preparo.
+El progreso se guarda en volumenes de Docker del PC donde se utiliza. Cerrar
+o volver a abrir no lo borra. No elimines los volumenes ni restablezcas Docker.
+Copiar esta carpeta a otro PC no copia el progreso. La app ofrece exportacion
+y borrado en Privacidad. No guarda grabaciones de audio; Whisper convierte el
+audio en memoria temporal. La voz del navegador puede usar servicios de Internet.
+Esta version solo escucha en el propio PC. No abras puertos ni la publiques.
+El acceso es una demo local sin contrasena; cualquier persona con acceso a tu
+sesion de Windows puede entrar. Usa una cuenta de Windows privada.
+
+REQUISITOS
+Windows compatible con Docker Desktop, procesador x64 y virtualizacion/WSL 2.
+Se propone un equipo de 16 GB de RAM y 20 GB libres para esta configuracion;
+la rapidez de la IA debe comprobarse en el PC de destino. No se garantiza buen
+rendimiento en equipos modestos. La configuracion usa CPU, no exige GPU.
+No hay API de pago ni alternativa de pago automatica.
+
+LICENCIAS Y DESCARGAS
+Al ejecutar INSTALAR.cmd se solicitan las imagenes y estos modelos:
+- Ollama 0.40.13 y llama3.2:3b: https://ollama.com/library/llama3.2
+  Licencia del modelo: https://www.llama.com/llama3_2/license/
+- whisper.cpp v1.9.5 y Whisper base multilingue:
+  https://github.com/ggml-org/whisper.cpp
+  https://huggingface.co/ggerganov/whisper.cpp
+- Docker Desktop: revisa los terminos del instalador oficial.
+Los modelos no se incluyen en el ZIP. La instalacion los descarga expresamente.
+
+ESTADO Y AYUDA
+Esta entrega permite validar el arranque local y las funciones existentes. Los
+controles de publicacion/piloto de PLAN.md siguen vigentes: no acredita una
+version final ni la validacion del microfono, rendimiento o calidad educativa
+en tu PC. Completa la revision del piloto antes de usar datos reales.
+Si falla, conserva el mensaje de error y reintenta INSTALAR.cmd; no borra datos.
+Si el puerto 17880 esta ocupado, cierra la otra aplicacion que lo utiliza.
+No muevas la carpeta despues de crear el acceso del escritorio; si la mueves,
+vuelve a ejecutar INSTALAR.cmd para actualizarlo.
