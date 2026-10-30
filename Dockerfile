@@ -10,7 +10,8 @@ RUN --mount=type=secret,id=proxy_ca if [ -f /run/secrets/proxy_ca ]; then export
 
 FROM build AS migrate
 ENV NODE_ENV=production
-RUN chown -R node:node /app
+# migrate deploy only reads the committed schema/migrations. Keep build inputs
+# read-only to node; recursively chowning node_modules copies the entire tree.
 USER node
 CMD ["packages/infrastructure/node_modules/.bin/prisma", "migrate", "deploy", "--schema", "packages/infrastructure/prisma/schema.prisma"]
 
