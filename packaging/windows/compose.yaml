@@ -48,7 +48,7 @@ services:
     volumes: [speech-model:/models]
     tmpfs: ["/tmp:size=128m,mode=1777"]
     healthcheck:
-      test: [CMD, curl, --fail, --silent, http://127.0.0.1:8080/]
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1:8080/health]
       interval: 5s
       timeout: 5s
       retries: 30

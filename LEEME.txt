@@ -30,7 +30,7 @@ sesion de Windows puede entrar. Usa una cuenta de Windows privada.
 
 REQUISITOS
 Windows compatible con Docker Desktop, procesador x64 y virtualizacion/WSL 2.
-Se propone un equipo de 16 GB de RAM y 20 GB libres para esta configuracion;
+Se propone un equipo de 16 GB de RAM y 30 GB libres para esta configuracion;
 la rapidez de la IA debe comprobarse en el PC de destino. No se garantiza buen
 rendimiento en equipos modestos. La configuracion usa CPU, no exige GPU.
 No hay API de pago ni alternativa de pago automatica.
