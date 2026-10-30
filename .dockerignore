@@ -2,8 +2,12 @@
 .env
 .env.*
 !.env.example
+**/.env
+**/.env.*
+!**/.env.example
 node_modules
 **/node_modules
 **/dist
+**/*.tsbuildinfo
 coverage
 *.log

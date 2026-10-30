@@ -65,7 +65,7 @@ function Open-App {
     Invoke-Compose -Arguments @('up', '-d', '--no-build', '--pull', 'never', '--wait', '--wait-timeout', '180')
     Write-Host 'Preparando el tutor local. La primera apertura puede tardar...'
     # Warm the model with synthetic text before the first timed learner request.
-    Invoke-Compose -Arguments @('exec', '-T', 'ollama', 'ollama', 'run', 'llama3.2:3b', 'Reply only with OK.') | Out-Null
+    Invoke-Compose -Arguments @('exec', '--interactive=false', '-T', 'ollama', 'timeout', '120', 'ollama', 'run', 'llama3.2:3b', 'Reply only with OK.') | Out-Null
     # Health of nginx alone is insufficient: verify the proxied API as well.
     $null = Invoke-RestMethod -Uri 'http://localhost:17880/api/v1/auth/mode' -TimeoutSec 10
     Write-Host 'FluentCoach esta listo en http://localhost:17880'
