@@ -26,6 +26,10 @@ type SpeechProbe = {
   __deliverCancelledAudio?: () => void;
   __releaseMicrophone?: () => void;
   __finishStop?: () => void;
+  __holdAfterFirstDelta?: boolean;
+  __sawFirstDelta?: boolean;
+  __holdAfterSequence?: number;
+  __heldStreamMessages?: {source: EventSource; data: string}[];
 };
 const browserVoices = [
   { voiceURI: 'spanish', lang: 'es-ES', name: 'Spanish', localService: true, default: true },
@@ -54,8 +58,15 @@ function installBrowserFakes(
         super(url, options);
         probe.__eventSources.push(this);
         this.addEventListener('message', (event) => {
-          const value = JSON.parse(String(event.data)) as { kind: string };
+          const value = JSON.parse(String(event.data)) as { kind: string; sequence: number };
           if (value.kind === 'tutor.delta') probe.__deltas.push(String(event.data));
+          const fresh = value.sequence > (probe.__holdAfterSequence ?? 0);
+          if (probe.__holdAfterFirstDelta && probe.__sawFirstDelta && fresh) {
+            (probe.__heldStreamMessages ??= []).push({source: this, data: String(event.data)});
+            event.stopImmediatePropagation();
+            return;
+          }
+          if (value.kind === 'tutor.delta' && fresh) probe.__sawFirstDelta = true;
         });
       }
     };
@@ -263,14 +274,44 @@ async function voiceTurn(page: Page) {
 test('voice streams live, reconciles persisted events, and ignores late duplicate deltas across turns', async ({ page }) => {
   await installBrowserFakes(page, 'allowed');
   await enterPractice(page);
+  let previousCursor = 0;
   for (let turn = 1; turn <= 2; turn++) {
+    await page.evaluate(cursor => {
+      const probe = window as unknown as SpeechProbe;
+      probe.__holdAfterFirstDelta = true;
+      probe.__sawFirstDelta = false;
+      probe.__heldStreamMessages = [];
+      probe.__holdAfterSequence = cursor;
+    }, previousCursor);
+    // Hold actual later SSE messages and the HTTP acknowledgement independently.
+    // A busy runner must not skip the short first-chunk observation window.
+    let acknowledge!: () => void;
+    const acknowledgement = new Promise<void>(resolve => {acknowledge = resolve;});
+    const voiceUrl = '**/api/v1/sessions/*/voice-turns';
+    await page.route(voiceUrl, async route => {
+      const result = await route.fetch();
+      await acknowledgement;
+      await route.fulfill({response: result});
+    });
     let completed = false;
     const response = page.waitForResponse(r => r.url().endsWith('/voice-turns'))
       .then(r => { completed = true; return r; });
-    await voiceTurn(page);
-    await expect(page.getByTestId('tutor-stream')).toHaveText("Tutor: Let's continue: ");
-    expect(completed).toBe(false);
+    try {
+      await voiceTurn(page);
+      await expect(page.getByTestId('tutor-stream')).toHaveText("Tutor: Let's continue: ");
+      expect(completed).toBe(false);
+      await page.evaluate(() => {
+        const probe = window as unknown as SpeechProbe;
+        probe.__holdAfterFirstDelta = false;
+        for (const {source, data} of probe.__heldStreamMessages ?? []) {
+          source.dispatchEvent(new MessageEvent('message', {data}));
+        }
+        probe.__heldStreamMessages = [];
+      });
+    } finally {acknowledge();}
     const record = await (await response).json() as { events: { sequence: number }[] };
+    previousCursor = Math.max(...record.events.map(event => event.sequence));
+    await page.unroute(voiceUrl);
     await expect(page.getByText(/Tutor:.*Synthetic spoken turn/)).toHaveCount(turn);
     await expect(page.getByTestId('tutor-stream')).toHaveCount(0);
     await expect(page.locator('[data-cursor]')).toHaveAttribute('data-cursor', String(Math.max(...record.events.map(e => e.sequence))));
