@@ -1,16 +1,17 @@
 # syntax=docker/dockerfile:1
 FROM node:20.20.2-alpine3.22 AS build
-RUN --mount=type=secret,id=proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca corepack enable && NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca corepack prepare pnpm@10.28.1 --activate
+RUN --mount=type=secret,id=proxy_ca if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; corepack enable && corepack prepare pnpm@10.28.1 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
-RUN --mount=type=secret,id=proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca pnpm install --frozen-lockfile && pnpm build
-RUN --mount=type=secret,id=proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca pnpm --filter @fluentcoach/api deploy --legacy --prod /runtime/api && NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca pnpm --filter @fluentcoach/worker deploy --legacy --prod /runtime/worker
+RUN --mount=type=secret,id=proxy_ca if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; pnpm install --frozen-lockfile && pnpm build
+RUN --mount=type=secret,id=proxy_ca if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; pnpm --filter @fluentcoach/api deploy --legacy --prod /runtime/api && pnpm --filter @fluentcoach/worker deploy --legacy --prod /runtime/worker
 
 FROM build AS migrate
 ENV NODE_ENV=production
-RUN chown -R node:node /app
+# migrate deploy only reads the committed schema/migrations. Keep build inputs
+# read-only to node; recursively chowning node_modules copies the entire tree.
 USER node
 CMD ["packages/infrastructure/node_modules/.bin/prisma", "migrate", "deploy", "--schema", "packages/infrastructure/prisma/schema.prisma"]
 

@@ -39,6 +39,9 @@ all its representative derived state are absent; B's sessions/reports/issues,
 vocabulary/reviews, plans/activities and progress survive, and schemaReady passes.
 It drops only those generated databases and removes temporary dump/ledger files.
 It refuses a production-like URL, missing flag or non-local host.
+For a separately named disposable local PostgreSQL container, set
+`PRIVACY_DRILL_POSTGRES_CONTAINER` to its exact name; the default remains the
+Compose `postgres` service. The database URL must select that same instance.
 
 Measured synthetic run: 18,824.76 ms, 125,048 backup bytes, two replay passes,
 A absent/B history intact/readiness true. It passed. Re-run measurements are

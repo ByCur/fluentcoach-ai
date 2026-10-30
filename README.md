@@ -31,6 +31,14 @@ Apply migration `202610070001_tutor_opening_progress` before the new API.
 
 ## Prerequisites
 
+For the **Windows local validation package**, see [LEEME.txt](LEEME.txt).
+Install Docker Desktop/WSL 2 once, extract the complete ZIP, then run
+`INSTALAR.cmd`; subsequent launches use the desktop shortcut or `ABRIR.cmd`.
+`CERRAR.cmd` stops services while preserving data and installed models. This
+package is a development demo with local synthetic identity; target-device and
+real-learner gates remain pending. See [ADR 0022](docs/adr/0022-local-windows-validation-package.md).
+Maintainers produce the committed-input ZIP with `node scripts/package-windows.mjs`.
+
 - Node.js **20.20.x** (see `.nvmrc`)
 - pnpm **10.28.1** through Corepack
 - Docker Engine with Compose v2
@@ -134,7 +142,14 @@ AI_PROVIDER=ollama
 AI_FALLBACK_PROVIDER=none
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_MODEL=llama3.2:3b
+OLLAMA_ANALYSIS_TIMEOUT_MS=90000
 ```
+
+Local report analysis allows 90 seconds by default; the timeout accepts integer
+milliseconds from 30000 to 120000. Tutor turns, openings and roadmap selection
+remain limited to 25, 10 and 3 seconds. Analysis jobs hold a 150-second lease,
+and local chat requests keep the model warm for 10 minutes. A failed report
+keeps the practice; **Reintentar informe** reuses the same transcript revision.
 
 On Windows, run Ollama on the host and run the API directly from the same host
 for the default loopback URL. If the API runs in a container, set an explicitly
@@ -158,11 +173,21 @@ pnpm test:e2e:reports
 pnpm eval:ai -- --suite pilot-text --billing-mode free_only
 ```
 
+Local reports use `ollama-analysis-v1`: one strength and at most one priority
+correction, with exact canonical citation choices. The application still rejects
+invalid evidence before saving a report. See [ADR 0023](docs/adr/0023-constrained-local-report-citations.md).
+For an explicit synthetic local-model check, use
+`pnpm eval:ollama:reports -- --live --max-calls 4` with a loopback
+`OLLAMA_BASE_URL` and `llama3.2:3b`. The A1–B2 structural matrix makes at most four
+calls, each capped at 120 seconds; it makes no paid calls and does not establish
+educational quality. Artifacts contain metadata only in the OS temporary folder.
+
 Set `DATABASE_URL` and `REDIS_URL` in the host environment for tests; these CLI
 suites do not load the API's `.env`. `db:migrate:test` resets the selected test
 schema. Keep that database separate from learner or ordinary development state.
-The eval command defaults to the 48-case fake baseline and writes synthetic
-results to `/tmp/fluentcoach-pilot-text-eval.json`; this does not pass the live
+The eval command defaults to the synthetic fake baseline and writes results to
+`fluentcoach-pilot-text-eval.json` in the operating system temporary directory;
+this does not pass the live
 gate or establish educational quality.
 
 Gemini checks are explicit and synthetic-only:

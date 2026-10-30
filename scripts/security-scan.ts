@@ -52,7 +52,7 @@ async function main() {
     throw Error("HIGH_CRITICAL_DEPENDENCY_VULNERABILITY");
   const dir = await mkdtemp(tmpdir() + "/m10-security-");
   try {
-    for (const service of ["api", "web", "worker"]) {
+    for (const service of ["api", "web", "worker", "whisper"]) {
       const image = `fluentcoach-${service}:security`,
         config = JSON.parse(
           execFileSync("docker", ["image", "inspect", image], {

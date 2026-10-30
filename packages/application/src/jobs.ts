@@ -2,6 +2,8 @@ import type { Telemetry } from './telemetry.js';
 import { AiError, type ReportResult } from './ai.js';
 import type { ConversationTurn } from '@fluentcoach/domain';
 export const JOB_ENVELOPE_VERSION = 1 as const;
+// The maximum supported report deadline is 120s; allow 30s for DB work.
+export const ANALYSIS_JOB_LEASE_MS = 150_000;
 export interface AnalysisJob {
   version: 1;
   deletionEpoch?: number | undefined;
@@ -90,7 +92,7 @@ export class JobService {
     const run = await this.store.claim(
       job,
       now,
-      new Date(now.getTime() + 30_000),
+      new Date(now.getTime() + ANALYSIS_JOB_LEASE_MS),
       this.maxAttempts,
     );
     if (!run) {this.telemetry.record({operation:'analysis',outcome:'cancelled',count:1});return 'duplicate';}

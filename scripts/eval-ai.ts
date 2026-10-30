@@ -2,6 +2,8 @@ import {evaluateOpenings} from './eval-openings.js';
 import { evaluateRoadmap } from './eval-roadmap.js';
 import { parseArgs } from 'node:util';
 import { writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   AiError,
   ANALYSIS_PROMPT_VERSION,
@@ -39,7 +41,7 @@ async function main() {
       offset: { type: 'string', default: '0' },
       output: {
         type: 'string',
-        default: '/tmp/fluentcoach-pilot-text-eval.json',
+        default: join(tmpdir(), 'fluentcoach-pilot-text-eval.json'),
       },
     },
   });

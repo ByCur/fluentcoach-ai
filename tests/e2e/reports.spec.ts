@@ -61,6 +61,38 @@ test(`automatic report cites actual learner text and survives history reload (${
   ).toContainText('Informe listo');
 });
 }
+test('pending and running reports keep polling beyond 25s and 60s without showing failure', async ({ page }) => {
+  await start(page);
+  await page.getByLabel('Tu respuesta').fill('I need a room for two nights');
+  await page.getByRole('button', { name: 'Enviar', exact: true }).click();
+  await expect(page.getByText(/Tú:.*I need a room/)).toBeVisible();
+  await page.clock.install();
+  let status: 'pending' | 'running' | 'complete' = 'pending';
+  let polls = 0;
+  await page.route('**/api/v1/sessions/*/report', async route => {
+    polls++;
+    if (status === 'complete') await route.continue();
+    else await route.fulfill({ json: { status, partial: false, revision: 1 } });
+  });
+  await page.getByRole('button', { name: 'Terminar' }).click();
+  const panel = page.getByRole('region', { name: 'Informe de sesión' });
+  const preparing = 'Preparando tu informe… Puede tardar hasta un minuto aproximadamente.';
+  await expect(panel.getByRole('status')).toHaveText(preparing);
+  status = 'running';
+  await page.clock.runFor(1000);
+  await expect.poll(() => polls).toBeGreaterThan(1);
+  for (const elapsed of [30_000, 59_000]) {
+    const before = polls;
+    await page.clock.fastForward(elapsed);
+    await expect.poll(() => polls).toBeGreaterThan(before);
+    await expect(panel.getByRole('status')).toHaveText(preparing);
+    await expect(panel.getByRole('button', { name: 'Reintentar informe' })).toHaveCount(0);
+  }
+  status = 'complete';
+  await page.clock.runFor(1000);
+  await expect(panel.getByRole('status')).toContainText('Informe listo');
+  await expect(panel.getByText('I need a room for two nights', { exact: true })).toBeVisible();
+});
 test('provider failure is visible and report retry recovers without duplicating the session', async ({
   page,
 }) => {

@@ -1,6 +1,7 @@
 import type { ConversationTurn, SessionSnapshot } from '@fluentcoach/domain';
 export const TUTOR_PROMPT_VERSION = 'tutor-v4';
 export const ANALYSIS_PROMPT_VERSION = 'analysis-v3';
+export const OLLAMA_ANALYSIS_PROMPT_VERSION = 'ollama-analysis-v1';
 export const REPORT_SCHEMA_VERSION = 'report-v1';
 export const RUBRIC_VERSION = 'pilot-text-v1';
 export type AiErrorCode =
@@ -249,6 +250,7 @@ export class ReportService {
   constructor(
     private readonly repository: ReportRepository,
     private readonly analyzer: SessionAnalyzer,
+    private readonly analysisTimeoutMs = 25_000,
   ) {}
   async analyze(job: {
     analysisRunId: string;
@@ -258,10 +260,10 @@ export class ReportService {
   }): Promise<ReportResult> {
     const transcript = await this.repository.transcript(job);
     const controller = new AbortController();
-    const deadline = new Date(Date.now() + 25_000);
+    const deadline = new Date(Date.now() + this.analysisTimeoutMs);
     const timer = setTimeout(
       () => controller.abort(new AiError('timeout')),
-      25_000,
+      this.analysisTimeoutMs,
     );
     try {
       const result = await beforeDeadline(
